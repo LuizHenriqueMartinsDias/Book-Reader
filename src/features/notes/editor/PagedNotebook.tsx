@@ -190,7 +190,7 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
                       height={h}
                       view={{ x: 0, y: 0, zoom: scale }}
                       rotation={rotation}
-                      background={page.background && pdf ? <PdfBackground page={page} pdf={pdf} pdfPage={page.background.pdfPage} scale={scale} /> : undefined}
+                      background={page.background?.pdfPage && pdf ? <PdfBackground page={page} pdf={pdf} pdfPage={page.background.pdfPage} scale={scale} /> : undefined}
                     />
                   )}
                 </div>

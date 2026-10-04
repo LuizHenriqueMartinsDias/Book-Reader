@@ -43,7 +43,7 @@ export async function exportNotebookPdf(notebookId: string, loadImage: (blob: Bl
       out = doc.addPage([w, h]);
       toUser = (x, y) => [x - box.x + MARGIN, h - (y - box.y + MARGIN)];
       drawPaper(out, notebook.paper, w, h);
-    } else if (page.background && source && hasMargins(marginsOf(page))) {
+    } else if (page.background?.pdfPage && source && hasMargins(marginsOf(page))) {
       // A stretched sheet: paper all over, the PDF page drawn upright inside it as a picture.
       const sourcePage = source.getPage(page.background.pdfPage - 1);
       const view = viewBoxOf(sourcePage);
@@ -58,7 +58,7 @@ export async function exportNotebookPdf(notebookId: string, loadImage: (blob: Bl
         const embedded = await doc.embedPage(sourcePage, { left: x1, bottom: y1, right: x2, top: y2 }, userToDisplayMatrix(view, sourcePage.getRotation().angle));
         out.drawPage(embedded, { x: box.x, y: page.height - box.y - box.h });
       }
-    } else if (page.background && source) {
+    } else if (page.background?.pdfPage && source) {
       const [copied] = await doc.copyPages(source, [page.background.pdfPage - 1]);
       out = doc.addPage(copied);
       toUser = viewToUserSpace(viewBoxOf(out), out.getRotation().angle);

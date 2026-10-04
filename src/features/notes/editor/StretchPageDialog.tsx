@@ -188,7 +188,7 @@ export default function StretchPageDialog({ notebook, pages, page, pdf, onClose 
           <div className="absolute shadow-md" style={{ ...sheet, ...paperCss(notebook.paper, k) }} />
           {isPdf ? (
             <div className="absolute bg-white ring-1 ring-black/15" style={{ left: bx, top: by, width: w * k, height: h * k }}>
-              {pdf && page.background && <PdfPageCanvas doc={pdf} pageNumber={page.background.pdfPage} scale={k} />}
+              {pdf && page.background?.pdfPage && <PdfPageCanvas doc={pdf} pageNumber={page.background.pdfPage} scale={k} />}
             </div>
           ) : (
             <div className="pointer-events-none absolute border border-dashed border-stone-500/60" style={{ left: bx, top: by, width: w * k, height: h * k }} />

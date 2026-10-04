@@ -146,8 +146,25 @@ export interface NotePage {
   /** In points; A4 is 595 × 842. Ignored for infinite canvases. Includes the margins. */
   width: number;
   height: number;
-  /** Page of the notebook's PDF drawn underneath (imported PDFs), inset by `margins` if any. */
-  background?: { pdfPage: number; margins?: Margins };
+  /**
+   * What's drawn underneath, inset by `margins` if any: a page of the notebook's PDF (imported
+   * PDFs) or one of the user's page templates.
+   */
+  background?: { pdfPage?: number; template?: string; margins?: Margins };
+}
+
+/** A page design of the user's (a planner, Cornell notes…), from a picture or a PDF page. */
+export interface PageTemplate {
+  id: string;
+  name: string;
+  /** The design as a picture (PNG or JPEG, which PDF export can embed). */
+  blob: Blob;
+  /** Size of a page made with it, in points. */
+  width: number;
+  height: number;
+  /** Small picture for choosing it. */
+  thumb: string;
+  createdAt: number;
 }
 
 /** Where a quote sent from the reader came from, to jump back to it. */
@@ -285,6 +302,7 @@ export class BookDB extends Dexie {
   notePages!: EntityTable<NotePage, 'id'>;
   noteItems!: EntityTable<NoteItem, 'id'>;
   noteAssets!: EntityTable<NoteAsset, 'id'>;
+  pageTemplates!: EntityTable<PageTemplate, 'id'>;
 
   constructor(name = 'book-reader') {
     super(name);
@@ -307,6 +325,10 @@ export class BookDB extends Dexie {
     this.version(3).stores({
       books: 'id, lastOpenedAt, addedAt, folderId',
       bookFolders: 'id, order',
+    });
+    // v4: page templates. Only adds a table.
+    this.version(4).stores({
+      pageTemplates: 'id, createdAt',
     });
   }
 }

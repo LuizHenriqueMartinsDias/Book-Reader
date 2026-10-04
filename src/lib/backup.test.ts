@@ -29,4 +29,14 @@ describe('backup', () => {
     expect(new TextDecoder().decode(await (await db.noteAssets.get('a'))!.blob.arrayBuffer())).toBe('img');
     expect(new TextDecoder().decode(await (await db.files.get(nb.id))!.data.arrayBuffer())).toBe('%PDF-1.4 fake');
   });
+
+  it('round-trips page templates with their pictures', async () => {
+    await db.pageTemplates.add({ id: 't', name: 'Cornell', blob: new Blob(['png-bytes'], { type: 'image/png' }), width: 595, height: 842, thumb: 'data:', createdAt: 1 });
+    const backup = await createBackup();
+    await Promise.all(db.tables.map((t) => t.clear()));
+    await restoreBackup(backup);
+    const t = (await db.pageTemplates.get('t'))!;
+    expect(t.name).toBe('Cornell');
+    expect(new TextDecoder().decode(await t.blob.arrayBuffer())).toBe('png-bytes');
+  });
 });
