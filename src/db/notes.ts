@@ -1,4 +1,5 @@
 import { db, type Notebook, type NotebookKind, type NoteItem, type NotePage, type Paper } from './schema';
+import { pdfBox } from '../lib/notes/margins';
 import { newId } from './repo';
 
 export const A4 = { width: 595, height: 842 };
@@ -64,10 +65,18 @@ export async function addPage(notebookId: string, afterOrder?: number) {
   return db.transaction('rw', db.notePages, db.notebooks, async () => {
     const pages = await getPages(notebookId);
     const at = afterOrder === undefined ? pages.length : afterOrder + 1;
-    const template = pages[Math.min(Math.max(at - 1, 0), pages.length - 1)];
-    const size = template && !template.background ? { width: template.width, height: template.height } : A4;
+    // Like the page before it: its size, or its template (at the template's size); after a PDF page, A4.
+    const like = pages[Math.min(Math.max(at - 1, 0), pages.length - 1)];
+    const box = like && pdfBox(like);
+    const look: Partial<NotePage> = !like
+      ? A4
+      : like.background?.template
+        ? { width: box!.w, height: box!.h, background: { template: like.background.template } }
+        : like.background
+          ? A4
+          : { width: like.width, height: like.height };
     for (const p of pages) if (p.order >= at) await db.notePages.update(p.id, { order: p.order + 1 });
-    const page: NotePage = { id: newId(), notebookId, order: at, ...size };
+    const page = { ...A4, ...look, id: newId(), notebookId, order: at } as NotePage;
     await db.notePages.add(page);
     await db.notebooks.update(notebookId, { updatedAt: Date.now() });
     return page;

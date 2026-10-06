@@ -1,4 +1,4 @@
-import { BlendMode, LineCapStyle, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib';
+import { BlendMode, LineCapStyle, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFImage, type PDFPage } from 'pdf-lib';
 import { getPages } from '../../db/notes';
 import { db, type NodeItem, type NoteItem, type Paper } from '../../db/schema';
 import { getBookFile } from '../../db/repo';
@@ -30,6 +30,22 @@ export async function exportNotebookPdf(notebookId: string, loadImage: (blob: Bl
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const sourceFile = notebook.hasPdf ? await getBookFile(notebookId) : undefined;
   const source = sourceFile ? await PDFDocument.load(await sourceFile.arrayBuffer(), { ignoreEncryption: true }) : null;
+
+  // Each template's picture is embedded once, however many pages use it.
+  const templates = new Map<string, Promise<PDFImage | null>>();
+  const templateImage = (id: string) => {
+    if (!templates.has(id))
+      templates.set(
+        id,
+        db.pageTemplates.get(id).then(async (t) => {
+          if (!t) return null;
+          if (t.blob.type === 'image/png') return doc.embedPng(new Uint8Array(await t.blob.arrayBuffer()));
+          if (t.blob.type === 'image/jpeg') return doc.embedJpg(new Uint8Array(await t.blob.arrayBuffer()));
+          return doc.embedPng(await loadImage(t.blob));
+        }),
+      );
+    return templates.get(id)!;
+  };
 
   for (const page of pages) {
     const items = layered(await db.noteItems.where('pageId').equals(page.id).toArray());
@@ -66,6 +82,12 @@ export async function exportNotebookPdf(notebookId: string, loadImage: (blob: Bl
       out = doc.addPage([page.width, page.height]);
       toUser = (x, y) => [x, page.height - y];
       drawPaper(out, notebook.paper, page.width, page.height);
+      // A page template, where it sits on the sheet.
+      const image = page.background?.template ? await templateImage(page.background.template) : null;
+      if (image) {
+        const box = pdfBox(page);
+        out.drawImage(image, { x: box.x, y: page.height - box.y - box.h, width: box.w, height: box.h });
+      }
     }
 
     const nodes = nodesById(items);

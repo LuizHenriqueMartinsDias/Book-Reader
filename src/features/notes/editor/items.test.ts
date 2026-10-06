@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createNotebook, getPages } from '../../../db/notes';
+import { addPage, createNotebook, getPages } from '../../../db/notes';
 import { db, type StrokeItem, type TextItem } from '../../../db/schema';
 import { useNoteHistory } from '../../../store/history';
-import { cloneItems, commitStretch } from './items';
+import { cloneItems, commitStretch, commitTemplate } from './items';
 
 describe('commitStretch', () => {
   beforeEach(async () => {
@@ -46,5 +46,20 @@ describe('commitStretch', () => {
     expect(inkCopy.parentId).toBe(boxCopy.id);
     const [alone] = await cloneItems([ink], 'p', 20);
     expect(alone.parentId).toBe('b');
+  });
+
+  it('puts a template under pages (at its size), new pages follow it, and it undoes', async () => {
+    const nb = await createNotebook({ title: 'Planner', kind: 'paged', paper: { style: 'blank', color: '#ffffff' }, coverColor: '#000' });
+    const [first] = await getPages(nb.id);
+    const template = { id: 'cornell', name: 'Cornell', blob: new Blob([]), width: 595, height: 760, thumb: '', createdAt: 0 };
+
+    await commitTemplate([first], template);
+    expect(await getPages(nb.id)).toMatchObject([{ width: 595, height: 760, background: { template: 'cornell' } }]);
+    await addPage(nb.id, 0);
+    expect((await getPages(nb.id))[1]).toMatchObject({ width: 595, height: 760, background: { template: 'cornell' } });
+
+    await useNoteHistory.getState().undo();
+    expect((await getPages(nb.id))[0]).toMatchObject({ width: 595, height: 842 });
+    expect((await getPages(nb.id))[0].background).toBeUndefined();
   });
 });

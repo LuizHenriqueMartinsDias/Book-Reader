@@ -1,5 +1,6 @@
 import { db, type NoteItem, type Notebook, type NotePage } from '../../db/schema';
 import { bboxOf, unionBox } from './geometry';
+import { pdfBox } from './margins';
 import { connectorPoints, nodesById } from './connectors';
 import { drawConnectorLabel, drawItems, drawNodeText, PAPER_SPACING, paperInk } from './render';
 
@@ -29,6 +30,18 @@ export async function renderThumbnail(notebook: Notebook, page: NotePage, items:
     }
   }
   ctx.setTransform(k, 0, 0, k, ox * k, oy * k);
+  // The page's template, where it sits on the sheet.
+  const template = notebook.kind === 'paged' && page.background?.template ? await db.pageTemplates.get(page.background.template) : undefined;
+  if (template) {
+    try {
+      const bitmap = await createImageBitmap(template.blob);
+      const box = pdfBox(page);
+      ctx.drawImage(bitmap, box.x, box.y, box.w, box.h);
+      bitmap.close();
+    } catch {
+      // unreadable picture: the cover goes without it
+    }
+  }
   // Same stacking as the editor: images, then text, then ink.
   for (const img of items.sort((a, b) => a.z - b.z)) {
     if (img.type !== 'image') continue;

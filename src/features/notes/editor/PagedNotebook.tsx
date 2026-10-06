@@ -11,6 +11,7 @@ import PdfPageCanvas from '../../reader/PdfPageCanvas';
 import type { ZoomChange, ZoomMode } from '../../reader/views/types';
 import { useNoteEditor } from './editorStore';
 import NoteSurface from './NoteSurface';
+import TemplateBackground from './TemplateBackground';
 import { anchorAt, buildLayout, FOOTER, GAP, PADDING, pageIndexAt, scrollFor, turnedSize, type Anchor, type PagedLayout } from './pagedLayout';
 
 const MAX_FIT = 2.2;
@@ -190,7 +191,13 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
                       height={h}
                       view={{ x: 0, y: 0, zoom: scale }}
                       rotation={rotation}
-                      background={page.background?.pdfPage && pdf ? <PdfBackground page={page} pdf={pdf} pdfPage={page.background.pdfPage} scale={scale} /> : undefined}
+                      background={
+                        page.background?.pdfPage && pdf ? (
+                          <PdfBackground page={page} pdf={pdf} pdfPage={page.background.pdfPage} scale={scale} />
+                        ) : page.background?.template ? (
+                          <TemplateBackground page={page} scale={scale} />
+                        ) : undefined
+                      }
                     />
                   )}
                 </div>

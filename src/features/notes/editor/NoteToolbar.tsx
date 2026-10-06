@@ -38,6 +38,7 @@ import { MARKER_COLORS, PEN_COLORS, useUi } from '../../../store/ui';
 import InkSettings from '../../InkSettings';
 import FullscreenButton from '../../reader/FullscreenButton';
 import { useNoteEditor, type EraserMode, type NoteTool } from './editorStore';
+import TemplatePicker from './TemplatePicker';
 
 const TOOLS: { id: NoteTool; icon: typeof PenLine; label: string }[] = [
   { id: 'pen', icon: PenLine, label: 'Caneta (P)' },
@@ -86,6 +87,8 @@ interface Props {
   onOpenBook: () => void;
   /** Paged notebooks: open "stretch the sheet" for the page in view. */
   onStretchPage?: () => void;
+  /** Paged notebooks: page templates for the page in view. */
+  template?: React.ComponentProps<typeof TemplatePicker>;
   rulerOn: boolean;
   onToggleRuler: () => void;
   fullscreen: { supported: boolean; toggle: () => void };
@@ -93,7 +96,7 @@ interface Props {
   onClose?: () => void;
 }
 
-export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertImage, onPaste, onExport, onOpenBook, onStretchPage, rulerOn, onToggleRuler, fullscreen, onClose }: Props) {
+export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertImage, onPaste, onExport, onOpenBook, onStretchPage, template, rulerOn, onToggleRuler, fullscreen, onClose }: Props) {
   const ui = useUi();
   const editor = useNoteEditor();
   const { undoStack, redoStack, undo, redo } = useNoteHistory();
@@ -304,7 +307,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
           {paperOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setPaperOpen(false)} />
-              <div className="fixed top-12 right-2 z-50 w-60 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm shadow-xl">
+              <div className="fixed top-12 right-2 z-50 max-h-[calc(100dvh-4rem)] w-72 overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm shadow-xl">
                 <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">Papel</div>
                 <div className="grid grid-cols-2 gap-1">
                   {PAPERS.map((p) => (
@@ -329,6 +332,11 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
                     />
                   ))}
                 </div>
+                {template && (
+                  <div className="mt-3">
+                    <TemplatePicker {...template} />
+                  </div>
+                )}
                 {onStretchPage && (
                   <button
                     className="mt-3 flex w-full items-center gap-2 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs hover:border-amber-500"

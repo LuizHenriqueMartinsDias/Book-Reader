@@ -80,4 +80,16 @@ describe('exportNotebookPdf', () => {
     const xobjects = out.node.Resources()!.lookup(PDFName.of('XObject'))!;
     expect(xobjects.toString()).toContain('EmbeddedPdfPage');
   });
+
+  it('draws a page template under the page', async () => {
+    // A 1×1 PNG.
+    const png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0));
+    await db.pageTemplates.put({ id: 't', name: 'Cornell', blob: new Blob([png], { type: 'image/png' }), width: 595, height: 760, thumb: '', createdAt: 0 });
+    const nb = await createNotebook({ title: 'Planner', kind: 'paged', paper, coverColor: '#000' });
+    const [page] = await getPages(nb.id);
+    await db.notePages.update(page.id, { width: 595 + 100, height: 760, background: { template: 't', margins: { top: 0, right: 100, bottom: 0, left: 0 } } });
+    const out = (await PDFDocument.load(await exportNotebookPdf(nb.id))).getPage(0);
+    expect(out.getSize()).toEqual({ width: 695, height: 760 });
+    expect(out.node.Resources()!.lookup(PDFName.of('XObject'))!.toString()).toContain('Image');
+  });
 });

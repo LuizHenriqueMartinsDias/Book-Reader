@@ -8,6 +8,7 @@ import type { PDFDocumentProxy } from '../../../lib/pdf';
 import { sizeCanvas } from '../../reader/canvasSize';
 import PdfPageCanvas from '../../reader/PdfPageCanvas';
 import { commitStretch } from './items';
+import { useTemplateUrl } from './TemplateBackground';
 
 type Side = keyof Margins;
 /** Handles around the sheet: the sides each one moves and where it sits (fractions of the sheet). */
@@ -63,8 +64,12 @@ interface Props {
  * adds margins around the PDF; on a plain page it makes the page bigger (or smaller).
  */
 export default function StretchPageDialog({ notebook, pages, page, pdf, onClose }: Props) {
-  const isPdf = !!page.background;
-  const group = pages.filter((p) => !!p.background === isPdf);
+  // A page over a PDF page or a template opens margins around it; a plain page just resizes.
+  const kindOf = (p: NotePage) => (p.background?.pdfPage ? 'pdf' : p.background?.template ? 'template' : 'plain');
+  const kind = kindOf(page);
+  const isPdf = kind !== 'plain';
+  const group = pages.filter((p) => kindOf(p) === kind);
+  const templateUrl = useTemplateUrl(page.background?.template);
   const base = stretchBase(page);
   const { w, h } = base;
   const [sides, setSides] = useState(() => currentSides(page));
@@ -189,6 +194,7 @@ export default function StretchPageDialog({ notebook, pages, page, pdf, onClose 
           {isPdf ? (
             <div className="absolute bg-white ring-1 ring-black/15" style={{ left: bx, top: by, width: w * k, height: h * k }}>
               {pdf && page.background?.pdfPage && <PdfPageCanvas doc={pdf} pageNumber={page.background.pdfPage} scale={k} />}
+              {templateUrl && <img src={templateUrl} alt="" className="size-full max-w-none" />}
             </div>
           ) : (
             <div className="pointer-events-none absolute border border-dashed border-stone-500/60" style={{ left: bx, top: by, width: w * k, height: h * k }} />
@@ -208,7 +214,7 @@ export default function StretchPageDialog({ notebook, pages, page, pdf, onClose 
         </div>
         <p className="mt-2 text-xs text-[var(--muted)]">
           {isPdf
-            ? `Arraste as bordas para abrir espaço de anotação ao redor do PDF. Folha: ${newSize} (PDF ${cm(w)} × ${cm(h)} cm).`
+            ? `Arraste as bordas para abrir espaço de anotação ao redor ${kind === 'pdf' ? 'do PDF' : 'do modelo'}. Folha: ${newSize} (${kind === 'pdf' ? 'PDF' : 'modelo'} ${cm(w)} × ${cm(h)} cm).`
             : `Arraste as bordas para aumentar ou diminuir a folha; o que está escrito fica no lugar. Folha: ${newSize} (agora ${cm(w)} × ${cm(h)} cm).`}
         </p>
 
@@ -228,7 +234,7 @@ export default function StretchPageDialog({ notebook, pages, page, pdf, onClose 
         {group.length > 1 && (
           <label className="mt-4 flex items-center gap-2 text-sm">
             <input type="checkbox" checked={allPages} onChange={(e) => setAllPages(e.target.checked)} className="size-4 accent-amber-500" />
-            Aplicar a todas as {group.length} páginas {isPdf ? 'do PDF' : notebook.hasPdf ? 'sem PDF' : 'do caderno'}
+            Aplicar a todas as {group.length} páginas {kind === 'pdf' ? 'do PDF' : kind === 'template' ? 'com modelo' : notebook.hasPdf ? 'sem PDF' : 'do caderno'}
           </label>
         )}
 

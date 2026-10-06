@@ -17,7 +17,7 @@ import { useSplit } from '../../split/splitStore';
 import BookPicker from './BookPicker';
 import { useNoteEditor, type NoteTool } from './editorStore';
 import InfiniteCanvas from './InfiniteCanvas';
-import { cloneItems, commitItems } from './items';
+import { cloneItems, commitItems, commitTemplate } from './items';
 import NoteToolbar from './NoteToolbar';
 import PagedNotebook from './PagedNotebook';
 import StretchPageDialog from './StretchPageDialog';
@@ -241,6 +241,18 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
   }, [pages]);
   const stretchPage = useCallback((page: { id: string }) => setStretchingId(page.id), []);
 
+  // Page templates, from the paper menu: on the page in view, or on all of them.
+  const currentPageId = useNoteEditor((s) => s.currentPageId);
+  const currentPage = pages.find((p) => p.id === currentPageId) ?? pages[0];
+  const applyTemplate = useCallback(
+    async (templateId: string | null, all: boolean) => {
+      const template = templateId ? await db.pageTemplates.get(templateId) : null;
+      if (templateId && !template) return;
+      await commitTemplate(all ? pages : currentPage ? [currentPage] : [], template ?? null);
+    },
+    [pages, currentPage],
+  );
+
   const registerZoom = useCallback((fn: (z: ZoomChange) => void) => {
     canvasZoom.current = fn;
   }, []);
@@ -269,6 +281,15 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
             onExport={exportPdf}
             onOpenBook={() => setPickingBook(true)}
             onStretchPage={notebook.kind === 'paged' ? stretchCurrent : undefined}
+            template={
+              notebook.kind === 'paged'
+                ? {
+                    current: currentPage?.background?.pdfPage ? undefined : (currentPage?.background?.template ?? null),
+                    onPick: (id) => applyTemplate(id, false),
+                    onPickAll: () => applyTemplate(currentPage?.background?.template ?? null, true),
+                  }
+                : undefined
+            }
             rulerOn={!!ruler}
             onToggleRuler={toggleRuler}
             fullscreen={fullscreen}

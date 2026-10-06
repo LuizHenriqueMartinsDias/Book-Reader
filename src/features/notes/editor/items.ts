@@ -1,4 +1,4 @@
-import { db, type ConnectorEnd, type Margins, type NoteItem, type NotePage } from '../../../db/schema';
+import { db, type ConnectorEnd, type Margins, type NoteItem, type NotePage, type PageTemplate } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { touchNotebook } from '../../../db/notes';
 import { transformItems } from '../../../lib/notes/geometry';
@@ -61,5 +61,17 @@ export async function commitStretch(pages: NotePage[], sides: Margins) {
   }
   if (!after.length) return;
   await useNoteHistory.getState().commit({ added: { notePages: after, noteItems: newItems }, removed: { notePages: before, noteItems: oldItems } });
+  touchNotebook(pages[0].notebookId);
+}
+
+/**
+ * Puts a template under pages (their size becomes the template's), or takes it away (they keep
+ * their size); undoable. PDF pages are left as they are.
+ */
+export async function commitTemplate(pages: NotePage[], template: PageTemplate | null) {
+  const before = pages.filter((p) => !p.background?.pdfPage && (template ? p.background?.template !== template.id || p.background.margins : p.background?.template));
+  if (!before.length) return;
+  const after = before.map(({ background: _, ...p }): NotePage => (template ? { ...p, width: template.width, height: template.height, background: { template: template.id } } : p));
+  await useNoteHistory.getState().commit({ added: { notePages: after }, removed: { notePages: before } });
   touchNotebook(pages[0].notebookId);
 }

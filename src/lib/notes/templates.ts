@@ -68,10 +68,8 @@ async function fromPdf(file: File, name: string): Promise<PageTemplate[]> {
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(viewport.width);
       canvas.height = Math.round(viewport.height);
-      const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      await page.render({ canvasContext: ctx, viewport }).promise;
+      // See-through where the page is blank, so the notebook's paper (color, lines) shows under it.
+      await page.render({ canvasContext: canvas.getContext('2d')!, viewport, background: 'rgba(0,0,0,0)' }).promise;
       page.cleanup();
       out.push({
         id: newId(),
