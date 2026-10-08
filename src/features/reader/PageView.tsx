@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import type { PDFPageProxy } from 'pdfjs-dist';
 import { pdfjs, type PageSize, type PDFDocumentProxy } from '../../lib/pdf';
 import { sizeCanvas } from './canvasSize';
@@ -12,12 +12,15 @@ interface Props {
   scale: number;
   /** Only pages near the viewport render content; others are sized placeholders. */
   active: boolean;
+  /** False while the page is mid-animation: no drawing, selecting or clicking. */
+  interactive?: boolean;
+  shadow?: boolean;
 }
 
 /** Re-rendering on every zoom step is costly; let the old bitmap stretch until zooming settles. */
 const RERENDER_DELAY = 180;
 
-export default function PageView({ doc, pageNumber, size, scale, active }: Props) {
+export default memo(function PageView({ doc, pageNumber, size, scale, active, interactive = true, shadow = true }: Props) {
   const width = size.width * scale;
   const height = size.height * scale;
 
@@ -25,7 +28,7 @@ export default function PageView({ doc, pageNumber, size, scale, active }: Props
     <div
       data-page={pageNumber}
       data-scale={scale}
-      className="page relative mx-auto bg-white shadow-md"
+      className={`page relative mx-auto bg-white ${shadow ? 'shadow-md' : ''} ${interactive ? '' : 'page-inert'}`}
       style={{ width, height, ['--scale-factor' as string]: scale }}
     >
       {active ? (
@@ -35,9 +38,9 @@ export default function PageView({ doc, pageNumber, size, scale, active }: Props
       )}
     </div>
   );
-}
+});
 
-function PageContent({ doc, pageNumber, size, scale }: Omit<Props, 'active'>) {
+function PageContent({ doc, pageNumber, size, scale }: Pick<Props, 'doc' | 'pageNumber' | 'size' | 'scale'>) {
   const [page, setPage] = useState<PDFPageProxy | null>(null);
   const [renderScale, setRenderScale] = useState(scale);
   const canvasRef = useRef<HTMLCanvasElement>(null);

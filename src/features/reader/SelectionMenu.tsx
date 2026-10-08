@@ -27,7 +27,7 @@ export default function SelectionMenu() {
       const container = range.commonAncestorContainer;
       const el = container instanceof Element ? container : container.parentElement;
       // Only selections inside the pages (possibly spanning several), not e.g. the notes panel.
-      if (!el || !document.querySelector('[data-page]')?.parentElement?.contains(el)) return;
+      if (!el?.closest('[data-reader-pages]')) return;
       const rects = [...range.getClientRects()].filter((r) => r.width > 0);
       const last = rects.at(-1);
       if (!last) return;

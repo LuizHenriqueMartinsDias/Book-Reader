@@ -10,6 +10,7 @@
   --muted: #78716c;
   --page-filter: none;
   --highlight-blend: multiply;
+  --paper: #ffffff;
   color-scheme: light;
 }
 .theme-sepia {
@@ -19,6 +20,7 @@
   --border: #dccfb8;
   --muted: #7c6a55;
   --page-filter: sepia(0.35) brightness(0.97);
+  --paper: #f4ecdc;
 }
 .theme-dark {
   --app-bg: #0c0a09;
@@ -28,6 +30,7 @@
   --muted: #a8a29e;
   --page-filter: invert(0.9) hue-rotate(180deg);
   --highlight-blend: screen;
+  --paper: #262626;
   color-scheme: dark;
 }
 
@@ -46,6 +49,13 @@ body {
 
 .page-canvas {
   filter: var(--page-filter);
+}
+
+/* A page mid-turn ignores input, including layers that opt back into pointer events. */
+.page-inert,
+.page-inert * {
+  pointer-events: none !important;
+  user-select: none;
 }
 
 /* pdf.js text layer (from pdfjs-dist/web/pdf_viewer.css, trimmed) */

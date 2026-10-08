@@ -1,5 +1,7 @@
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   Eraser,
   FileDown,
   Highlighter,
@@ -22,6 +24,7 @@ import { download } from '../../lib/backup';
 import { useHistory } from '../../store/history';
 import { MARKER_COLORS, PEN_COLORS, useUi, type Theme, type Tool } from '../../store/ui';
 import { useReader } from './readerStore';
+import ViewMenu from './ViewMenu';
 
 const TOOLS: { id: Tool; icon: typeof PenLine; label: string }[] = [
   { id: 'select', icon: MousePointer2, label: 'Selecionar texto (V)' },
@@ -49,6 +52,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
   const ui = useUi();
   const { undoStack, redoStack, undo, redo } = useHistory();
   const currentPage = useReader((s) => s.currentPage);
+  const paged = ui.viewMode !== 'scroll';
   const [pageInput, setPageInput] = useState(String(currentPage));
   const [exporting, setExporting] = useState(false);
   const ThemeIcon = THEME_ICON[ui.theme];
@@ -152,6 +156,11 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
           <Plus className="size-4" />
         </button>
         {divider}
+        {paged && (
+          <button className={btn} title="Página anterior (←)" disabled={currentPage <= 1} onClick={() => useReader.getState().prev()}>
+            <ChevronLeft className="size-5" />
+          </button>
+        )}
         <form
           className="flex items-center gap-1 text-sm"
           onSubmit={(e) => {
@@ -171,7 +180,13 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
           />
           <span className="text-[var(--muted)] tabular-nums">/ {pageCount}</span>
         </form>
+        {paged && (
+          <button className={btn} title="Próxima página (→)" onClick={() => useReader.getState().next()}>
+            <ChevronRight className="size-5" />
+          </button>
+        )}
         {divider}
+        <ViewMenu className={btn} />
         <button className={btn} title="Tema" onClick={() => ui.set({ theme: NEXT_THEME[ui.theme] })}>
           <ThemeIcon className="size-5" />
         </button>
