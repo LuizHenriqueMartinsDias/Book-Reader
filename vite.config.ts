@@ -4,7 +4,9 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
+// `vite build --mode pages` targets GitHub Pages, served under /<repo>/.
+export default defineConfig(({ mode }) => ({
+  base: mode === 'pages' ? '/Book-Reader/' : '/',
   plugins: [
     react(),
     tailwindcss(),
@@ -36,4 +38,4 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
   },
-});
+}));
