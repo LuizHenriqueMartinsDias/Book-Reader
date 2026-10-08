@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { BookOpen, Download, FilePlus2, Moon, Sun, SunDim, Upload } from 'lucide-react';
+import { BookOpen, Download, FilePlus2, Globe, Moon, Sun, SunDim, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { navigate } from '../../App';
 import { db } from '../../db/schema';
@@ -100,6 +100,12 @@ export default function LibraryPage() {
         >
           <Upload className="size-4" />
         </button>
+        <a
+          href="#/explorar"
+          className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium hover:bg-[var(--app-bg)]"
+        >
+          <Globe className="size-4" /> Buscar livros grátis
+        </a>
         <button
           className="flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-amber-400"
           onClick={() => fileInput.current?.click()}
@@ -151,6 +157,15 @@ export default function LibraryPage() {
             <span className="text-base font-medium text-[var(--app-fg)]">Sua estante está vazia</span>
             <span className="text-sm">Clique aqui ou arraste arquivos PDF para começar a ler.</span>
           </button>
+        )}
+        {books && books.length === 0 && (
+          <p className="mt-4 text-center text-sm text-[var(--muted)]">
+            Ou{' '}
+            <a href="#/explorar" className="font-medium text-amber-600 underline">
+              busque livros gratuitos
+            </a>{' '}
+            em domínio público.
+          </p>
         )}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-5 gap-y-8">
           {books?.map((book) => <BookCard key={book.id} book={book} />)}

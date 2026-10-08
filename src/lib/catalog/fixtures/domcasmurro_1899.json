@@ -1,0 +1,114 @@
+{
+ "metadata": {
+  "identifier": "domcasmurro_1899",
+  "title": "Dom Casmurro",
+  "creator": "Machado de Assis",
+  "date": "1899",
+  "language": "por",
+  "licenseurl": "http://creativecommons.org/licenses/by-nc-sa/3.0/br/"
+ },
+ "files": [
+  {
+   "name": "000181844.epub",
+   "format": "EPUB",
+   "size": "385492",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844.pdf",
+   "format": "Text PDF",
+   "size": "31346440",
+   "source": "original"
+  },
+  {
+   "name": "000181844_chocr.html.gz",
+   "format": "chOCR",
+   "size": "5692146",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_daisy.zip",
+   "format": "Daisy",
+   "size": "255407",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_djvu.txt",
+   "format": "DjVuTXT",
+   "size": "411466",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_djvu.xml",
+   "format": "Djvu XML",
+   "size": "5695448",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_hocr.html",
+   "format": "hOCR",
+   "size": "10661628",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_hocr_pageindex.json.gz",
+   "format": "OCR Page Index",
+   "size": "4861",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_hocr_searchtext.txt.gz",
+   "format": "OCR Search Text",
+   "size": "159274",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_jp2.zip",
+   "format": "Single Page Processed JP2 ZIP",
+   "size": "172817768",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_page_numbers.json",
+   "format": "Page Numbers JSON",
+   "size": "70529",
+   "source": "derivative"
+  },
+  {
+   "name": "000181844_scandata.xml",
+   "format": "Scandata",
+   "size": "146665",
+   "source": "derivative"
+  },
+  {
+   "name": "__ia_thumb.jpg",
+   "format": "Item Tile",
+   "size": "16863",
+   "source": "original"
+  },
+  {
+   "name": "domcasmurro_1899_archive.torrent",
+   "format": "Archive BitTorrent",
+   "size": "12484",
+   "source": "metadata"
+  },
+  {
+   "name": "domcasmurro_1899_files.xml",
+   "format": "Metadata",
+   "size": null,
+   "source": "original"
+  },
+  {
+   "name": "domcasmurro_1899_meta.sqlite",
+   "format": "Metadata",
+   "size": "11264",
+   "source": "original"
+  },
+  {
+   "name": "domcasmurro_1899_meta.xml",
+   "format": "Metadata",
+   "size": "1770",
+   "source": "original"
+  }
+ ]
+}

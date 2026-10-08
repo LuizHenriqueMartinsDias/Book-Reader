@@ -32,7 +32,8 @@ export default defineConfig(({ mode }) => ({
       },
     }),
   ],
-  server: { host: true },
+  // wrangler dev keeps its local state in worker/.wrangler; don't reload the app on every write.
+  server: { host: true, watch: { ignored: ['**/.wrangler/**'] } },
   build: { chunkSizeWarningLimit: 1500 },
   test: {
     environment: 'jsdom',

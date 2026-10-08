@@ -26,6 +26,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build:pages
+        env:
+          VITE_PROXY_URL: ${{ vars.PROXY_URL }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

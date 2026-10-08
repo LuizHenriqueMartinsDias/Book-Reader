@@ -5,7 +5,8 @@ import { getTitle, openPdf, renderThumbnail, sha256 } from '../../lib/pdf';
 export type ImportResult = { status: 'added' | 'exists'; id: string; title: string } | { status: 'error'; name: string; error: string };
 
 /** Books are keyed by content hash, so re-importing a file is detected and backups match across devices. */
-export async function importBook(file: File): Promise<ImportResult> {
+/** `title` overrides the PDF's own metadata, e.g. with the catalog title of a downloaded book. */
+export async function importBook(file: File, title?: string): Promise<ImportResult> {
   try {
     const data = await file.arrayBuffer();
     const id = await sha256(data);
@@ -14,7 +15,7 @@ export async function importBook(file: File): Promise<ImportResult> {
 
     const doc = await openPdf(data);
     try {
-      const title = await getTitle(doc, file.name);
+      title ||= await getTitle(doc, file.name);
       const now = Date.now();
       await addBook(
         {
