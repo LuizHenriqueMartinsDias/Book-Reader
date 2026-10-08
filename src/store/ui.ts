@@ -27,6 +27,10 @@ interface UiState {
   sidebarOpen: boolean;
   /** Once a stylus is seen, finger touches scroll instead of drawing (palm rejection). */
   penDetected: boolean;
+  /** With a stylus, it writes even when the select tool is active; fingers keep selecting and navigating. */
+  stylusAlwaysInks: boolean;
+  /** Ink tool the stylus uses under the select tool: the last one picked. */
+  lastInkTool: 'pen' | 'marker';
   set: (patch: Partial<Omit<UiState, "set">>) => void;
 }
 
@@ -45,7 +49,10 @@ export const useUi = create<UiState>()(
       epubFont: 'original',
       sidebarOpen: false,
       penDetected: false,
-      set: (patch) => set(patch),
+      stylusAlwaysInks: true,
+      lastInkTool: 'pen',
+      set: (patch) =>
+        set(patch.tool === 'pen' || patch.tool === 'marker' ? { ...patch, lastInkTool: patch.tool } : patch),
     }),
     {
       name: 'book-reader-ui',

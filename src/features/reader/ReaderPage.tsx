@@ -9,7 +9,9 @@ import SelectionMenu from './SelectionMenu';
 import Sidebar from './Sidebar';
 import Toolbar from './Toolbar';
 import EpubReader from '../epub/EpubReader';
+import FullscreenChrome from './FullscreenChrome';
 import { useDocument } from './useDocument';
+import { useFullscreen } from './useFullscreen';
 import PagedView from './views/PagedView';
 import ScrollView from './views/ScrollView';
 import { MAX_ZOOM, MIN_ZOOM, type ZoomChange, type ZoomMode } from './views/types';
@@ -54,6 +56,7 @@ function Reader({ book, doc, sizes }: { book: Book; doc: PDFDocumentProxy; sizes
   const viewMode = useUi((s) => s.viewMode);
   const currentPage = useReader((s) => s.currentPage);
   const scale = useReader((s) => s.scale);
+  const fullscreen = useFullscreen();
 
   useEffect(() => {
     useReader.setState({ doc });
@@ -135,12 +138,19 @@ function Reader({ book, doc, sizes }: { book: Book; doc: PDFDocumentProxy; sizes
 
   return (
     <div className="flex h-full flex-col">
-      <Toolbar
-        book={book}
-        pageCount={sizes.length}
-        zoomPercent={Math.round((scale / CSS_UNITS) * 100)}
-        fitWidth={zoom === null}
-        onZoom={changeZoom}
+      <FullscreenChrome
+        fullscreen={fullscreen.active}
+        onExit={fullscreen.toggle}
+        toolbar={
+          <Toolbar
+            book={book}
+            pageCount={sizes.length}
+            zoomPercent={Math.round((scale / CSS_UNITS) * 100)}
+            fitWidth={zoom === null}
+            onZoom={changeZoom}
+            fullscreen={fullscreen}
+          />
+        }
       />
       <div className="relative flex min-h-0 flex-1">
         <View key={viewMode === 'scroll' ? 'scroll' : 'paged'} doc={doc} sizes={sizes} zoom={zoom} onZoom={changeZoom} />

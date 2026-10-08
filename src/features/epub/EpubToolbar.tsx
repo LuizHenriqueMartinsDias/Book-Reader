@@ -4,6 +4,7 @@ import type { Book } from '../../db/schema';
 import { useHistory } from '../../store/history';
 import { useUi, type EpubFont, type Theme } from '../../store/ui';
 import { useReader } from '../reader/readerStore';
+import FullscreenButton from '../reader/FullscreenButton';
 import ViewMenu from '../reader/ViewMenu';
 import type { EpubLocation } from './EpubReader';
 import { EPUB_FONTS, FONT_SIZES } from './epubTheme';
@@ -13,7 +14,13 @@ const THEME_ICON = { light: Sun, sepia: SunDim, dark: Moon };
 const btn = 'rounded-md p-2 hover:bg-[var(--app-bg)] disabled:opacity-30 disabled:hover:bg-transparent';
 const divider = <div className="mx-1 h-6 w-px shrink-0 bg-[var(--border)]" />;
 
-export default function EpubToolbar({ book, location }: { book: Book; location: EpubLocation | null }) {
+interface Props {
+  book: Book;
+  location: EpubLocation | null;
+  fullscreen: { supported: boolean; toggle: () => void };
+}
+
+export default function EpubToolbar({ book, location, fullscreen }: Props) {
   const ui = useUi();
   const { undoStack, redoStack, undo, redo } = useHistory();
   const [typeOpen, setTypeOpen] = useState(false);
@@ -90,6 +97,7 @@ export default function EpubToolbar({ book, location }: { book: Book; location: 
           )}
         </div>
         <ViewMenu className={btn} />
+        <FullscreenButton className={btn} supported={fullscreen.supported} onClick={fullscreen.toggle} />
         <button className={btn} title="Tema" onClick={() => ui.set({ theme: NEXT_THEME[ui.theme] })}>
           <ThemeIcon className="size-5" />
         </button>

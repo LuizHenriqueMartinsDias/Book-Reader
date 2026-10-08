@@ -8,7 +8,9 @@ import { useHistory } from '../../store/history';
 import { useUi } from '../../store/ui';
 import AnnotationMenu, { type MenuTarget } from '../reader/AnnotationMenu';
 import { useReader } from '../reader/readerStore';
+import FullscreenChrome from '../reader/FullscreenChrome';
 import Sidebar from '../reader/Sidebar';
+import { useFullscreen } from '../reader/useFullscreen';
 import EpubToolbar from './EpubToolbar';
 import { EPUB_FONTS, EPUB_THEMES, FONT_SIZES } from './epubTheme';
 
@@ -76,6 +78,7 @@ function EpubView({ book, epub }: { book: Book; epub: EpubBook }) {
   const { viewMode, spreadLayout, theme, epubFontSize, epubFont, sidebarOpen } = useUi();
   const flow = viewMode === 'scroll' ? 'scrolled' : 'paginated';
   const spread = spreadLayout === 'single' ? 'none' : spreadLayout === 'double' ? 'always' : 'auto';
+  const fullscreen = useFullscreen();
   const highlights = useLiveQuery(() => db.highlights.where('bookId').equals(book.id).toArray(), [book.id]);
 
   useEffect(() => {
@@ -385,7 +388,11 @@ function EpubView({ book, epub }: { book: Book; epub: EpubBook }) {
 
   return (
     <div className="flex h-full flex-col">
-      <EpubToolbar book={book} location={location} />
+      <FullscreenChrome
+        fullscreen={fullscreen.active}
+        onExit={fullscreen.toggle}
+        toolbar={<EpubToolbar book={book} location={location} fullscreen={fullscreen} />}
+      />
       <div className="relative flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col" style={{ background: colors.background }}>
           <div className={`min-h-0 flex-1 ${flow === 'paginated' ? 'px-4 py-6 sm:px-10' : ''}`}>

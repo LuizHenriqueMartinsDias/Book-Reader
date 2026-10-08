@@ -11,6 +11,7 @@ import {
   MousePointer2,
   PanelRight,
   PenLine,
+  PenTool,
   Plus,
   Redo2,
   Sun,
@@ -24,6 +25,7 @@ import { download } from '../../lib/backup';
 import { useHistory } from '../../store/history';
 import { MARKER_COLORS, PEN_COLORS, useUi, type Theme, type Tool } from '../../store/ui';
 import { useReader } from './readerStore';
+import FullscreenButton from './FullscreenButton';
 import ViewMenu from './ViewMenu';
 
 const TOOLS: { id: Tool; icon: typeof PenLine; label: string }[] = [
@@ -46,9 +48,10 @@ interface Props {
   zoomPercent: number;
   fitWidth: boolean;
   onZoom: (next: number | null | ((z: number) => number)) => void;
+  fullscreen: { supported: boolean; toggle: () => void };
 }
 
-export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom }: Props) {
+export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom, fullscreen }: Props) {
   const ui = useUi();
   const { undoStack, redoStack, undo, redo } = useHistory();
   const currentPage = useReader((s) => s.currentPage);
@@ -59,7 +62,8 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
 
   useEffect(() => setPageInput(String(currentPage)), [currentPage]);
 
-  const isPen = ui.tool === 'pen';
+  // Under the select tool, the colors shown are those of the ink tool the stylus will use.
+  const isPen = ui.tool === 'pen' || (ui.tool === 'select' && ui.lastInkTool === 'pen');
   const colors = isPen ? PEN_COLORS : MARKER_COLORS;
   const color = isPen ? ui.penColor : ui.markerColor;
   const widths = isPen ? PEN_WIDTHS : MARKER_WIDTHS;
@@ -107,7 +111,23 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
         ))}
       </div>
 
-      {(ui.tool === 'pen' || ui.tool === 'marker') && (
+      {ui.penDetected && (
+        <button
+          title={
+            ui.stylusAlwaysInks
+              ? 'Caneta sempre escreve; o dedo navega e seleciona (toque para desligar)'
+              : 'A caneta segue a ferramenta escolhida (toque para a caneta sempre escrever)'
+          }
+          onClick={() => ui.set({ stylusAlwaysInks: !ui.stylusAlwaysInks })}
+          className={`ml-1 flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${
+            ui.stylusAlwaysInks ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'border-[var(--border)] text-[var(--muted)]'
+          }`}
+        >
+          <PenTool className="size-4" /> Caneta escreve
+        </button>
+      )}
+
+      {(ui.tool === 'pen' || ui.tool === 'marker' || (ui.tool === 'select' && ui.penDetected && ui.stylusAlwaysInks)) && (
         <div className="flex shrink-0 items-center gap-1 pl-1">
           {colors.map((c) => (
             <button
@@ -187,6 +207,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
         )}
         {divider}
         <ViewMenu className={btn} />
+        <FullscreenButton className={btn} supported={fullscreen.supported} onClick={fullscreen.toggle} />
         <button className={btn} title="Tema" onClick={() => ui.set({ theme: NEXT_THEME[ui.theme] })}>
           <ThemeIcon className="size-5" />
         </button>
