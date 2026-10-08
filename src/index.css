@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.theme-dark, .theme-dark *));
+
+:root {
+  --app-bg: #f5f5f4;
+  --app-fg: #1c1917;
+  --panel: #ffffff;
+  --border: #e7e5e4;
+  --muted: #78716c;
+  --page-filter: none;
+  --highlight-blend: multiply;
+  color-scheme: light;
+}
+.theme-sepia {
+  --app-bg: #ede4d3;
+  --app-fg: #3b2f22;
+  --panel: #f6efe2;
+  --border: #dccfb8;
+  --muted: #7c6a55;
+  --page-filter: sepia(0.35) brightness(0.97);
+}
+.theme-dark {
+  --app-bg: #0c0a09;
+  --app-fg: #e7e5e4;
+  --panel: #1c1917;
+  --border: #292524;
+  --muted: #a8a29e;
+  --page-filter: invert(0.9) hue-rotate(180deg);
+  --highlight-blend: screen;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--app-bg);
+  color: var(--app-fg);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.page-canvas {
+  filter: var(--page-filter);
+}
+
+/* pdf.js text layer (from pdfjs-dist/web/pdf_viewer.css, trimmed) */
+.textLayer {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 0;
+}
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+}
+.textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+.textLayer ::selection {
+  background: rgb(37 99 235 / 0.3);
+}
+.textLayer br::selection {
+  background: transparent;
+}
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
