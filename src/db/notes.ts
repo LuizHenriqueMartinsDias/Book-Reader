@@ -1,4 +1,4 @@
-import { db, type Notebook, type NotebookKind, type NoteItem, type NotePage, type Paper } from './schema';
+import { db, type Notebook, type PageTemplate, type NotebookKind, type NoteItem, type NotePage, type Paper } from './schema';
 import { pdfBox } from '../lib/notes/margins';
 import { newId } from './repo';
 
@@ -15,6 +15,8 @@ export interface NewNotebook {
   sourceBookId?: string;
   /** Imported PDF: the file and the size of each of its pages. */
   pdf?: { data: Blob; pageSizes: { width: number; height: number }[] };
+  /** Paged notebooks: a page template under the first page (and the ones added after it). */
+  template?: Pick<PageTemplate, 'id' | 'width' | 'height'>;
 }
 
 export async function createNotebook(input: NewNotebook) {
@@ -34,7 +36,9 @@ export async function createNotebook(input: NewNotebook) {
   };
   const pages: NotePage[] = input.pdf
     ? input.pdf.pageSizes.map((size, i) => ({ id: newId(), notebookId: notebook.id, order: i, ...size, background: { pdfPage: i + 1 } }))
-    : [{ id: newId(), notebookId: notebook.id, order: 0, ...A4 }];
+    : input.template && input.kind === 'paged'
+      ? [{ id: newId(), notebookId: notebook.id, order: 0, width: input.template.width, height: input.template.height, background: { template: input.template.id } }]
+      : [{ id: newId(), notebookId: notebook.id, order: 0, ...A4 }];
   await db.transaction('rw', db.notebooks, db.notePages, db.files, async () => {
     await db.notebooks.add(notebook);
     await db.notePages.bulkAdd(pages);

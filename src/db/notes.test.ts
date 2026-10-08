@@ -76,4 +76,9 @@ describe('notebooks', () => {
     expect((await searchNotebooks('física')).map((n) => n.id)).toEqual([a.id]);
     expect((await searchNotebooks('newton')).map((n) => n.id)).toEqual([b.id]);
   });
+
+  it('starts a notebook on a page template', async () => {
+    const nb = await createNotebook({ title: 'Agenda', kind: 'paged', paper, coverColor: '#000', template: { id: 'semana', width: 595, height: 700 } });
+    expect(await getPages(nb.id)).toMatchObject([{ width: 595, height: 700, background: { template: 'semana' } }]);
+  });
 });

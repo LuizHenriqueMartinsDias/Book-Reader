@@ -1,7 +1,8 @@
 import { LayoutGrid, Square, X } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { COVER_COLORS, createNotebook } from '../../db/notes';
-import type { Folder, NotebookKind, PaperStyle } from '../../db/schema';
+import { db, type Folder, type NotebookKind, type PaperStyle } from '../../db/schema';
 import { PAPER_COLORS, paperCss } from '../../lib/notes/render';
 
 const PAPERS: { id: PaperStyle; label: string }[] = [
@@ -25,6 +26,8 @@ export default function NewNotebookDialog({ folders, folderId, onCreated, onClos
   const [paperColor, setPaperColor] = useState(PAPER_COLORS[0]);
   const [cover, setCover] = useState(COVER_COLORS[0]);
   const [folder, setFolder] = useState<string | null>(folderId);
+  const templates = useLiveQuery(() => db.pageTemplates.orderBy('createdAt').toArray(), []) ?? [];
+  const [templateId, setTemplateId] = useState<string | null>(null);
 
   async function create() {
     const nb = await createNotebook({
@@ -33,6 +36,7 @@ export default function NewNotebookDialog({ folders, folderId, onCreated, onClos
       paper: { style, color: paperColor },
       coverColor: cover,
       folderId: folder,
+      template: templates.find((t) => t.id === templateId),
     });
     onCreated(nb.id);
   }
@@ -87,6 +91,32 @@ export default function NewNotebookDialog({ folders, folderId, onCreated, onClos
             <button key={c} type="button" title={c} onClick={() => setPaperColor(c)} className={`size-7 rounded-md border-2 ${paperColor === c ? 'border-amber-500' : 'border-[var(--border)]'}`} style={{ background: c }} />
           ))}
         </div>
+
+        {kind === 'paged' && templates.length > 0 && (
+          <>
+            <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">Modelo da folha</div>
+            <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+              <button
+                type="button"
+                onClick={() => setTemplateId(null)}
+                className={`flex h-16 w-12 shrink-0 items-center justify-center rounded-md border-2 text-[10px] text-[var(--muted)] ${templateId === null ? 'border-amber-500' : 'border-[var(--border)]'}`}
+              >
+                Nenhum
+              </button>
+              {templates.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  title={t.name}
+                  onClick={() => setTemplateId(t.id)}
+                  className={`h-16 w-12 shrink-0 overflow-hidden rounded-md border-2 ${templateId === t.id ? 'border-amber-500' : 'border-[var(--border)]'}`}
+                >
+                  <img src={t.thumb} alt={t.name} className="size-full object-cover object-top" />
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">Capa</div>
         <div className="mb-4 flex gap-2">
