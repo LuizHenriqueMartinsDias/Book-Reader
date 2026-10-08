@@ -1,11 +1,11 @@
-import { allowedOrigin, isAllowedTarget, isPdfResponse } from './validate';
+import { allowedOrigin, bookType, isAllowedTarget } from './validate';
 
 const MAX_REDIRECTS = 5;
 const MAX_BYTES = 500 * 1024 * 1024;
 
 /**
- * CORS proxy for the Book Reader app: GET /fetch?url=<pdf url> streams a PDF from an allowed
- * host (the Internet Archive doesn't send CORS headers on files, so browsers can't fetch them).
+ * CORS proxy for the Book Reader app: GET /fetch?url=<book url> streams a PDF or EPUB from an
+ * allowed host (the Internet Archive and Project Gutenberg don't send CORS headers on files).
  */
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -37,12 +37,13 @@ export default {
     }
     if (!upstream) return fail(508, 'Redirecionamentos demais');
     if (!upstream.ok) return fail(upstream.status, `Falha na origem (${upstream.status})`);
-    if (!isPdfResponse(upstream.headers.get('Content-Type'), target)) return fail(415, 'O arquivo não é um PDF');
+    const type = bookType(upstream.headers.get('Content-Type'), target);
+    if (!type) return fail(415, 'O arquivo não é um PDF nem um EPUB');
     const length = Number(upstream.headers.get('Content-Length') ?? 0);
     if (length > MAX_BYTES) return fail(413, 'Arquivo grande demais');
 
     const headers = new Headers(cors);
-    headers.set('Content-Type', 'application/pdf');
+    headers.set('Content-Type', type);
     if (length) headers.set('Content-Length', String(length));
     headers.set('Cache-Control', 'public, max-age=86400');
     return new Response(upstream.body, { status: 200, headers });

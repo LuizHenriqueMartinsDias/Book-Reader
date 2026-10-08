@@ -1,12 +1,19 @@
 import { create } from 'zustand';
+import type { BookFormat } from '../../db/schema';
+import type { EpubBook } from '../../lib/epub';
 import type { PDFDocumentProxy } from '../../lib/pdf';
 
 export type SidebarTab = 'outline' | 'notes' | 'search';
 
 interface ReaderState {
   bookId: string;
+  format: BookFormat;
   doc: PDFDocumentProxy | null;
+  epub: EpubBook | null;
+  /** PDF: page. EPUB: chapter (spine index + 1). */
   currentPage: number;
+  /** EPUB: CFI of the start of the visible text. */
+  currentCfi: string | null;
   sidebarTab: SidebarTab;
   /** Note to scroll to and focus in the notes panel. */
   focusNoteId: string | null;
@@ -16,19 +23,25 @@ interface ReaderState {
   goToPage: (page: number) => void;
   next: () => void;
   prev: () => void;
+  /** EPUB: jump to a CFI or a table-of-contents href. */
+  goToCfi: (target: string) => void;
   set: (patch: Partial<Omit<ReaderState, 'set'>>) => void;
 }
 
 /** Per-open-book state shared by the reader's components; reset when a book opens. */
 export const useReader = create<ReaderState>((set) => ({
   bookId: '',
+  format: 'pdf',
   doc: null,
+  epub: null,
   currentPage: 1,
+  currentCfi: null,
   sidebarTab: 'notes',
   focusNoteId: null,
   scale: 1,
   goToPage: () => {},
   next: () => {},
   prev: () => {},
+  goToCfi: () => {},
   set: (patch) => set(patch),
 }));

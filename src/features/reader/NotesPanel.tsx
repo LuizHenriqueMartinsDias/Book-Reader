@@ -12,6 +12,8 @@ export default function NotesPanel() {
   const bookId = useReader((s) => s.bookId);
   const currentPage = useReader((s) => s.currentPage);
   const focusNoteId = useReader((s) => s.focusNoteId);
+  const epub = useReader((s) => s.format === 'epub');
+  const unit = epub ? 'Posição' : 'Página';
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
 
@@ -42,7 +44,8 @@ export default function NotesPanel() {
 
   async function addPageNote() {
     const now = Date.now();
-    const note: Note = { id: newId(), bookId, page: currentPage, body: '', createdAt: now, updatedAt: now };
+    const { currentCfi } = useReader.getState();
+    const note: Note = { id: newId(), bookId, page: currentPage, cfi: currentCfi ?? undefined, body: '', createdAt: now, updatedAt: now };
     await putNote(note);
     useReader.setState({ focusNoteId: note.id });
   }
@@ -58,7 +61,7 @@ export default function NotesPanel() {
         />
         <button
           onClick={addPageNote}
-          title={`Nova nota na página ${currentPage}`}
+          title={`Nova nota aqui (${unit.toLowerCase()} ${currentPage})`}
           className="flex items-center gap-1 rounded-md bg-amber-500 px-2.5 text-sm font-medium text-stone-900 hover:bg-amber-400"
         >
           <Plus className="size-4" /> Nota
@@ -68,10 +71,13 @@ export default function NotesPanel() {
         {(
           [
             ['all', 'Todas'],
-            ['page', `Página ${currentPage}`],
+            ['page', `${unit} ${currentPage}`],
             ['highlights', 'Destaques'],
           ] as const
-        ).map(([id, label]) => (
+        )
+          // EPUB positions are too fine-grained for a "this page" filter.
+          .filter(([id]) => !(epub && id === 'page'))
+          .map(([id, label]) => (
           <button
             key={id}
             onClick={() => setFilter(id)}
@@ -99,6 +105,8 @@ export default function NotesPanel() {
   );
 }
 
+const Unit = () => <>{useReader((s) => (s.format === 'epub' ? 'Posição' : 'Página'))}</>;
+
 const Empty = ({ children }: { children: React.ReactNode }) => <p className="py-6 text-center text-sm text-[var(--muted)]">{children}</p>;
 
 function Quote({ highlight }: { highlight: Highlight }) {
@@ -111,8 +119,10 @@ function Quote({ highlight }: { highlight: Highlight }) {
 
 function HighlightItem({ highlight }: { highlight: Highlight }) {
   return (
-    <button className="rounded-lg border border-[var(--border)] p-2.5 text-left hover:bg-[var(--app-bg)]" onClick={() => jumpTo(highlight.page)}>
-      <div className="mb-1 text-xs text-[var(--muted)]">Página {highlight.page}</div>
+    <button className="rounded-lg border border-[var(--border)] p-2.5 text-left hover:bg-[var(--app-bg)]" onClick={() => jumpTo(highlight.cfi ?? highlight.page)}>
+      <div className="mb-1 text-xs text-[var(--muted)]">
+        <Unit /> {highlight.page}
+      </div>
       <Quote highlight={highlight} />
     </button>
   );
@@ -147,8 +157,8 @@ function NoteItem({ note, highlight, autoFocus }: { note: Note; highlight?: High
   return (
     <div ref={card} className="group rounded-lg border border-[var(--border)] p-2.5 focus-within:border-amber-500">
       <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--muted)]">
-        <button className="hover:text-amber-600 hover:underline" onClick={() => jumpTo(note.page)}>
-          Página {note.page}
+        <button className="hover:text-amber-600 hover:underline" onClick={() => jumpTo(note.cfi ?? note.page)}>
+          <Unit /> {note.page}
         </button>
         <span className="flex items-center gap-2">
           {new Date(note.updatedAt).toLocaleDateString()}

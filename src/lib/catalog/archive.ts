@@ -1,9 +1,9 @@
+import type { BookFile, CatalogItem, CatalogPage, Language, Rights } from './types';
+
 /**
  * Internet Archive catalog: searching (its APIs allow cross-origin requests) and picking the
- * PDF to download (files themselves need the proxy, see download.ts).
+ * file to download (files themselves need the proxy, see download.ts).
  */
-
-export type Language = 'all' | 'por' | 'eng' | 'spa' | 'fre';
 
 /** The Archive's language field is free text, so match the common spellings. */
 const LANGUAGE_TERMS: Record<Exclude<Language, 'all'>, string[]> = {
@@ -43,13 +43,13 @@ export interface SearchResult {
 
 const quote = (s: string) => (/^[\p{L}\p{N}]+$/u.test(s) ? s : `"${s.replace(/"/g, '')}"`);
 
-/** Solr query for public, downloadable PDFs (no lending or access-restricted items). */
+/** Solr query for public, downloadable PDFs and EPUBs (no lending or access-restricted items). */
 export function buildQuery({ query, language, openOnly }: Omit<SearchParams, 'page'>) {
   const terms = query.replace(/[():[\]{}^~*?\\/!]|\b(AND|OR|NOT)\b/g, ' ').trim();
   const parts = [
     terms ? `(${terms})` : '*:*',
     'mediatype:texts',
-    'format:pdf',
+    'format:(pdf OR epub)',
     'NOT access-restricted-item:true',
     'NOT collection:(inlibrary OR printdisabled OR lendinglibrary)',
   ];
@@ -73,11 +73,6 @@ export async function searchArchive(params: SearchParams, signal?: AbortSignal):
   return { total: data.response.numFound, docs: data.response.docs };
 }
 
-export type Rights =
-  | { kind: 'public-domain'; label: string }
-  | { kind: 'open-license'; label: string }
-  | { kind: 'unknown'; label: string };
-
 export function yearOf(doc: ArchiveDoc): number | null {
   const y = Number(String(doc.year ?? doc.date ?? '').slice(0, 4));
   return Number.isFinite(y) && y > 0 ? y : null;
@@ -94,7 +89,6 @@ export function classifyRights(doc: ArchiveDoc): Rights {
   return { kind: 'unknown', label: 'Verifique os direitos' };
 }
 
-export const firstOf = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 export const authorsOf = (doc: ArchiveDoc) => (Array.isArray(doc.creator) ? doc.creator.join('; ') : (doc.creator ?? ''));
 
 export const coverUrl = (id: string) => `https://archive.org/services/img/${encodeURIComponent(id)}`;
@@ -107,35 +101,54 @@ export interface ArchiveFile {
   source?: string | null;
 }
 
-export interface PdfChoice {
-  name: string;
-  size: number | null;
-  url: string;
-}
-
 /**
- * The best PDF of an item: the uploader's original if it is a PDF, else the OCR'd
- * "Text PDF" the Archive derives from scans, else the largest PDF.
+ * The best file of an item: what the uploader sent (PDF, then EPUB), else the OCR'd "Text PDF"
+ * the Archive derives from scans, else its auto-generated EPUB, else the largest PDF.
+ * Derived EPUBs come from OCR and read worse than the scan, hence their low priority.
  */
-export function pickPdf(identifier: string, files: ArchiveFile[]): PdfChoice | null {
-  const pdfs = files.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
-  if (!pdfs.length) return null;
+export function pickBookFile(identifier: string, files: ArchiveFile[]): BookFile | null {
+  const ext = (f: ArchiveFile) => f.name.toLowerCase().split('.').pop();
+  const pdfs = files.filter((f) => ext(f) === 'pdf');
+  const epubs = files.filter((f) => ext(f) === 'epub');
   const size = (f: ArchiveFile) => Number(f.size ?? 0);
   const best =
     pdfs.find((f) => f.source === 'original') ??
+    epubs.find((f) => f.source === 'original') ??
     pdfs.find((f) => f.format === 'Text PDF') ??
+    epubs[0] ??
     [...pdfs].sort((a, b) => size(b) - size(a))[0];
+  if (!best) return null;
   return {
     name: best.name,
     size: size(best) || null,
+    format: ext(best) === 'epub' ? 'epub' : 'pdf',
     url: `https://archive.org/download/${encodeURIComponent(identifier)}/${best.name.split('/').map(encodeURIComponent).join('/')}`,
   };
 }
 
-export async function fetchPdfChoice(identifier: string, signal?: AbortSignal) {
+export async function fetchArchiveFile(identifier: string, signal?: AbortSignal) {
   const res = await fetch(`https://archive.org/metadata/${encodeURIComponent(identifier)}`, { signal });
   if (!res.ok) throw new Error(`Falha ao consultar o item (${res.status})`);
   const data = (await res.json()) as { files?: ArchiveFile[]; is_dark?: boolean };
   if (data.is_dark || !data.files) throw new Error('Este item não está disponível');
-  return pickPdf(identifier, data.files);
+  return pickBookFile(identifier, data.files);
+}
+
+export function archiveItem(doc: ArchiveDoc): CatalogItem {
+  return {
+    key: `ia:${doc.identifier}`,
+    title: doc.title?.trim() || doc.identifier,
+    authors: authorsOf(doc),
+    year: yearOf(doc),
+    rights: classifyRights(doc),
+    downloads: doc.downloads,
+    cover: coverUrl(doc.identifier),
+    pageUrl: itemUrl(doc.identifier),
+    resolveFile: (signal) => fetchArchiveFile(doc.identifier, signal),
+  };
+}
+
+export async function searchArchiveItems(params: SearchParams, signal?: AbortSignal): Promise<CatalogPage> {
+  const { total, docs } = await searchArchive(params, signal);
+  return { total, items: docs.map(archiveItem), hasMore: params.page * PAGE_SIZE < total };
 }

@@ -1,4 +1,4 @@
-/** Proxy that adds CORS headers to Internet Archive files (see worker/). Empty when not configured. */
+/** Proxy that adds CORS headers to Internet Archive and Gutenberg files (see worker/). Empty when not configured. */
 export const PROXY_URL = (import.meta.env.VITE_PROXY_URL as string | undefined)?.replace(/\/$/, '') ?? '';
 
 export interface Progress {
@@ -6,13 +6,14 @@ export interface Progress {
   total: number | null;
 }
 
-/** Downloads a PDF through the proxy, reporting progress; abort with `signal`. */
-export async function downloadPdf(url: string, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<Blob> {
+/** Downloads a book through the proxy, reporting progress; abort with `signal`. */
+export async function downloadBook(url: string, onProgress: (p: Progress) => void, signal?: AbortSignal): Promise<Blob> {
   if (!PROXY_URL) throw new Error('Download direto não configurado');
   if (!navigator.onLine) throw new Error('Sem conexão com a internet');
   const res = await fetch(`${PROXY_URL}/fetch?url=${encodeURIComponent(url)}`, { signal });
   if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Falha no download (${res.status})`);
   const total = Number(res.headers.get('Content-Length')) || null;
+  const type = res.headers.get('Content-Type') ?? 'application/octet-stream';
   if (!res.body) return res.blob();
 
   const reader = res.body.getReader();
@@ -26,7 +27,7 @@ export async function downloadPdf(url: string, onProgress: (p: Progress) => void
     loaded += value.byteLength;
     onProgress({ loaded, total });
   }
-  return new Blob(chunks, { type: 'application/pdf' });
+  return new Blob(chunks, { type });
 }
 
 export const formatBytes = (n: number) =>

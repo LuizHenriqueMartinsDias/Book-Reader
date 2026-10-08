@@ -1,5 +1,5 @@
-/** Hosts the proxy may fetch from: the Internet Archive and its file servers. */
-const ALLOWED_HOSTS = ['archive.org'];
+/** Hosts the proxy may fetch from: the Internet Archive (and its file servers) and Project Gutenberg. */
+const ALLOWED_HOSTS = ['archive.org', 'gutenberg.org'];
 
 const ALLOWED_ORIGINS = ['https://luizhenriquemartinsdias.github.io', 'http://localhost:5173', 'http://localhost:4173'];
 /** The dev server on the local network, to test on the tablet. */
@@ -23,8 +23,14 @@ export function allowedOrigin(origin: string | null): string | null {
   return ALLOWED_ORIGINS.includes(origin) || LAN_ORIGIN.test(origin) ? origin : null;
 }
 
-/** Only PDFs go through, so the proxy can't be used to fetch arbitrary pages. */
-export function isPdfResponse(contentType: string | null, url: URL) {
+/** Only books (PDF or EPUB) go through, so the proxy can't be used to fetch arbitrary pages. */
+export function bookType(contentType: string | null, url: URL): 'application/pdf' | 'application/epub+zip' | null {
   const type = (contentType ?? '').split(';')[0].trim().toLowerCase();
-  return type === 'application/pdf' || (type === 'application/octet-stream' && url.pathname.toLowerCase().endsWith('.pdf'));
+  if (type === 'application/pdf' || type === 'application/epub+zip') return type;
+  if (type === 'application/octet-stream' || type === 'application/zip') {
+    const path = url.pathname.toLowerCase();
+    if (path.endsWith('.pdf')) return 'application/pdf';
+    if (path.endsWith('.epub')) return 'application/epub+zip';
+  }
+  return null;
 }

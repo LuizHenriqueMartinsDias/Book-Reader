@@ -1,12 +1,13 @@
 # Book Reader
 
-Leitor pessoal de livros em PDF com anotações — roda no navegador, instalável como app (PWA) e funciona offline.
+Leitor pessoal de livros em PDF e EPUB com anotações — roda no navegador, instalável como app (PWA) e funciona offline.
 
-- **Biblioteca**: importe PDFs (botão ou arrastar e soltar); capa, progresso e última página lida.
+- **Biblioteca**: importe PDFs e EPUBs (botão ou arrastar e soltar); capa, progresso e última posição lida.
+- **EPUB**: texto que se ajusta à tela, com tamanho e fonte ajustáveis, temas, sumário, busca, destaques e notas. Modo página (com toque/deslize nas bordas) ou rolagem. Escrita à mão livre e exportação em PDF são só para PDFs.
 - **Leitura**: rolagem contínua, zoom (botões, Ctrl+roda, pinça), sumário, busca no texto, temas claro/sépia/escuro.
 - **Escrita à mão**: caneta e marca-texto com pressão de stylus, borracha (inclusive a ponta-borracha da caneta), desfazer/refazer. Com stylus detectado, o dedo rola a página (rejeição de palma).
 - **Destaques e notas**: selecione texto → escolha a cor ou crie uma nota; notas por página no painel lateral.
-- **Buscar livros grátis**: pesquisa no Internet Archive obras em domínio público ou com licença aberta e baixa o PDF direto para a estante.
+- **Buscar livros grátis**: pesquisa no Internet Archive (PDF/EPUB, domínio público ou licença aberta) e no Project Gutenberg (EPUB) e baixa direto para a estante.
 - **Exportar**: gera um PDF com destaques e traços gravados e as notas como comentários; backup/restauração das anotações em JSON.
 
 Tudo fica salvo localmente no navegador (IndexedDB). Livros são identificados pelo hash do arquivo, então um backup restaurado em outro dispositivo reconecta as anotações quando o mesmo PDF for importado.
@@ -23,7 +24,7 @@ npm run preview    # serve o build
 
 ## Proxy de download (Cloudflare Worker)
 
-O Internet Archive permite buscar pelo navegador, mas não envia cabeçalhos CORS nos arquivos. O Worker em `worker/` repassa apenas PDFs de `*.archive.org` e só aceita requisições vindas do app.
+O Internet Archive e o Project Gutenberg permitem buscar pelo navegador, mas não enviam cabeçalhos CORS nos arquivos. O Worker em `worker/` repassa apenas PDFs e EPUBs de `*.archive.org` e `*.gutenberg.org` e só aceita requisições vindas do app.
 
 ```bash
 npm run worker:dev     # proxy local em http://localhost:8787 (use VITE_PROXY_URL=http://localhost:8787 em .env.local)

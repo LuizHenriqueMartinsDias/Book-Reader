@@ -1,17 +1,16 @@
-import { Copy, StickyNote, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { db, type Highlight } from '../../db/schema';
-import { newId, putNote } from '../../db/repo';
+import { newId } from '../../db/repo';
 import { clientRectsToPdf } from '../../lib/coords';
-import { useHistory } from '../../store/history';
-import { HIGHLIGHT_COLORS, useUi } from '../../store/ui';
+import { useUi } from '../../store/ui';
+import AnnotationMenu, { type MenuTarget } from './AnnotationMenu';
 import { useReader } from './readerStore';
 
 type MenuState =
   | { kind: 'selection'; x: number; y: number; range: Range }
   | { kind: 'highlight'; x: number; y: number; highlight: Highlight };
 
-/** Floating menu for a text selection (create highlight) or a clicked highlight (edit it). */
+/** Tracks text selections and highlight clicks on PDF pages and shows the annotation menu. */
 export default function SelectionMenu() {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const pointerDown = useRef(false);
@@ -78,96 +77,12 @@ export default function SelectionMenu() {
     getSelection()?.removeAllRanges();
   };
 
-  const openNote = (noteId: string) => {
-    useReader.setState({ sidebarTab: 'notes', focusNoteId: noteId });
-    useUi.getState().set({ sidebarOpen: true });
-  };
+  const target: MenuTarget =
+    menu.kind === 'selection'
+      ? { kind: 'selection', text: menu.range.toString(), createHighlights: (color) => rangeToHighlights(menu.range, color) }
+      : { kind: 'highlight', highlight: menu.highlight };
 
-  async function highlightSelection(color: string, withNote = false) {
-    if (menu?.kind !== 'selection') return;
-    const created = rangeToHighlights(menu.range, color);
-    if (!created.length) return close();
-    await useHistory.getState().commit({ added: { highlights: created }, removed: {} });
-    if (withNote) {
-      const h = created[0];
-      const note = { id: newId(), bookId: h.bookId, page: h.page, highlightId: h.id, body: '', createdAt: Date.now(), updatedAt: Date.now() };
-      await putNote(note);
-      openNote(note.id);
-    }
-    close();
-  }
-
-  async function recolor(color: string) {
-    if (menu?.kind !== 'highlight') return;
-    const old = menu.highlight;
-    await useHistory.getState().commit({ added: { highlights: [{ ...old, color }] }, removed: { highlights: [old] } });
-    close();
-  }
-
-  async function noteForHighlight() {
-    if (menu?.kind !== 'highlight') return;
-    const h = menu.highlight;
-    const existing = await db.notes.where('highlightId').equals(h.id).first();
-    const note = existing ?? { id: newId(), bookId: h.bookId, page: h.page, highlightId: h.id, body: '', createdAt: Date.now(), updatedAt: Date.now() };
-    if (!existing) await putNote(note);
-    openNote(note.id);
-    close();
-  }
-
-  const left = Math.min(Math.max(8, menu.x - 130), window.innerWidth - 268);
-  const top = Math.min(menu.y + 8, window.innerHeight - 56);
-  const current = menu.kind === 'highlight' ? menu.highlight.color : null;
-
-  return (
-    <div
-      data-selection-menu
-      className="fixed z-50 flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1.5 shadow-xl"
-      style={{ left, top }}
-      onPointerDown={(e) => e.preventDefault()}
-    >
-      {HIGHLIGHT_COLORS.map((c) => (
-        <button
-          key={c}
-          title="Destacar"
-          onClick={() => (menu.kind === 'selection' ? highlightSelection(c) : recolor(c))}
-          className={`size-7 rounded-full border-2 ${current === c ? 'border-amber-600' : 'border-transparent'}`}
-        >
-          <span className="block size-full rounded-full ring-1 ring-black/10" style={{ background: c }} />
-        </button>
-      ))}
-      <div className="mx-1 h-6 w-px bg-[var(--border)]" />
-      <button
-        title="Adicionar nota"
-        className="rounded-md p-1.5 hover:bg-[var(--app-bg)]"
-        onClick={() => (menu.kind === 'selection' ? highlightSelection(HIGHLIGHT_COLORS[0], true) : noteForHighlight())}
-      >
-        <StickyNote className="size-5" />
-      </button>
-      {menu.kind === 'selection' ? (
-        <button
-          title="Copiar"
-          className="rounded-md p-1.5 hover:bg-[var(--app-bg)]"
-          onClick={() => {
-            navigator.clipboard?.writeText(menu.range.toString());
-            close();
-          }}
-        >
-          <Copy className="size-5" />
-        </button>
-      ) : (
-        <button
-          title="Remover destaque"
-          className="rounded-md p-1.5 text-red-600 hover:bg-[var(--app-bg)]"
-          onClick={async () => {
-            await useHistory.getState().commit({ added: {}, removed: { highlights: [menu.highlight] } });
-            close();
-          }}
-        >
-          <Trash2 className="size-5" />
-        </button>
-      )}
-    </div>
-  );
+  return <AnnotationMenu x={menu.x} y={menu.y} target={target} onClose={close} />;
 }
 
 /** Splits a DOM selection into one highlight per page it touches. */

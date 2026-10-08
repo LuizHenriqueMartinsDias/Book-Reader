@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Book } from '../../db/schema';
+import { db, type Book, type BookFormat } from '../../db/schema';
 import { updateBook } from '../../db/repo';
 import { CSS_UNITS, type PageSize, type PDFDocumentProxy } from '../../lib/pdf';
 import { useHistory } from '../../store/history';
@@ -8,12 +8,22 @@ import { useReader } from './readerStore';
 import SelectionMenu from './SelectionMenu';
 import Sidebar from './Sidebar';
 import Toolbar from './Toolbar';
+import EpubReader from '../epub/EpubReader';
 import { useDocument } from './useDocument';
 import PagedView from './views/PagedView';
 import ScrollView from './views/ScrollView';
 import { MAX_ZOOM, MIN_ZOOM, type ZoomChange, type ZoomMode } from './views/types';
 
 export default function ReaderPage({ bookId }: { bookId: string }) {
+  const [format, setFormat] = useState<BookFormat | null | 'missing'>(null);
+  useEffect(() => {
+    db.books.get(bookId).then((b) => setFormat(b ? (b.format ?? 'pdf') : 'missing'));
+  }, [bookId]);
+  if (format === null) return <div className="p-8 text-[var(--muted)]">Abrindo livro…</div>;
+  return format === 'epub' ? <EpubReader bookId={bookId} /> : <PdfReader bookId={bookId} />;
+}
+
+function PdfReader({ bookId }: { bookId: string }) {
   const state = useDocument(bookId);
 
   if (state.status === 'loading') return <div className="p-8 text-[var(--muted)]">Abrindo livro…</div>;
@@ -35,7 +45,7 @@ const TOOL_KEYS: Record<string, Tool> = { v: 'select', p: 'pen', h: 'marker', e:
 function Reader({ book, doc, sizes }: { book: Book; doc: PDFDocumentProxy; sizes: PageSize[] }) {
   // Seed the per-book store before any child renders, so views open on the last-read page.
   useState(() => {
-    useReader.setState({ bookId: book.id, doc, currentPage: book.lastPage, focusNoteId: null });
+    useReader.setState({ bookId: book.id, format: 'pdf', doc, epub: null, currentPage: book.lastPage, currentCfi: null, focusNoteId: null });
     useHistory.getState().reset();
   });
 
@@ -46,13 +56,14 @@ function Reader({ book, doc, sizes }: { book: Book; doc: PDFDocumentProxy; sizes
   const scale = useReader((s) => s.scale);
 
   useEffect(() => {
+    useReader.setState({ doc });
     updateBook(book.id, { lastOpenedAt: Date.now() });
     document.title = `${book.title} · Book Reader`;
     return () => {
       document.title = 'Book Reader';
       useReader.setState({ doc: null });
     };
-  }, [book]);
+  }, [book, doc]);
 
   useEffect(() => {
     const t = setTimeout(() => updateBook(book.id, { lastPage: currentPage }), 500);

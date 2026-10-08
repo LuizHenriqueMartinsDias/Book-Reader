@@ -7,9 +7,15 @@ import Dexie, { type EntityTable } from 'dexie';
 export type Point = [x: number, y: number, pressure: number];
 export type Rect = [x: number, y: number, w: number, h: number];
 
+export type BookFormat = 'pdf' | 'epub';
+
 export interface Book {
   id: string;
   title: string;
+  /** Absent on books stored before EPUB support, which are all PDFs. */
+  format?: BookFormat;
+  author?: string;
+  /** PDF: number of pages. EPUB: 0 (reflowable text has no fixed pages). */
   pageCount: number;
   coverThumb?: string;
   addedAt: number;
@@ -17,6 +23,11 @@ export interface Book {
   lastPage: number;
   zoom: number;
   fileSize: number;
+  /** EPUB reading position (CFI) and fraction read. */
+  lastLocation?: string;
+  progress?: number;
+  /** EPUB: cached epub.js locations (JSON), slow to compute for long books. */
+  locations?: string;
 }
 
 /** Kept apart from `books` so listing the library doesn't load every PDF into memory. */
@@ -41,9 +52,13 @@ export interface Stroke {
 export interface Highlight {
   id: string;
   bookId: string;
+  /** PDF: page number. EPUB: chapter (spine index + 1), for grouping and filtering. */
   page: number;
   color: string;
+  /** PDF only; empty for EPUB, which anchors by `cfi`. */
   rects: Rect[];
+  /** EPUB: CFI range of the highlighted text. */
+  cfi?: string;
   text: string;
   createdAt: number;
 }
@@ -53,6 +68,8 @@ export interface Note {
   bookId: string;
   page: number;
   highlightId?: string;
+  /** EPUB: where the note was taken (CFI). */
+  cfi?: string;
   body: string;
   createdAt: number;
   updatedAt: number;

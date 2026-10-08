@@ -6,16 +6,21 @@ import { deleteBook, updateBook } from '../../db/repo';
 
 export default function BookCard({ book }: { book: Book }) {
   const [menu, setMenu] = useState(false);
-  const progress = book.pageCount > 1 ? (book.lastPage - 1) / (book.pageCount - 1) : 0;
+  const epub = book.format === 'epub';
+  const progress = epub ? (book.progress ?? 0) : book.pageCount > 1 ? (book.lastPage - 1) / (book.pageCount - 1) : 0;
 
   return (
     <div className="group relative">
       <button onClick={() => navigate(`#/read/${book.id}`)} className="block w-full text-left">
-        <div className="aspect-[2/3] overflow-hidden rounded-md bg-[var(--panel)] shadow-md ring-1 ring-black/5 transition group-hover:-translate-y-1 group-hover:shadow-lg">
+        <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-[var(--panel)] shadow-md ring-1 ring-black/5 transition group-hover:-translate-y-1 group-hover:shadow-lg">
+          {epub && <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">EPUB</span>}
           {book.coverThumb ? (
-            <img src={book.coverThumb} alt="" className="page-canvas size-full object-cover object-top" />
+            <img src={book.coverThumb} alt="" className={`${epub ? '' : 'page-canvas'} size-full object-cover object-top`} />
           ) : (
-            <div className="flex size-full items-center justify-center p-3 text-center text-sm">{book.title}</div>
+            <div className="flex size-full flex-col items-center justify-center gap-1 p-3 text-center text-sm">
+              <span className="font-medium">{book.title}</span>
+              {book.author && <span className="text-xs text-[var(--muted)]">{book.author}</span>}
+            </div>
           )}
         </div>
         <div className="mt-2 line-clamp-2 text-sm font-medium leading-snug" title={book.title}>
@@ -25,7 +30,7 @@ export default function BookCard({ book }: { book: Book }) {
           <div className="h-1 flex-1 overflow-hidden rounded bg-[var(--border)]">
             <div className="h-full bg-amber-500" style={{ width: `${progress * 100}%` }} />
           </div>
-          {book.lastOpenedAt ? `${book.lastPage}/${book.pageCount}` : 'Novo'}
+          {!book.lastOpenedAt ? 'Novo' : epub ? `${Math.round(progress * 100)}%` : `${book.lastPage}/${book.pageCount}`}
         </div>
       </button>
 

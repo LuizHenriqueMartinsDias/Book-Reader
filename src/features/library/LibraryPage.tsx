@@ -6,7 +6,7 @@ import { db } from '../../db/schema';
 import { createBackup, download, restoreBackup } from '../../lib/backup';
 import { useUi, type Theme } from '../../store/ui';
 import BookCard from './BookCard';
-import { importBook } from './importBook';
+import { ACCEPTED_FILES, importBook, isBookFile } from './importBook';
 
 const THEMES: { id: Theme; icon: typeof Sun; label: string }[] = [
   { id: 'light', icon: Sun, label: 'Claro' },
@@ -24,8 +24,8 @@ export default function LibraryPage() {
   const backupInput = useRef<HTMLInputElement>(null);
 
   async function handleFiles(files: Iterable<File>) {
-    const pdfs = [...files].filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
-    if (!pdfs.length) return setMessage('Nenhum PDF encontrado.');
+    const pdfs = [...files].filter(isBookFile);
+    if (!pdfs.length) return setMessage('Nenhum PDF ou EPUB encontrado.');
     const results = [];
     for (const [i, file] of pdfs.entries()) {
       setBusy(`Importando ${i + 1}/${pdfs.length}: ${file.name}`);
@@ -110,12 +110,12 @@ export default function LibraryPage() {
           className="flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-amber-400"
           onClick={() => fileInput.current?.click()}
         >
-          <FilePlus2 className="size-4" /> Adicionar PDF
+          <FilePlus2 className="size-4" /> Adicionar livro
         </button>
         <input
           ref={fileInput}
           type="file"
-          accept="application/pdf,.pdf"
+          accept={ACCEPTED_FILES}
           multiple
           hidden
           onChange={(e) => {
@@ -155,7 +155,7 @@ export default function LibraryPage() {
           >
             <FilePlus2 className="size-10" />
             <span className="text-base font-medium text-[var(--app-fg)]">Sua estante está vazia</span>
-            <span className="text-sm">Clique aqui ou arraste arquivos PDF para começar a ler.</span>
+            <span className="text-sm">Clique aqui ou arraste arquivos PDF ou EPUB para começar a ler.</span>
           </button>
         )}
         {books && books.length === 0 && (
@@ -174,7 +174,7 @@ export default function LibraryPage() {
 
       {dragging && (
         <div className="pointer-events-none fixed inset-0 z-20 flex items-center justify-center bg-amber-500/15 text-lg font-medium ring-4 ring-amber-500 ring-inset">
-          Solte os PDFs para adicionar
+          Solte os livros para adicionar
         </div>
       )}
     </div>

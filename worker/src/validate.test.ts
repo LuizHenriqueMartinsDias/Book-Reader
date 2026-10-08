@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { allowedOrigin, isAllowedTarget, isPdfResponse } from './validate';
+import { allowedOrigin, bookType, isAllowedTarget } from './validate';
 
 describe('isAllowedTarget', () => {
   it('accepts the Internet Archive and its file servers over https', () => {
     expect(isAllowedTarget('https://archive.org/download/x/y.pdf')).not.toBeNull();
     expect(isAllowedTarget('https://ia801508.us.archive.org/3/items/x/y.pdf')).not.toBeNull();
     expect(isAllowedTarget('https://dn760102.eu.archive.org/0/items/x/y.pdf')).not.toBeNull();
+    expect(isAllowedTarget('https://www.gutenberg.org/ebooks/55752.epub3.images')).not.toBeNull();
   });
 
   it('rejects other hosts, look-alikes, plain http and odd URLs', () => {
@@ -36,12 +37,15 @@ describe('allowedOrigin', () => {
   });
 });
 
-describe('isPdfResponse', () => {
-  const url = new URL('https://archive.org/download/x/book.pdf');
-  it('passes PDFs and generic binaries named .pdf', () => {
-    expect(isPdfResponse('application/pdf', url)).toBe(true);
-    expect(isPdfResponse('application/octet-stream', url)).toBe(true);
-    expect(isPdfResponse('text/html; charset=utf-8', url)).toBe(false);
-    expect(isPdfResponse('application/octet-stream', new URL('https://archive.org/x.zip'))).toBe(false);
+describe('bookType', () => {
+  const pdf = new URL('https://archive.org/download/x/book.pdf');
+  const epub = new URL('https://archive.org/download/x/book.epub');
+  it('passes PDFs and EPUBs, including generic binaries named after them', () => {
+    expect(bookType('application/pdf', pdf)).toBe('application/pdf');
+    expect(bookType('application/epub+zip', new URL('https://www.gutenberg.org/ebooks/1.epub3.images'))).toBe('application/epub+zip');
+    expect(bookType('application/octet-stream', pdf)).toBe('application/pdf');
+    expect(bookType('application/zip', epub)).toBe('application/epub+zip');
+    expect(bookType('text/html; charset=utf-8', pdf)).toBeNull();
+    expect(bookType('application/octet-stream', new URL('https://archive.org/x.zip'))).toBeNull();
   });
 });

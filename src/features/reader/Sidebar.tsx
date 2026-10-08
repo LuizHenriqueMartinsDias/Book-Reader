@@ -1,5 +1,7 @@
 import { ListTree, Search, StickyNote, X } from 'lucide-react';
 import { useUi } from '../../store/ui';
+import EpubOutlinePanel from '../epub/EpubOutlinePanel';
+import EpubSearchPanel from '../epub/EpubSearchPanel';
 import NotesPanel from './NotesPanel';
 import OutlinePanel from './OutlinePanel';
 import { useReader, type SidebarTab } from './readerStore';
@@ -13,6 +15,7 @@ const TABS: { id: SidebarTab; icon: typeof Search; label: string }[] = [
 
 export default function Sidebar({ pageCount }: { pageCount: number }) {
   const tab = useReader((s) => s.sidebarTab);
+  const epub = useReader((s) => s.format === 'epub');
   const close = () => useUi.getState().set({ sidebarOpen: false });
 
   return (
@@ -38,16 +41,18 @@ export default function Sidebar({ pageCount }: { pageCount: number }) {
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {tab === 'notes' && <NotesPanel />}
-          {tab === 'outline' && <OutlinePanel />}
-          {tab === 'search' && <SearchPanel pageCount={pageCount} />}
+          {tab === 'outline' && (epub ? <EpubOutlinePanel /> : <OutlinePanel />)}
+          {tab === 'search' && (epub ? <EpubSearchPanel /> : <SearchPanel pageCount={pageCount} />)}
         </div>
       </aside>
     </>
   );
 }
 
-/** Navigates and, on small screens, gets the sidebar out of the way. */
-export function jumpTo(page: number) {
-  useReader.getState().goToPage(page);
+/** Navigates to a page (PDF) or CFI (EPUB) and, on small screens, gets the sidebar out of the way. */
+export function jumpTo(target: number | string) {
+  const reader = useReader.getState();
+  if (typeof target === 'string') reader.goToCfi(target);
+  else reader.goToPage(target);
   if (window.matchMedia('(max-width: 767px)').matches) useUi.getState().set({ sidebarOpen: false });
 }
