@@ -47,10 +47,10 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
     if (!rotating) setLayoutRotation(pageRotation);
   }, [rotating, pageRotation]);
   const boxes = useMemo(() => pages.map((p) => turnedSize(p, layoutRotation[p.id] ?? 0)), [pages, layoutRotation]);
-  // Empty room beside the pages, so the view moves sideways freely; it grows (on both sides)
-  // whenever the view gets near its end, so there's always more.
-  const [side, setSide] = useState(() => window.innerWidth);
-  const layout = useMemo(() => buildLayout(boxes, scale, side), [boxes, scale, side]);
+  // Empty room around the pages, so the view moves freely: beside them (both sides at once),
+  // above and below. Each grows whenever the view gets near its end, so there's always more.
+  const [room, setRoom] = useState(() => ({ side: window.innerWidth, top: window.innerHeight, bottom: window.innerHeight }));
+  const layout = useMemo(() => buildLayout(boxes, scale, room.side, room.top), [boxes, scale, room.side, room.top]);
   const offsets = layout.offsets;
 
   useEffect(() => onScale(scale), [scale, onScale]);
@@ -61,23 +61,30 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
     setViewport({ top: el.scrollTop, height: el.clientHeight, width: el.clientWidth });
   }, []);
 
+  /** Room is being added before or beside the pages; the layout effect keeps the view in place. */
   const growing = useRef(false);
   const onScroll = () => {
     measure();
     const el = scrollRef.current;
-    if (!el || growing.current) return;
-    const room = el.clientWidth;
-    if (el.scrollLeft < room / 2 || el.scrollWidth - el.clientWidth - el.scrollLeft < room / 2) {
-      // Keeping the same spot in view is the layout effect's job (the pages move right).
+    if (!el) return;
+    const [w, h] = [el.clientWidth, el.clientHeight];
+    const nearSide = el.scrollLeft < w / 2 || el.scrollWidth - w - el.scrollLeft < w / 2;
+    const nearTop = el.scrollTop < h / 2;
+    const nearBottom = el.scrollHeight - h - el.scrollTop < h / 2;
+    if ((nearSide || nearTop) && !growing.current) {
+      // Room before the pages moves them; keeping the same spot in view is the layout effect's job.
       growing.current = true;
-      setSide((s) => s + room);
+      setRoom((r) => ({ ...r, side: nearSide ? r.side + w : r.side, top: nearTop ? r.top + h : r.top }));
     }
+    if (nearBottom) setRoom((r) => ({ ...r, bottom: r.bottom + h }));
   };
 
-  // Open with the pages in the middle.
+  // Open with the pages in the middle, at the top of the first one.
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    if (!el) return;
+    el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    el.scrollTop = layoutRef.current.top;
   }, []);
 
   useLayoutEffect(() => {
@@ -151,7 +158,16 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
 
   return (
     <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto overscroll-contain" style={{ touchAction: 'pan-x pan-y' }}>
-      <div ref={contentRef} className="origin-top-left" style={{ width: layout.maxWidth * scale + 2 * (PADDING + side), padding: PADDING, paddingInline: PADDING + side }}>
+      <div
+        ref={contentRef}
+        className="origin-top-left"
+        style={{
+          width: layout.maxWidth * scale + 2 * (PADDING + room.side),
+          paddingInline: PADDING + room.side,
+          paddingTop: PADDING + room.top,
+          paddingBottom: PADDING + room.bottom,
+        }}
+      >
         {pages.map((page, i) => {
           const w = page.width * scale;
           const h = page.height * scale;
@@ -240,6 +256,8 @@ type TwoFinger = {
   angle: number;
   mid: Vec;
   lastMid: Vec;
+  /** Scrolling the browser couldn't do yet (it rounds positions), px. */
+  carry: Vec;
   scroll: Vec;
   /** Where the content's top-left corner was on screen when the fingers landed. */
   origin: Vec;
@@ -282,6 +300,7 @@ function useTwoFingerGestures(
         tf: initialTwoFinger(),
         ...t,
         lastMid: t.mid,
+        carry: [0, 0],
         scroll: [el.scrollLeft, el.scrollTop],
         origin: [contentRef.current!.getBoundingClientRect().left, contentRef.current!.getBoundingClientRect().top],
         scale: layoutRef.current.scale,
@@ -301,6 +320,7 @@ function useTwoFingerGestures(
       // into scrolling: it scrolls along while zoom and rotation can still start.
       const wasZooming = zooms(g.tf);
       g.tf = classify(g.tf, ratio, turn, !!g.pageId);
+      const prevMid = g.lastMid;
       g.lastMid = t.mid;
       if (zooms(g.tf) && !wasZooming) {
         // Zoom starts now: measure the preview from where scrolling has brought things.
@@ -311,8 +331,13 @@ function useTwoFingerGestures(
       }
 
       if (!zooms(g.tf)) {
-        el.scrollLeft = g.scroll[0] - (t.mid[0] - g.mid[0]);
-        el.scrollTop = g.scroll[1] - (t.mid[1] - g.mid[1]);
+        // By how much the fingers moved since last time, not from where they started: the view
+        // may have been shifted meanwhile (room added around the pages keeps the same spot in view).
+        // The browser rounds scroll positions, so the leftover fraction is carried along.
+        const want: Vec = [el.scrollLeft - (t.mid[0] - prevMid[0]) + g.carry[0], el.scrollTop - (t.mid[1] - prevMid[1]) + g.carry[1]];
+        el.scrollLeft = want[0];
+        el.scrollTop = want[1];
+        g.carry = [want[0] - el.scrollLeft, want[1] - el.scrollTop];
       }
       if (zooms(g.tf)) {
         const target = Math.min(MAX_ZOOM * CSS_UNITS, Math.max(MIN_ZOOM * CSS_UNITS, g.scale * ratio));

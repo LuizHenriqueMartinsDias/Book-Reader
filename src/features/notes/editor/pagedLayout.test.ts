@@ -48,3 +48,13 @@ describe('room beside the pages', () => {
     expect(scrollFor(after, a).left).toBeCloseTo(100 + 800, 6); // the pages moved right by the new room
   });
 });
+
+describe('room above the pages', () => {
+  it('puts the pages below it and keeps a spot above them in place when it grows', () => {
+    const before = buildLayout(pages, 1, 0, 700);
+    expect(before.offsets[0]).toBe(700 + 16);
+    const a = anchorAt(before, 0, 100, 300, 200); // above the first page
+    expect(a.fy).toBeLessThan(0);
+    expect(scrollFor(buildLayout(pages, 1, 0, 1400), a).top).toBeCloseTo(100 + 700, 6);
+  });
+});

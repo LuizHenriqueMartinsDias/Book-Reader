@@ -21,12 +21,13 @@ export interface PagedLayout {
   heights: number[];
   maxWidth: number;
   scale: number;
-  /** Empty room (px) on each side of the pages, to move the view sideways into. */
+  /** Empty room (px) on each side of the pages, and above the first one, to move the view into. */
   side: number;
+  top: number;
 }
 
-export function buildLayout(pages: { width: number; height: number }[], scale: number, side = 0): PagedLayout {
-  const offsets = [PADDING];
+export function buildLayout(pages: { width: number; height: number }[], scale: number, side = 0, top = 0): PagedLayout {
+  const offsets = [top + PADDING];
   for (const p of pages) offsets.push(offsets[offsets.length - 1] + p.height * scale + FOOTER + GAP);
   return {
     offsets,
@@ -35,6 +36,7 @@ export function buildLayout(pages: { width: number; height: number }[], scale: n
     maxWidth: Math.max(...pages.map((p) => p.width), 1),
     scale,
     side,
+    top,
   };
 }
 
