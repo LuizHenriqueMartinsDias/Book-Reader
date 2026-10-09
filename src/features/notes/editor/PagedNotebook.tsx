@@ -2,19 +2,19 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { addPage, deletePage, movePage } from '../../../db/notes';
 import { db, type Notebook, type NotePage } from '../../../db/schema';
-import { CSS_UNITS, type PDFDocumentProxy } from '../../../lib/pdf';
-import { snapQuarter } from '../../../lib/notes/geometry';
+import { snapQuarter, type Vec } from '../../../lib/notes/geometry';
 import { paperCss } from '../../../lib/notes/render';
+import { CSS_UNITS, type PDFDocumentProxy } from '../../../lib/pdf';
 import PdfPageCanvas from '../../reader/PdfPageCanvas';
-import { useZoomGestures } from '../../reader/views/useZoomGestures';
 import type { ZoomChange, ZoomMode } from '../../reader/views/types';
 import { useNoteEditor } from './editorStore';
 import NoteSurface from './NoteSurface';
+import { anchorAt, buildLayout, FOOTER, GAP, PADDING, pageIndexAt, scrollFor, type Anchor, type PagedLayout } from './pagedLayout';
 
-const GAP = 12;
-const FOOTER = 34;
-const PADDING = 16;
 const MAX_FIT = 2.2;
+/** Zoom limits relative to 100%, as in the editor. */
+const MIN_ZOOM = 0.3;
+const MAX_ZOOM = 4;
 
 interface Props {
   notebook: Notebook;
@@ -28,28 +28,16 @@ interface Props {
 /** A4-like pages one under the other, like a paper notebook; only pages near the screen render. */
 export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onScale }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ top: 0, height: 800, width: 800 });
 
   const maxWidth = useMemo(() => Math.max(...pages.map((p) => p.width), 1), [pages]);
   const fit = Math.min(MAX_FIT, Math.max(0.2, (viewport.width - 2 * PADDING) / maxWidth));
   const scale = zoom === null ? fit : zoom * CSS_UNITS;
+  const layout = useMemo(() => buildLayout(pages, scale), [pages, scale]);
+  const offsets = layout.offsets;
 
   useEffect(() => onScale(scale), [scale, onScale]);
-
-  const offsets = useMemo(() => {
-    const out = [PADDING];
-    for (const p of pages) out.push(out[out.length - 1] + p.height * scale + FOOTER + GAP);
-    return out;
-  }, [pages, scale]);
-
-  const pageAt = useCallback(
-    (y: number) => {
-      let i = 0;
-      while (i < pages.length - 1 && offsets[i + 1] <= y) i++;
-      return i;
-    },
-    [offsets, pages.length],
-  );
 
   const measure = useCallback(() => {
     const el = scrollRef.current;
@@ -66,7 +54,7 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
   }, [measure]);
 
   // The page around the middle of the screen receives pasted items, images and quotes.
-  const current = pages[pageAt(viewport.top + viewport.height / 2)];
+  const current = pages[pageIndexAt(layout, viewport.top + viewport.height / 2)];
   useEffect(() => {
     if (!current) return;
     const top = offsets[pages.indexOf(current)];
@@ -80,30 +68,43 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
     });
   }, [current, offsets, pages, scale]);
 
-  // Keep the reading position across zoom changes.
-  const anchor = useRef<{ index: number; fraction: number } | null>(null);
-  const prevScale = useRef(scale);
+  // Zooming keeps a spot of the notebook in place: the one under the fingers or the cursor,
+  // else the middle of the screen. It's measured in the layout before the change.
+  const layoutRef = useRef(layout);
+  const pendingAnchor = useRef<Anchor | null>(null);
+  /** The spot under a point on screen (client coordinates), in the current layout. */
+  const anchorAtClient = useCallback(([cx, cy]: Vec) => {
+    const el = scrollRef.current!;
+    const r = el.getBoundingClientRect();
+    return anchorAt(layoutRef.current, el.scrollLeft, el.scrollTop, cx - r.left, cy - r.top);
+  }, []);
+  const zoomAround = useCallback(
+    (next: ZoomChange, anchor: Anchor) => {
+      pendingAnchor.current = anchor;
+      onZoom(next);
+    },
+    [onZoom],
+  );
+
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    if (!el || prevScale.current === scale) return;
-    prevScale.current = scale;
-    const a = anchor.current;
-    if (a && pages[a.index]) el.scrollTop = offsets[a.index] + a.fraction * pages[a.index].height * scale - PADDING;
-  }, [scale, offsets, pages]);
-
-  const onScroll = () => {
-    const el = scrollRef.current!;
-    const i = pageAt(el.scrollTop + PADDING);
-    if (pages[i]) anchor.current = { index: i, fraction: (el.scrollTop + PADDING - offsets[i]) / (pages[i].height * scale) };
+    const before = layoutRef.current;
+    layoutRef.current = layout;
+    if (!el || before.scale === layout.scale) return;
+    const a = pendingAnchor.current ?? anchorAt(before, el.scrollLeft, el.scrollTop, el.clientWidth / 2, el.clientHeight / 2);
+    pendingAnchor.current = null;
+    const { left, top } = scrollFor(layout, a);
+    el.scrollLeft = left;
+    el.scrollTop = top;
     measure();
-  };
+  }, [layout, measure]);
 
-  useZoomGestures(scrollRef, onZoom, () => scale / CSS_UNITS);
-  usePageTwist(scrollRef);
+  useTwoFingerGestures(scrollRef, contentRef, layoutRef, zoomAround);
+  useCtrlWheelZoom(scrollRef, anchorAtClient, zoomAround);
   const pageRotation = useNoteEditor((s) => s.pageRotation);
 
-  const first = pageAt(viewport.top - viewport.height);
-  const last = pageAt(viewport.top + viewport.height * 2);
+  const first = pageIndexAt(layout, viewport.top - viewport.height);
+  const last = pageIndexAt(layout, viewport.top + viewport.height * 2);
 
   async function removePage(page: NotePage) {
     const count = await db.noteItems.where('pageId').equals(page.id).count();
@@ -113,8 +114,8 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
   }
 
   return (
-    <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto overscroll-contain" style={{ touchAction: 'pan-x pan-y' }}>
-      <div className="mx-auto" style={{ width: maxWidth * scale + 2 * PADDING, padding: PADDING }}>
+    <div ref={scrollRef} onScroll={measure} className="min-h-0 flex-1 overflow-auto overscroll-contain" style={{ touchAction: 'pan-x pan-y' }}>
+      <div ref={contentRef} className="mx-auto origin-top-left" style={{ width: maxWidth * scale + 2 * PADDING, padding: PADDING }}>
         {pages.map((page, i) => {
           const w = page.width * scale;
           const h = page.height * scale;
@@ -177,43 +178,118 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
   );
 }
 
-/** Degrees past which a two-finger gesture turns the page (below, it's just a pinch or a scroll). */
-const TWIST_START = 6;
+/** How far (relative) the fingers must spread or pinch before it counts as zooming. */
+const ZOOM_START = 0.06;
+/** Degrees the fingers must turn (before any zoom) to rotate the page instead. */
+const TWIST_START = 12;
+/** Pixels the fingers must travel together to scroll. */
+const PAN_START = 8;
 
-/** Two fingers turning on a page rotate that page, like turning paper on a desk. */
-function usePageTwist(ref: React.RefObject<HTMLDivElement | null>) {
+type TwoFinger = {
+  mode: 'pending' | 'zoom' | 'rotate' | 'pan';
+  dist: number;
+  angle: number;
+  mid: Vec;
+  lastMid: Vec;
+  scroll: Vec;
+  /** Where the content's top-left corner was on screen when the fingers landed. */
+  origin: Vec;
+  scale: number;
+  k: number;
+  pageId: string | null;
+  baseRotation: number;
+};
+
+/**
+ * Two fingers do one thing at a time: zoom (spread/pinch, previewed with a CSS transform so it
+ * stays smooth, then re-rendered sharp around the fingers), rotate the page under them (turning
+ * first), or scroll (moving together).
+ */
+function useTwoFingerGestures(
+  scrollRef: React.RefObject<HTMLDivElement | null>,
+  contentRef: React.RefObject<HTMLDivElement | null>,
+  layoutRef: { current: PagedLayout },
+  zoomAround: (next: ZoomChange, anchor: Anchor) => void,
+) {
+  const zoomRef = useRef(zoomAround);
+  zoomRef.current = zoomAround;
+
   useEffect(() => {
-    const el = ref.current;
+    const el = scrollRef.current;
     if (!el) return;
-    let twist: { pageId: string; start: number; base: number; turning: boolean } | null = null;
-    const angle = (t: TouchList) => (Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * 180) / Math.PI;
+    let g: TwoFinger | null = null;
+    const info = (t: TouchList) => ({
+      dist: Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY),
+      angle: (Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * 180) / Math.PI,
+      mid: [(t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2] as Vec,
+    });
 
     const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
-      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const box = document.elementFromPoint(mx, my)?.closest<HTMLElement>('[data-page-box]');
-      if (!box) return;
-      const pageId = box.dataset.pageBox!;
-      twist = { pageId, start: angle(e.touches), base: useNoteEditor.getState().pageRotation[pageId] ?? 0, turning: false };
+      const t = info(e.touches);
+      const box = document.elementFromPoint(t.mid[0], t.mid[1])?.closest<HTMLElement>('[data-page-box]');
+      const pageId = box?.dataset.pageBox ?? null;
+      g = {
+        mode: 'pending',
+        ...t,
+        lastMid: t.mid,
+        scroll: [el.scrollLeft, el.scrollTop],
+        origin: [contentRef.current!.getBoundingClientRect().left, contentRef.current!.getBoundingClientRect().top],
+        scale: layoutRef.current.scale,
+        k: 1,
+        pageId,
+        baseRotation: pageId ? (useNoteEditor.getState().pageRotation[pageId] ?? 0) : 0,
+      };
     };
+
     const onMove = (e: TouchEvent) => {
-      if (!twist || e.touches.length !== 2) return;
-      let delta = angle(e.touches) - twist.start;
-      delta = ((delta + 540) % 360) - 180;
-      if (!twist.turning && Math.abs(delta) < TWIST_START) return;
-      twist.turning = true;
-      const rotation = snapQuarter(twist.base + delta);
-      const editor = useNoteEditor.getState();
-      editor.set({ pageRotation: { ...editor.pageRotation, [twist.pageId]: rotation }, rotationHint: rotation });
+      if (!g || e.touches.length !== 2) return;
+      e.preventDefault(); // two fingers are ours, not the browser's
+      const t = info(e.touches);
+      const ratio = t.dist / g.dist;
+      const turn = ((t.angle - g.angle + 540) % 360) - 180;
+      const moved = Math.hypot(t.mid[0] - g.mid[0], t.mid[1] - g.mid[1]);
+      if (g.mode === 'pending') {
+        if (Math.abs(ratio - 1) > ZOOM_START) g.mode = 'zoom';
+        else if (Math.abs(turn) > TWIST_START && g.pageId) g.mode = 'rotate';
+        else if (moved > PAN_START) g.mode = 'pan';
+      }
+      g.lastMid = t.mid;
+
+      if (g.mode === 'zoom') {
+        const target = Math.min(MAX_ZOOM * CSS_UNITS, Math.max(MIN_ZOOM * CSS_UNITS, g.scale * ratio));
+        g.k = target / g.scale;
+        const content = contentRef.current!;
+        // Scale around the starting midpoint (in content coordinates) and follow the fingers.
+        content.style.transformOrigin = `${g.mid[0] - g.origin[0]}px ${g.mid[1] - g.origin[1]}px`;
+        content.style.transform = `translate(${t.mid[0] - g.mid[0]}px, ${t.mid[1] - g.mid[1]}px) scale(${g.k})`;
+      } else if (g.mode === 'rotate' && g.pageId) {
+        const rotation = snapQuarter(g.baseRotation + turn);
+        const editor = useNoteEditor.getState();
+        editor.set({ pageRotation: { ...editor.pageRotation, [g.pageId]: rotation }, rotationHint: rotation });
+      } else if (g.mode === 'pan') {
+        el.scrollLeft = g.scroll[0] - (t.mid[0] - g.mid[0]);
+        el.scrollTop = g.scroll[1] - (t.mid[1] - g.mid[1]);
+      }
     };
+
     const onEnd = (e: TouchEvent) => {
-      if (e.touches.length >= 2 || !twist) return;
-      twist = null;
-      useNoteEditor.getState().set({ rotationHint: null });
+      if (!g || e.touches.length >= 2) return;
+      const done = g;
+      g = null;
+      if (done.mode === 'rotate') useNoteEditor.getState().set({ rotationHint: null });
+      if (done.mode !== 'zoom') return;
+      const content = contentRef.current!;
+      const r = el.getBoundingClientRect();
+      // The spot that was under the fingers at the start goes where the fingers ended.
+      const start = anchorAt(layoutRef.current, done.scroll[0], done.scroll[1], done.mid[0] - r.left, done.mid[1] - r.top);
+      content.style.transform = '';
+      content.style.transformOrigin = '';
+      zoomRef.current((done.scale * done.k) / CSS_UNITS, { ...start, sx: done.lastMid[0] - r.left, sy: done.lastMid[1] - r.top });
     };
+
     el.addEventListener('touchstart', onStart, { passive: true });
-    el.addEventListener('touchmove', onMove, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
     el.addEventListener('touchend', onEnd);
     el.addEventListener('touchcancel', onEnd);
     return () => {
@@ -222,5 +298,24 @@ function usePageTwist(ref: React.RefObject<HTMLDivElement | null>) {
       el.removeEventListener('touchend', onEnd);
       el.removeEventListener('touchcancel', onEnd);
     };
-  }, [ref]);
+  }, [scrollRef, contentRef, layoutRef]);
+}
+
+/** Ctrl/⌘ + wheel (and trackpad pinch) zooms around the cursor. */
+function useCtrlWheelZoom(
+  scrollRef: React.RefObject<HTMLDivElement | null>,
+  anchorAtClient: (p: Vec) => Anchor,
+  zoomAround: (next: ZoomChange, anchor: Anchor) => void,
+) {
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      zoomAround((z) => z * Math.exp(-e.deltaY * 0.01), anchorAtClient([e.clientX, e.clientY]));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [scrollRef, anchorAtClient, zoomAround]);
 }

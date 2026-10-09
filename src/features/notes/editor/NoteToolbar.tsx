@@ -217,11 +217,18 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
           </button>
         )}
         <button
-          className={`${btn} ${editor.fingerDraws ? 'text-amber-600' : ''}`}
-          title={editor.fingerDraws ? 'O dedo desenha (toque para o dedo navegar)' : 'O dedo navega (toque para desenhar com o dedo)'}
+          className={`flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${
+            editor.fingerDraws ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'border-[var(--border)] text-[var(--muted)]'
+          }`}
+          title={
+            editor.fingerDraws
+              ? 'O dedo escreve com a ferramenta escolhida; dois dedos rolam e dão zoom. Toque para o dedo voltar a navegar.'
+              : 'O dedo rola, dá zoom e gira a folha; a caneta escreve. Toque para escrever também com o dedo (sem caneta).'
+          }
           onClick={() => editor.set({ fingerDraws: !editor.fingerDraws })}
         >
-          <Hand className="size-5" />
+          {editor.fingerDraws ? <PenLine className="size-4" /> : <Hand className="size-4" />}
+          {editor.fingerDraws ? 'Dedo: escreve' : 'Dedo: navega'}
         </button>
         <button className={`${btn} max-sm:hidden`} title="Diminuir zoom" onClick={() => onZoom((z) => z / 1.2)}>
           <Minus className="size-4" />

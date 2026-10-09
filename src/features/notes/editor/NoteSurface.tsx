@@ -65,7 +65,6 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   const selection = useNoteEditor((s) => (s.selection?.pageId === page.id ? s.selection : null));
   const editingTextId = useNoteEditor((s) => s.editingTextId);
   const fingerDraws = useNoteEditor((s) => s.fingerDraws);
-  const penDetected = useUi((s) => s.penDetected);
 
   const inkRef = useRef<HTMLCanvasElement>(null);
   const liveRef = useRef<HTMLCanvasElement>(null);
@@ -168,11 +167,8 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
 
   const nextZ = () => items.reduce((m, i) => Math.max(m, i.z), 0) + 1;
 
-  /** Stylus and mouse use the tool; fingers navigate unless finger drawing is on (or no stylus is around). */
-  const usesTool = (e: React.PointerEvent) => {
-    if (e.pointerType !== 'touch') return true;
-    return fingerDraws || (!penDetected && !infinite);
-  };
+  /** Stylus and mouse use the tool; fingers navigate, unless "finger draws" is on. */
+  const usesTool = (e: React.PointerEvent) => e.pointerType !== 'touch' || fingerDraws;
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'pen') {

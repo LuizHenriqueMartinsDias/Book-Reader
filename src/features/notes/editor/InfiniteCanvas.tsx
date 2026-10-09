@@ -10,8 +10,9 @@ import NoteSurface from './NoteSurface';
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 8;
-/** Degrees past which a pinch also turns the canvas. */
-const TWIST_START = 6;
+/** Two fingers either zoom (spreading past this ratio) or turn (rotating past these degrees), not both. */
+const ZOOM_START = 0.06;
+const TWIST_START = 12;
 
 /** World point at the center of the screen, zoom (px per point) and rotation (degrees, clockwise). */
 interface Camera {
@@ -117,7 +118,7 @@ export default function InfiniteCanvas({ notebook, page, registerZoom, onScale }
   useEffect(() => {
     const el = hostRef.current!;
     let pan: { id: number; x: number; y: number } | null = null;
-    let pinch: { dist: number; angle: number; mid: Vec; world: Vec; zoom: number; rotation: number; turning: boolean } | null = null;
+    let pinch: { dist: number; angle: number; mid: Vec; world: Vec; zoom: number; rotation: number; mode: 'pending' | 'zoom' | 'rotate' } | null = null;
     let space = false;
 
     const local = (x: number, y: number): Vec => {
@@ -157,23 +158,28 @@ export default function InfiniteCanvas({ notebook, page, registerZoom, onScale }
       pan = null;
       const t = touchInfo(e.touches);
       const c = camRef.current;
-      pinch = { ...t, world: worldAt(c, t.mid), zoom: c.zoom, rotation: c.rotation, turning: false };
+      pinch = { ...t, world: worldAt(c, t.mid), zoom: c.zoom, rotation: c.rotation, mode: 'pending' };
     };
     const onTouchMove = (e: TouchEvent) => {
       if (!pinch || e.touches.length !== 2) return;
       e.preventDefault();
       const t = touchInfo(e.touches);
-      const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinch.zoom * (t.dist / pinch.dist)));
+      const ratio = t.dist / pinch.dist;
       const delta = ((t.angle - pinch.angle + 540) % 360) - 180;
-      if (!pinch.turning && Math.abs(delta) >= TWIST_START) pinch.turning = true;
-      const rotation = pinch.turning ? snapQuarter(pinch.rotation + delta) : pinch.rotation;
-      if (pinch.turning) useNoteEditor.getState().set({ rotationHint: rotation });
+      if (pinch.mode === 'pending') {
+        if (Math.abs(ratio - 1) > ZOOM_START) pinch.mode = 'zoom';
+        else if (Math.abs(delta) > TWIST_START) pinch.mode = 'rotate';
+      }
+      // Panning by the midpoint always works; zoom and rotation each need their own gesture.
+      const zoom = pinch.mode === 'zoom' ? Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinch.zoom * ratio)) : pinch.zoom;
+      const rotation = pinch.mode === 'rotate' ? snapQuarter(pinch.rotation + delta) : pinch.rotation;
+      if (pinch.mode === 'rotate') useNoteEditor.getState().set({ rotationHint: rotation });
       // Keep the world point that was under the fingers under them.
       setCam(pinTo(pinch.world, t.mid, zoom, rotation));
     };
     const onTouchEnd = (e: TouchEvent) => {
       if (e.touches.length >= 2) return;
-      if (pinch?.turning) useNoteEditor.getState().set({ rotationHint: null });
+      if (pinch?.mode === 'rotate') useNoteEditor.getState().set({ rotationHint: null });
       pinch = null;
     };
     const onWheel = (e: WheelEvent) => {
