@@ -69,7 +69,7 @@ interface Props {
   onPaste: () => void;
   onExport: () => Promise<void>;
   onOpenBook: () => void;
-  /** Imported PDF: open "stretch the sheet" for the page in view. */
+  /** Paged notebooks: open "stretch the sheet" for the page in view. */
   onStretchPage?: () => void;
   rulerOn: boolean;
   onToggleRuler: () => void;
@@ -283,7 +283,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
                       onStretchPage();
                     }}
                   >
-                    <Expand className="size-4" /> Esticar a folha (margens)…
+                    <Expand className="size-4" /> Esticar a folha…
                   </button>
                 )}
               </div>

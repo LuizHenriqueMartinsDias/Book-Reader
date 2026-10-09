@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { NotePage } from '../../db/schema';
-import { pdfBox, withMargins } from './margins';
+import { MIN_PAGE, pdfBox, snapToPaper, stretchPage, withMargins } from './margins';
 
 const page: NotePage = { id: 'p', notebookId: 'n', order: 0, width: 600, height: 800, background: { pdfPage: 1 } };
+const plain: NotePage = { id: 'q', notebookId: 'n', order: 0, width: 595, height: 842 };
 
 describe('sheet margins', () => {
   it('grows the page around the PDF and moves items by the left and top margins', () => {
@@ -22,5 +23,26 @@ describe('sheet margins', () => {
 
   it('only applies to PDF pages', () => {
     expect(withMargins({ ...page, background: undefined }, { top: 1, right: 1, bottom: 1, left: 1 })).toBeNull();
+  });
+});
+
+describe('stretching a plain page', () => {
+  it('moves its edges by the sides, items following the left and top ones', () => {
+    const r = stretchPage(plain, { top: 56, right: 300, bottom: -42, left: 0 });
+    expect(r.page).toEqual({ ...plain, width: 895, height: 856 });
+    expect([r.dx, r.dy]).toEqual([0, 56]);
+  });
+
+  it('never shrinks below the minimum size', () => {
+    const r = stretchPage(plain, { top: 0, right: -2000, bottom: 0, left: -100 });
+    expect(r.page.width).toBe(MIN_PAGE);
+    expect(r.dx).toBe(-100);
+  });
+
+  it('snaps the left and top edges to the paper pattern', () => {
+    const sides = { top: 40, right: 33, bottom: 17, left: 45 };
+    expect(snapToPaper(sides, { style: 'lined', color: '#fff' })).toEqual({ top: 28, right: 33, bottom: 17, left: 45 });
+    expect(snapToPaper(sides, { style: 'grid', color: '#fff' })).toEqual({ top: 40, right: 33, bottom: 17, left: 40 });
+    expect(snapToPaper(sides, { style: 'blank', color: '#fff' })).toEqual(sides);
   });
 });

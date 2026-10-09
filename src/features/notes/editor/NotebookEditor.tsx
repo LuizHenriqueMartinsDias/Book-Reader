@@ -19,7 +19,7 @@ import InfiniteCanvas from './InfiniteCanvas';
 import { cloneItems, commitItems } from './items';
 import NoteToolbar from './NoteToolbar';
 import PagedNotebook from './PagedNotebook';
-import PageMarginsDialog from './PageMarginsDialog';
+import StretchPageDialog from './StretchPageDialog';
 import RulerOverlay from './RulerOverlay';
 
 const TOOL_KEYS: Record<string, NoteTool> = { p: 'pen', h: 'marker', e: 'eraser', l: 'lasso', t: 'text', s: 'shape' };
@@ -231,10 +231,9 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
     };
   }, [changeZoom, insertImage, paste, toggleRuler]);
 
-  /** From the toolbar: the PDF page in view, else the first one. */
+  /** From the toolbar: the page in view. */
   const stretchCurrent = useCallback(() => {
-    const current = pages.find((p) => p.id === useNoteEditor.getState().currentPageId);
-    setStretchingId((current?.background ? current : pages.find((p) => p.background))?.id ?? null);
+    setStretchingId((pages.find((p) => p.id === useNoteEditor.getState().currentPageId) ?? pages[0])?.id ?? null);
   }, [pages]);
   const stretchPage = useCallback((page: { id: string }) => setStretchingId(page.id), []);
 
@@ -265,7 +264,7 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
             onPaste={paste}
             onExport={exportPdf}
             onOpenBook={() => setPickingBook(true)}
-            onStretchPage={notebook.hasPdf && notebook.kind === 'paged' ? stretchCurrent : undefined}
+            onStretchPage={notebook.kind === 'paged' ? stretchCurrent : undefined}
             rulerOn={!!ruler}
             onToggleRuler={toggleRuler}
             fullscreen={fullscreen}
@@ -286,7 +285,7 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
           </div>
         )}
       </div>
-      {stretching && <PageMarginsDialog notebook={notebook} pages={pages} page={stretching} pdf={pdf} onClose={() => setStretchingId(null)} />}
+      {stretching && <StretchPageDialog notebook={notebook} pages={pages} page={stretching} pdf={pdf} onClose={() => setStretchingId(null)} />}
       {pickingBook && (
         <BookPicker
           onClose={() => setPickingBook(false)}

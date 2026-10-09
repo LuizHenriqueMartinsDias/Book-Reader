@@ -25,7 +25,7 @@ interface Props {
   zoom: ZoomMode;
   onZoom: (z: ZoomChange) => void;
   onScale: (scale: number) => void;
-  /** Opens "stretch the sheet" for an imported PDF page. */
+  /** Opens "stretch the sheet" for a page. */
   onStretch: (page: NotePage) => void;
 }
 
@@ -149,11 +149,9 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
                   Página {i + 1} de {pages.length}
                 </span>
                 <span className="flex items-center gap-0.5">
-                  {page.background && (
-                    <button title="Esticar a folha (margens para anotar)" className="rounded p-1.5 hover:bg-[var(--panel)]" onClick={() => onStretch(page)}>
-                      <Expand className="size-3.5" />
-                    </button>
-                  )}
+                  <button title="Esticar a folha" className="rounded p-1.5 hover:bg-[var(--panel)]" onClick={() => onStretch(page)}>
+                    <Expand className="size-3.5" />
+                  </button>
                   <button title="Nova página depois desta" className="rounded p-1.5 hover:bg-[var(--panel)]" onClick={() => addPage(notebook.id, page.order)}>
                     <Plus className="size-3.5" />
                   </button>

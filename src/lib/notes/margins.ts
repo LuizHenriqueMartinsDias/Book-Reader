@@ -1,12 +1,16 @@
-import type { Margins, NotePage } from '../../db/schema';
+import type { Margins, NotePage, Paper } from '../../db/schema';
+import { PAPER_SPACING } from './render';
 
 /**
- * "Stretching" a sheet: blank space around an imported PDF page to write in. The page grows by
- * the margins and the PDF sits inset by them; items keep page coordinates, so when the left or
- * top margin changes they move along with the PDF.
+ * "Stretching" a sheet: moving its edges out (or in) to make room to write. On an imported PDF
+ * page that's blank space around the PDF, kept as `margins` so the PDF sits inset by them; on a
+ * plain page the page just gets bigger. Items keep page coordinates, so when the left or top edge
+ * moves they move too, staying where they were on the PDF or among the lines.
  */
 
 export const NO_MARGINS: Margins = { top: 0, right: 0, bottom: 0, left: 0 };
+/** Smallest a plain page can shrink to, in points. */
+export const MIN_PAGE = 150;
 
 export const marginsOf = (page: NotePage): Margins => page.background?.margins ?? NO_MARGINS;
 
@@ -17,6 +21,13 @@ export function pdfBox(page: NotePage) {
   const m = marginsOf(page);
   return { x: m.left, y: m.top, w: page.width - m.left - m.right, h: page.height - m.top - m.bottom };
 }
+
+/**
+ * What stretching is measured from: the PDF on PDF pages (sides are its margins, never below 0),
+ * else the page as it is now (sides are how far each edge moves, negative to shrink).
+ */
+export const stretchBase = (page: NotePage) => (page.background ? pdfBox(page) : { x: 0, y: 0, w: page.width, h: page.height });
+export const currentSides = (page: NotePage): Margins => (page.background ? marginsOf(page) : NO_MARGINS);
 
 /** The page with new margins, and how far its items move to stay on the same spot of the PDF. */
 export function withMargins(page: NotePage, margins: Margins) {
@@ -32,4 +43,23 @@ export function withMargins(page: NotePage, margins: Margins) {
     background: hasMargins(m) ? { ...background, margins: m } : background,
   };
   return { page: next, dx: m.left - old.left, dy: m.top - old.top };
+}
+
+/** Any page stretched by `sides` (see `stretchBase`), and how far its items move. */
+export function stretchPage(page: NotePage, sides: Margins) {
+  if (page.background) return withMargins(page, sides)!;
+  const width = Math.max(MIN_PAGE, page.width + sides.left + sides.right);
+  const height = Math.max(MIN_PAGE, page.height + sides.top + sides.bottom);
+  return { page: { ...page, width, height }, dx: sides.left, dy: sides.top };
+}
+
+/**
+ * The left and top edges move in whole steps of the paper's pattern, so writing that moves with
+ * them stays on its lines (lined paper only needs it vertically).
+ */
+export function snapToPaper(sides: Margins, paper: Paper): Margins {
+  if (paper.style === 'blank') return sides;
+  const s = PAPER_SPACING[paper.style];
+  const snap = (v: number) => Math.round(v / s) * s;
+  return { ...sides, top: snap(sides.top), left: paper.style === 'lined' ? sides.left : snap(sides.left) };
 }
