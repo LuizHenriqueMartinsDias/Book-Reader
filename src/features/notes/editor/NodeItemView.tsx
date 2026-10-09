@@ -19,8 +19,9 @@ export default function NodeItemView({ item, editing }: { item: NodeItem; editin
     if (!editing) return;
     original.current = item;
     const area = areaRef.current;
-    area?.focus({ preventScroll: true });
+    // Caret at the end, set before focusing: on a focused box Chrome would scroll to it.
     area?.setSelectionRange(area.value.length, area.value.length);
+    area?.focus({ preventScroll: true });
     // Only when editing starts: later changes to the item are this edit's own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);

@@ -1,14 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeftRight, ArrowRight, Minus, Plus, Spline, Type, Waypoints } from 'lucide-react';
+import { ArrowLeftRight, ArrowRight, Minus, Network, Plus, Spline, Type, Waypoints } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { db, type ConnectorEnd, type ConnectorItem, type ImageItem, type NodeItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { drawStroke } from '../../../lib/ink';
 import { attachedTo, connectorHit, connectorPoints, isConnector, midpoint, nodesById, settle, SIDES, sideDir, sidePoint, type Side } from '../../../lib/notes/connectors';
-import { attach, isNode, MIN_NODE, NODE_SIZE, nodeAt, withChildren, withDependents } from '../../../lib/notes/diagram';
+import { attach, isNode, layoutTree, NODE_SIZE, nodeAt, readSketch, snapMove, withChildren, withDependents } from '../../../lib/notes/diagram';
 import { eraseItem } from '../../../lib/notes/erase';
-import { bboxOf, eraserHits, itemsInLasso, screenToLocal, transformItems, type Transform, type Vec } from '../../../lib/notes/geometry';
-import { defaultInk, drawConnector, drawItems, drawNode, drawShape } from '../../../lib/notes/render';
+import { bboxOf, eraserHits, itemsInLasso, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
+import { defaultInk, drawConnector, drawItems, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
 import { useUi } from '../../../store/ui';
@@ -56,10 +56,10 @@ type Gesture =
   | { kind: 'shape'; id: number; from: Vec; to: Vec }
   | { kind: 'text'; id: number; at: Vec }
   /**
-   * Diagram tool: dragging a box (`hit`) moves it; on an arrow (`picked`) it just selects it;
-   * elsewhere it makes a box from `from` to `to`.
+   * Diagram tool: a tap on a box (`hit`) selects it, on paper makes a box; on an arrow
+   * (`picked`) it selects the arrow. Drawing (`points`) is read as a box, an arrow or writing.
    */
-  | { kind: 'diagram'; id: number; from: Vec; to: Vec; hit: NodeItem | null; picked: boolean };
+  | { kind: 'diagram'; id: number; from: Vec; hit: NodeItem | null; picked: boolean; points: Point[] };
 
 /** Dragging out of a box's "+" handle: an arrow to another box, or to where a new box goes. */
 interface Linking {
@@ -85,16 +85,18 @@ function inkColor(notebook: Notebook) {
   return pen === '#1f2937' ? defaultInk(notebook.paper) : pen;
 }
 
-/** A new diagram box spanning `from`–`to`, or of the usual size centered at `from` after a tap. */
-function newNode(from: Vec, to: Vec, zoom: number, notebook: Notebook): Omit<NodeItem, 'id' | 'notebookId' | 'pageId' | 'z' | 'createdAt'> {
-  const { nodeShape, nodeFilled, textSize } = useNoteEditor.getState();
-  const w = Math.abs(to[0] - from[0]);
-  const h = Math.abs(to[1] - from[1]);
-  const box =
-    w * zoom >= MIN_NODE && h * zoom >= MIN_NODE
-      ? { x: Math.min(from[0], to[0]), y: Math.min(from[1], to[1]), w, h }
-      : { x: from[0] - NODE_SIZE[nodeShape].w / 2, y: from[1] - NODE_SIZE[nodeShape].h / 2, ...NODE_SIZE[nodeShape] };
-  return { type: 'node', shape: nodeShape, ...box, color: inkColor(notebook), filled: nodeFilled, width: 2, text: '', fontSize: textSize };
+type NodeBox = Pick<NodeItem, 'shape' | 'x' | 'y' | 'w' | 'h'>;
+
+/** A box of the usual size for the chosen shape, centered at `at` (made with a tap). */
+function tapBox(at: Vec): NodeBox {
+  const { nodeShape } = useNoteEditor.getState();
+  return { shape: nodeShape, x: at[0] - NODE_SIZE[nodeShape].w / 2, y: at[1] - NODE_SIZE[nodeShape].h / 2, ...NODE_SIZE[nodeShape] };
+}
+
+/** A new diagram box there, looking like the tool's settings. */
+function newNode(box: NodeBox, notebook: Notebook): Omit<NodeItem, 'id' | 'notebookId' | 'pageId' | 'z' | 'createdAt'> {
+  const { nodeFilled, textSize } = useNoteEditor.getState();
+  return { type: 'node', ...box, color: inkColor(notebook), filled: nodeFilled, width: 2, text: '', fontSize: textSize };
 }
 
 /** A new arrow from a box to `to`, styled like the last ones. */
@@ -247,8 +249,8 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         ctx.arc(g.at[0], g.at[1], useNoteEditor.getState().eraserSize / view.zoom, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
-      } else if (g.kind === 'diagram' && !g.hit && (g.to[0] !== g.from[0] || g.to[1] !== g.from[1])) {
-        drawNode(ctx, { ...newNode(g.from, g.to, view.zoom, notebook), id: '', notebookId: '', pageId: '', z: 0, createdAt: 0 });
+      } else if (g.kind === 'diagram' && g.points.length > 1) {
+        drawStroke(ctx, { ...inkStyle('pen'), points: g.points }, false);
       } else if (g.kind === 'lasso' && g.points.length > 1) {
         ctx.save();
         ctx.strokeStyle = '#0ea5e9';
@@ -343,12 +345,12 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     } else if (tool === 'diagram') {
       // A tap while typing in a box just ends the typing (the text box loses focus).
       if (editor.editingTextId) return;
-      // On a box: select it (with its writing) and drag to move; elsewhere: make a box.
+      // An arrow under the tap is picked right away; boxes and paper wait to see a tap or a drawing.
       const hit = nodeAt(items, p) ?? null;
       const arrow = hit ? undefined : [...items].sort((a, b) => b.z - a.z).find((i) => isConnector(i) && connectorHit(i, nodeMap, p[0], p[1], PICK_PX / view.zoom));
-      if (hit) editor.set({ selection: { pageId: page.id, ids: withChildren([hit.id], items) } });
-      else if (arrow) editor.set({ selection: { pageId: page.id, ids: [arrow.id] } });
-      gesture.current = { kind: 'diagram', id, from: p, to: p, hit, picked: !!arrow };
+      if (arrow) editor.set({ selection: { pageId: page.id, ids: [arrow.id] } });
+      const point: Point = [p[0], p[1], e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5];
+      gesture.current = { kind: 'diagram', id, from: p, hit, picked: !!arrow, points: [point] };
     }
     renderLive();
   };
@@ -399,9 +401,9 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
           if (Math.hypot(p[0] - last[0], p[1] - last[1]) * view.zoom > 2) armHold();
         }
       } else if (g.kind === 'lasso') g.points.push(p);
-      else if (g.kind === 'shape' || g.kind === 'diagram') g.to = p;
+      else if (g.kind === 'shape') g.to = p;
+      else if (g.kind === 'diagram' && !g.picked) g.points.push([p[0], p[1], ev.pointerType === 'pen' ? ev.pressure || 0.5 : 0.5]);
     }
-    if (g.kind === 'diagram' && g.hit) setPreview(dragOf(g));
     renderLive();
   };
 
@@ -445,15 +447,36 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     }
   };
 
-  const dragOf = (g: Extract<Gesture, { kind: 'diagram' }>): Transform => ({ dx: g.to[0] - g.from[0], dy: g.to[1] - g.from[1], scale: 1, origin: g.from });
-
   /** Makes a box; loose writing already inside it becomes its content. Then types in it. */
-  const createNode = async (g: Extract<Gesture, { kind: 'diagram' }>) => {
-    const node: NodeItem = { ...newNode(g.from, g.to, view.zoom, notebook), id: newId(), notebookId: notebook.id, pageId: page.id, z: nextZ(), createdAt: Date.now() };
+  const createNode = async (box: NodeBox) => {
+    const node: NodeItem = { ...newNode(box, notebook), id: newId(), notebookId: notebook.id, pageId: page.id, z: nextZ(), createdAt: Date.now() };
     const loose = items.filter((i) => !i.parentId && (i.type === 'stroke' || i.type === 'shape'));
     const adopted = loose.map((i) => attach(i, [node])).filter((i) => i.parentId === node.id);
     await commitItems([node, ...adopted], loose.filter((i) => adopted.some((a) => a.id === i.id)));
     useNoteEditor.getState().set({ editingTextId: node.id });
+  };
+
+  /**
+   * A tap selects a box (with its writing) or makes one on the paper; a drawing becomes what it
+   * looks like (see `readSketch`): a box, an arrow between boxes, a new box connected to one,
+   * or else writing (in the box it's in, if any).
+   */
+  const finishDiagram = async (g: Extract<Gesture, { kind: 'diagram' }>) => {
+    const reach = Math.max(...g.points.map(([x, y]) => Math.hypot(x - g.from[0], y - g.from[1]))) * view.zoom;
+    if (reach < 6) {
+      if (g.hit) useNoteEditor.getState().set({ selection: { pageId: page.id, ids: withChildren([g.hit.id], items) } });
+      else await createNode(tapBox(g.from));
+      return;
+    }
+    const sketch = readSketch(
+      g.points.map(([x, y]) => [x, y]),
+      items,
+      useNoteEditor.getState().nodeShape,
+    );
+    if (sketch?.kind === 'box') return createNode(sketch);
+    if (sketch?.kind === 'link') return addDiagram([], [newConnector(sketch.from, { node: sketch.to.id, x: sketch.to.x, y: sketch.to.y })]);
+    if (sketch?.kind === 'branch') return branchTo(sketch.from, sketch.at);
+    await saveInk({ kind: 'ink', id: g.id, tool: 'pen', points: g.points, shape: null, edge: null });
   };
 
   const finish = async (e: React.PointerEvent<HTMLCanvasElement>, cancelled: boolean) => {
@@ -467,12 +490,6 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
 
     if (g.kind === 'erase') return saveErase();
     if (g.kind === 'diagram' && g.picked) return;
-    if (g.kind === 'diagram' && g.hit) {
-      const t = dragOf(g);
-      if (!cancelled && Math.hypot(t.dx, t.dy) * view.zoom > 3) actions.onCommit(t);
-      else setPreview(null);
-      return;
-    }
     if (cancelled) return;
 
     if (g.kind === 'ink') {
@@ -483,7 +500,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       const shape = useNoteEditor.getState().shape;
       await commitItems([{ ...base, type: 'shape', shape, x1: g.from[0], y1: g.from[1], x2: g.to[0], y2: g.to[1], color: style.color, width: style.width }]);
     } else if (g.kind === 'diagram') {
-      await createNode(g);
+      await finishDiagram(g);
     } else if (g.kind === 'lasso') {
       // A box comes with what's written in it.
       const ids = withChildren(itemsInLasso(items, g.points).map((i) => i.id), items);
@@ -571,9 +588,13 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       await addDiagram([], [newConnector(link.node, { node: target.id, x: link.to[0], y: link.to[1] })]);
       return;
     }
-    // Let go on empty paper: a new box there, connected.
-    const next = sibling(link.node, link.to[0] - link.node.w / 2, link.to[1] - link.node.h / 2);
-    await addDiagram([next], [newConnector(link.node, { node: next.id, x: link.to[0], y: link.to[1] })]);
+    await branchTo(link.node, link.to);
+  };
+
+  /** A new box centered at `at`, like `from` and connected to it, ready to type in. */
+  const branchTo = async (from: NodeItem, at: Vec) => {
+    const next = sibling(from, at[0] - from.w / 2, at[1] - from.h / 2);
+    await addDiagram([next], [newConnector(from, { node: next.id, x: at[0], y: at[1] })]);
     useNoteEditor.getState().set({ selection: null, editingTextId: next.id });
   };
 
@@ -644,6 +665,39 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     const target = soleBox ?? soleArrow;
     if (target) commitItems([{ ...target, ...patch } as NoteItem], [target]);
   };
+  /** "Organizar": the boxes reached from this one by its arrows, tidied into a tree. */
+  const organize = (root: NodeItem) => {
+    const spots = layoutTree(root.id, items);
+    if (!spots.size) return;
+    if (!infinite) {
+      // On a page, shift the whole tree (the root too) back inside the paper where it fits.
+      const nodeOf = (id: string) => items.find((i) => i.id === id) as NodeItem;
+      const all = [...spots].map(([id, [x, y]]) => ({ x, y, w: nodeOf(id).w, h: nodeOf(id).h }));
+      const box = unionBox([...all, root])!;
+      const fit = (start: number, size: number, room: number) => (size > room - 16 || start < 8 ? 8 - start : Math.min(0, room - 8 - (start + size)));
+      const dx = fit(box.x, box.w, page.width);
+      const dy = fit(box.y, box.h, page.height);
+      if (dx || dy) {
+        for (const [id, [x, y]] of spots) spots.set(id, [x + dx, y + dy]);
+        spots.set(root.id, [root.x + dx, root.y + dy]);
+      }
+    }
+    const moved: NoteItem[] = [];
+    const before: NoteItem[] = [];
+    for (const [id, [x, y]] of spots) {
+      const n = items.find((i) => i.id === id) as NodeItem;
+      const group = items.filter((i) => i.id === id || i.parentId === id);
+      before.push(...group);
+      moved.push(...transformItems(group, { dx: x - n.x, dy: y - n.y, scale: 1, origin: [0, 0] }));
+    }
+    const movedIds = new Set(moved.map((i) => i.id));
+    const all = [...items.filter((i) => !movedIds.has(i.id)), ...moved];
+    const map = nodesById(all);
+    const arrows = attachedTo(all, new Set(spots.keys()));
+    const settled = arrows.map((c) => settle(c, map)).filter((c, i) => c !== arrows[i]);
+    const settledIds = new Set(settled.map((c) => c.id));
+    commitItems([...moved, ...settled], [...before, ...items.filter((i) => settledIds.has(i.id))]);
+  };
   const pill = (active: boolean) => `rounded-md p-1.5 ${active ? 'bg-[var(--app-bg)] text-amber-600' : 'hover:bg-[var(--app-bg)]'}`;
   const extra = soleBox ? (
     <>
@@ -654,6 +708,11 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
           />
         </button>
       ))}
+      {items.some((i) => isConnector(i) && i.from.node === soleBox.id) && (
+        <button title="Organizar: arrumar as caixas ligadas a partir desta" className={pill(false)} onClick={() => organize(soleBox)}>
+          <Network className="size-4" />
+        </button>
+      )}
     </>
   ) : soleArrow ? (
     <>
@@ -701,6 +760,13 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       </button>
     </>
   ) : null;
+  /** Moving boxes lines them up with the others. */
+  const snap = selectedBoxes.length
+    ? (dx: number, dy: number) => {
+        const ids = new Set(selected.map((i) => i.id));
+        return snapMove(selectedBoxes, items.filter((i): i is NodeItem => isNode(i) && !ids.has(i.id)), dx, dy, 6 / view.zoom);
+      }
+    : undefined;
   // The "+" handles around a box selected with the diagram tool.
   const handles = tool === 'diagram' && soleBox && !preview && !editingTextId ? soleBox : null;
 
@@ -752,7 +818,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         ))}
       </div>
       {selected.length > 0 && (
-        <SelectionOverlay items={selected} view={view} rotation={rotation} preview={preview} onPreview={setPreview} extra={extra} clearance={handles ? 30 : 0} {...actions} />
+        <SelectionOverlay items={selected} view={view} rotation={rotation} preview={preview} onPreview={setPreview} extra={extra} clearance={handles ? 30 : 0} snap={snap} {...actions} />
       )}
       {handles &&
         SIDES.map((side) => {
