@@ -33,6 +33,8 @@ export interface Book {
   progress?: number;
   /** EPUB: cached epub.js locations (JSON), slow to compute for long books. */
   locations?: string;
+  /** Library folder (`bookFolders`); absent or null when the book isn't in one. */
+  folderId?: string | null;
 }
 
 /** Kept apart from `books` so listing the library doesn't load every PDF into memory. */
@@ -218,7 +220,10 @@ export class BookDB extends Dexie {
   strokes!: EntityTable<Stroke, 'id'>;
   highlights!: EntityTable<Highlight, 'id'>;
   notes!: EntityTable<Note, 'id'>;
+  /** Notebook folders. */
   folders!: EntityTable<Folder, 'id'>;
+  /** Library folders, apart from the notebooks' ones. */
+  bookFolders!: EntityTable<Folder, 'id'>;
   notebooks!: EntityTable<Notebook, 'id'>;
   notePages!: EntityTable<NotePage, 'id'>;
   noteItems!: EntityTable<NoteItem, 'id'>;
@@ -240,6 +245,11 @@ export class BookDB extends Dexie {
       notePages: 'id, notebookId, [notebookId+order]',
       noteItems: 'id, pageId, notebookId',
       noteAssets: 'id, notebookId',
+    });
+    // v3: library folders. Adds a table and indexes books by folder; nothing else changes.
+    this.version(3).stores({
+      books: 'id, lastOpenedAt, addedAt, folderId',
+      bookFolders: 'id, order',
     });
   }
 }

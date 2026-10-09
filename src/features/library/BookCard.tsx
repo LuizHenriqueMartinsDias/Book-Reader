@@ -1,13 +1,16 @@
 import { MoreVertical } from 'lucide-react';
 import { useState } from 'react';
 import { navigate } from '../../App';
-import type { Book } from '../../db/schema';
+import type { Book, Folder } from '../../db/schema';
 import { deleteBook, getBookFile, updateBook } from '../../db/repo';
+import { MoveToFolder } from '../FolderBar';
 import { notebookFromPdf } from '../notes/importPdf';
 
-export default function BookCard({ book }: { book: Book }) {
-  const [menu, setMenu] = useState(false);
+export default function BookCard({ book, folders }: { book: Book; folders: Folder[] }) {
+  // Which side of the card the menu opens to: rightwards when the card is too near the left edge.
+  const [menu, setMenu] = useState<false | 'left' | 'right'>(false);
   const epub = book.format === 'epub';
+  const folder = folders.find((f) => f.id === book.folderId);
   const progress = epub ? (book.progress ?? 0) : book.pageCount > 1 ? (book.lastPage - 1) / (book.pageCount - 1) : 0;
 
   return (
@@ -28,6 +31,7 @@ export default function BookCard({ book }: { book: Book }) {
           {book.title}
         </div>
         <div className="mt-1.5 flex items-center gap-2 text-xs text-[var(--muted)]">
+          {folder && <span className="size-2 shrink-0 rounded-full" style={{ background: folder.color }} title={folder.name} />}
           <div className="h-1 flex-1 overflow-hidden rounded bg-[var(--border)]">
             <div className="h-full bg-amber-500" style={{ width: `${progress * 100}%` }} />
           </div>
@@ -37,7 +41,10 @@ export default function BookCard({ book }: { book: Book }) {
 
       <button
         aria-label="Opções"
-        onClick={() => setMenu((m) => !m)}
+        onClick={(e) => {
+          const right = e.currentTarget.getBoundingClientRect().right;
+          setMenu((m) => (m ? false : right < 192 + 8 ? 'left' : 'right'));
+        }}
         className="absolute top-1 right-1 rounded-full bg-black/50 p-1 text-white opacity-0 group-hover:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100"
       >
         <MoreVertical className="size-4" />
@@ -45,7 +52,7 @@ export default function BookCard({ book }: { book: Book }) {
       {menu && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
-          <div className="absolute top-8 right-1 z-20 w-48 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] text-sm shadow-lg">
+          <div className={`absolute top-8 ${menu === 'left' ? 'left-1' : 'right-1'} z-20 w-48 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] text-sm shadow-lg`}>
             <button
               className="block w-full px-3 py-2 text-left hover:bg-[var(--app-bg)]"
               onClick={() => {
@@ -70,8 +77,16 @@ export default function BookCard({ book }: { book: Book }) {
                 Criar caderno deste PDF
               </button>
             )}
+            <MoveToFolder
+              folders={folders}
+              current={book.folderId}
+              onMove={(folderId) => {
+                setMenu(false);
+                updateBook(book.id, { folderId });
+              }}
+            />
             <button
-              className="block w-full px-3 py-2 text-left text-red-600 hover:bg-[var(--app-bg)]"
+              className="block w-full border-t border-[var(--border)] px-3 py-2 text-left text-red-600 hover:bg-[var(--app-bg)]"
               onClick={() => {
                 setMenu(false);
                 if (confirm(`Excluir "${book.title}" e todas as suas anotações?`)) deleteBook(book.id);

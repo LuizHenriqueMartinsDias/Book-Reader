@@ -5,6 +5,7 @@ import { navigate } from '../../App';
 import { db } from '../../db/schema';
 import { createBackup, download, restoreBackup } from '../../lib/backup';
 import { useUi, type Theme } from '../../store/ui';
+import FolderBar, { inFolder, useFolderFilter } from '../FolderBar';
 import HomeTabs from '../HomeTabs';
 import BookCard from './BookCard';
 import { ACCEPTED_FILES, importBook, isBookFile } from './importBook';
@@ -17,6 +18,9 @@ const THEMES: { id: Theme; icon: typeof Sun; label: string }[] = [
 
 export default function LibraryPage() {
   const books = useLiveQuery(() => db.books.orderBy('lastOpenedAt').reverse().toArray(), []);
+  const folders = useLiveQuery(() => db.bookFolders.orderBy('order').toArray(), []) ?? [];
+  const [filter, setFilter] = useFolderFilter('books');
+  const shown = books?.filter((b) => inFolder(b.folderId, filter));
   const { theme, set } = useUi();
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -30,7 +34,8 @@ export default function LibraryPage() {
     const results = [];
     for (const [i, file] of pdfs.entries()) {
       setBusy(`Importando ${i + 1}/${pdfs.length}: ${file.name}`);
-      results.push(await importBook(file));
+      // Books added while a folder is open go into it.
+      results.push(await importBook(file, { folderId: filter || null }));
     }
     setBusy(null);
     const errors = results.filter((r) => r.status === 'error');
@@ -136,6 +141,8 @@ export default function LibraryPage() {
         />
       </header>
 
+      {!!books?.length && <FolderBar kind="books" folders={folders} filter={filter} onFilter={setFilter} />}
+
       {(busy || message) && (
         <div className="mx-4 mt-4 flex items-start justify-between gap-4 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-sm sm:mx-6">
           <span>{busy ?? message}</span>
@@ -167,8 +174,13 @@ export default function LibraryPage() {
             em domínio público.
           </p>
         )}
+        {!!books?.length && shown?.length === 0 && (
+          <p className="mt-12 text-center text-sm text-[var(--muted)]">
+            {filter === '' ? 'Todos os livros estão em pastas.' : 'Nenhum livro nesta pasta. Use "Mover para" no menu de um livro, ou adicione um livro com a pasta aberta.'}
+          </p>
+        )}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-5 gap-y-8">
-          {books?.map((book) => <BookCard key={book.id} book={book} />)}
+          {shown?.map((book) => <BookCard key={book.id} book={book} folders={folders} />)}
         </div>
       </main>
 

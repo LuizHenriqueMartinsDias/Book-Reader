@@ -1,27 +1,9 @@
-import { db, type Folder, type Notebook, type NotebookKind, type NoteItem, type NotePage, type Paper } from './schema';
+import { db, type Notebook, type NotebookKind, type NoteItem, type NotePage, type Paper } from './schema';
 import { newId } from './repo';
 
 export const A4 = { width: 595, height: 842 };
 
-export const FOLDER_COLORS = ['#f59e0b', '#ef4444', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#64748b'];
 export const COVER_COLORS = ['#1e3a8a', '#7c2d12', '#065f46', '#581c87', '#9f1239', '#334155', '#a16207'];
-
-export async function createFolder(name: string, color: string) {
-  const last = await db.folders.orderBy('order').last();
-  const folder: Folder = { id: newId(), name, color, order: (last?.order ?? 0) + 1, createdAt: Date.now() };
-  await db.folders.add(folder);
-  return folder;
-}
-
-export const updateFolder = (id: string, changes: Partial<Folder>) => db.folders.update(id, changes);
-
-/** Deleting a folder keeps its notebooks; they just leave the folder. */
-export async function deleteFolder(id: string) {
-  await db.transaction('rw', db.folders, db.notebooks, async () => {
-    await db.notebooks.where('folderId').equals(id).modify({ folderId: null });
-    await db.folders.delete(id);
-  });
-}
 
 export interface NewNotebook {
   title: string;

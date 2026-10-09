@@ -38,7 +38,7 @@ async function epubDetails(data: ArrayBuffer, name: string): Promise<Details> {
  * Books are keyed by content hash, so re-importing a file is detected and backups match across devices.
  * `title` overrides the file's own metadata, e.g. with the catalog title of a downloaded book.
  */
-export async function importBook(file: File, title?: string): Promise<ImportResult> {
+export async function importBook(file: File, opts: { title?: string; folderId?: string | null } = {}): Promise<ImportResult> {
   try {
     const data = await file.arrayBuffer();
     const format = sniffFormat(data, file.name);
@@ -48,10 +48,10 @@ export async function importBook(file: File, title?: string): Promise<ImportResu
     if (existing) return { status: 'exists', id, title: existing.title };
 
     const details = format === 'pdf' ? await pdfDetails(data, file.name) : await epubDetails(data, file.name);
-    if (title) details.title = title;
+    if (opts.title) details.title = opts.title;
     const now = Date.now();
     await addBook(
-      { id, ...details, addedAt: now, lastOpenedAt: 0, lastPage: 1, zoom: 0, fileSize: file.size },
+      { id, ...details, addedAt: now, lastOpenedAt: 0, lastPage: 1, zoom: 0, fileSize: file.size, folderId: opts.folderId ?? null },
       new Blob([data], { type: format === 'pdf' ? 'application/pdf' : 'application/epub+zip' }),
     );
     navigator.storage?.persist?.().catch(() => {});

@@ -1,33 +1,24 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { FileUp, FolderPlus, LayoutGrid, MoreVertical, Plus, Search } from 'lucide-react';
+import { FileUp, LayoutGrid, MoreVertical, Plus, Search } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { navigate } from '../../App';
-import { createFolder, deleteFolder, deleteNotebook, FOLDER_COLORS, searchNotebooks, updateFolder, updateNotebook } from '../../db/notes';
+import { deleteNotebook, searchNotebooks, updateNotebook } from '../../db/notes';
 import { db, type Folder, type Notebook } from '../../db/schema';
 import { paperCss } from '../../lib/notes/render';
+import FolderBar, { inFolder, MoveToFolder, useFolderFilter } from '../FolderBar';
 import HomeTabs from '../HomeTabs';
 import { notebookFromPdf } from './importPdf';
 import NewNotebookDialog from './NewNotebookDialog';
 
-/** null = all notebooks, '' = notebooks without a folder. */
-type FolderFilter = string | null;
-
 export default function NotesHome() {
-  const [filter, setFilter] = useState<FolderFilter>(null);
+  const [filter, setFilter] = useFolderFilter('notebooks');
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const pdfInput = useRef<HTMLInputElement>(null);
   const folders = useLiveQuery(() => db.folders.orderBy('order').toArray(), []) ?? [];
   const notebooks = useLiveQuery(() => searchNotebooks(query), [query]);
-  const shown = notebooks?.filter((n) => filter === null || (filter === '' ? !n.folderId : n.folderId === filter));
-
-  async function addFolder() {
-    const name = prompt('Nome da pasta (ex.: matéria)')?.trim();
-    if (!name) return;
-    const f = await createFolder(name, FOLDER_COLORS[folders.length % FOLDER_COLORS.length]);
-    setFilter(f.id);
-  }
+  const shown = notebooks?.filter((n) => inFolder(n.folderId, filter));
 
   async function importPdf(file: File) {
     setBusy(`Importando ${file.name}…`);
@@ -68,16 +59,7 @@ export default function NotesHome() {
         />
       </header>
 
-      <div className="flex gap-1.5 overflow-x-auto px-4 pt-4 pb-1 sm:px-6 [scrollbar-width:none]">
-        <Chip active={filter === null} onClick={() => setFilter(null)} label="Todos" />
-        {folders.map((f) => (
-          <FolderChip key={f.id} folder={f} active={filter === f.id} onClick={() => setFilter(f.id)} onDeleted={() => setFilter(null)} />
-        ))}
-        {folders.length > 0 && <Chip active={filter === ''} onClick={() => setFilter('')} label="Sem pasta" />}
-        <button onClick={addFolder} className="flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-[var(--border)] px-3 py-1.5 text-sm text-[var(--muted)] hover:text-[var(--app-fg)]">
-          <FolderPlus className="size-4" /> Pasta
-        </button>
-      </div>
+      <FolderBar kind="notebooks" folders={folders} filter={filter} onFilter={setFilter} />
 
       {busy && <p className="mx-4 mt-3 text-sm text-[var(--muted)] sm:mx-6">{busy}</p>}
 
@@ -106,44 +88,9 @@ export default function NotesHome() {
   );
 }
 
-function Chip({ active, onClick, label, color }: { active: boolean; onClick: () => void; label: string; color?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ${active ? 'border-amber-500 bg-amber-500/10 font-medium' : 'border-[var(--border)]'}`}
-    >
-      {color && <span className="size-2.5 rounded-full" style={{ background: color }} />}
-      {label}
-    </button>
-  );
-}
-
-function FolderChip({ folder, active, onClick, onDeleted }: { folder: Folder; active: boolean; onClick: () => void; onDeleted: () => void }) {
-  return (
-    <div className="flex shrink-0 items-center">
-      <Chip active={active} onClick={onClick} label={folder.name} color={folder.color} />
-      {active && (
-        <button
-          className="ml-0.5 rounded-full p-1 text-[var(--muted)] hover:bg-[var(--panel)]"
-          title="Opções da pasta"
-          onClick={() => {
-            const action = prompt(`Pasta "${folder.name}": digite um novo nome, ou "excluir" para apagar a pasta (os cadernos ficam).`, folder.name)?.trim();
-            if (!action) return;
-            if (action.toLowerCase() === 'excluir') {
-              deleteFolder(folder.id);
-              onDeleted();
-            } else updateFolder(folder.id, { name: action });
-          }}
-        >
-          <MoreVertical className="size-3.5" />
-        </button>
-      )}
-    </div>
-  );
-}
-
 function NotebookCard({ notebook, folders }: { notebook: Notebook; folders: Folder[] }) {
-  const [menu, setMenu] = useState(false);
+  // Which side of the card the menu opens to: rightwards when the card is too near the left edge.
+  const [menu, setMenu] = useState<false | 'left' | 'right'>(false);
   const folder = folders.find((f) => f.id === notebook.folderId);
   return (
     <div className="group relative">
@@ -171,7 +118,10 @@ function NotebookCard({ notebook, folders }: { notebook: Notebook; folders: Fold
       </button>
       <button
         aria-label="Opções"
-        onClick={() => setMenu((m) => !m)}
+        onClick={(e) => {
+          const right = e.currentTarget.getBoundingClientRect().right;
+          setMenu((m) => (m ? false : right < 176 + 8 ? 'left' : 'right'));
+        }}
         className="absolute top-1 right-1 rounded-full bg-black/50 p-1 text-white opacity-0 group-hover:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100"
       >
         <MoreVertical className="size-4" />
@@ -179,7 +129,7 @@ function NotebookCard({ notebook, folders }: { notebook: Notebook; folders: Fold
       {menu && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
-          <div className="absolute top-8 right-1 z-20 w-44 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] text-sm shadow-lg">
+          <div className={`absolute top-8 ${menu === 'left' ? 'left-1' : 'right-1'} z-20 w-44 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] text-sm shadow-lg`}>
             <button
               className="block w-full px-3 py-2 text-left hover:bg-[var(--app-bg)]"
               onClick={() => {
@@ -190,24 +140,14 @@ function NotebookCard({ notebook, folders }: { notebook: Notebook; folders: Fold
             >
               Renomear
             </button>
-            {folders.length > 0 && (
-              <div className="border-t border-[var(--border)] py-1">
-                <div className="px-3 py-1 text-xs text-[var(--muted)]">Mover para</div>
-                {[{ id: null, name: 'Sem pasta', color: undefined } as { id: string | null; name: string; color?: string }, ...folders].map((f) => (
-                  <button
-                    key={f.id ?? 'none'}
-                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-[var(--app-bg)] ${notebook.folderId === f.id || (!notebook.folderId && !f.id) ? 'font-medium' : ''}`}
-                    onClick={() => {
-                      setMenu(false);
-                      updateNotebook(notebook.id, { folderId: f.id });
-                    }}
-                  >
-                    {f.color && <span className="size-2.5 rounded-full" style={{ background: f.color }} />}
-                    {f.name}
-                  </button>
-                ))}
-              </div>
-            )}
+            <MoveToFolder
+              folders={folders}
+              current={notebook.folderId}
+              onMove={(folderId) => {
+                setMenu(false);
+                updateNotebook(notebook.id, { folderId });
+              }}
+            />
             <button
               className="block w-full border-t border-[var(--border)] px-3 py-2 text-left text-red-600 hover:bg-[var(--app-bg)]"
               onClick={() => {

@@ -1,6 +1,7 @@
 import Dexie from 'dexie';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { addPage, createFolder, createNotebook, deleteFolder, deleteNotebook, deletePage, getPages, movePage, searchNotebooks } from './notes';
+import { createFolder, deleteFolder } from './folders';
+import { addPage, createNotebook, deleteNotebook, deletePage, getPages, movePage, searchNotebooks } from './notes';
 import { BookDB, db, type NoteItem } from './schema';
 
 const paper = { style: 'lined' as const, color: '#ffffff' };
@@ -59,9 +60,9 @@ describe('notebooks', () => {
   });
 
   it('keeps notebooks when their folder is deleted, and deletes everything of a notebook', async () => {
-    const folder = await createFolder('História', '#f00');
+    const folder = await createFolder('notebooks', 'História', '#f00');
     const nb = await createNotebook({ title: 'Revolução', kind: 'canvas', paper, coverColor: '#000', folderId: folder.id });
-    await deleteFolder(folder.id);
+    await deleteFolder('notebooks', folder.id);
     expect((await db.notebooks.get(nb.id))?.folderId).toBeNull();
     await deleteNotebook(nb.id);
     expect(await db.notePages.where('notebookId').equals(nb.id).count()).toBe(0);

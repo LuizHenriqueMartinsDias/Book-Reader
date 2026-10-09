@@ -33,7 +33,7 @@ export default function ResultCard({ item }: { item: CatalogItem }) {
       if (!file) throw new Error('Este item não tem PDF nem EPUB');
       const blob = await downloadBook(file.url, (progress) => setState({ status: 'downloading', progress: { ...progress, total: progress.total ?? file.size } }), ctrl.signal);
       setState({ status: 'saving' });
-      const result = await importBook(new File([blob], file.name, { type: blob.type }), title);
+      const result = await importBook(new File([blob], file.name, { type: blob.type }), { title });
       if (result.status === 'error') throw new Error(`O arquivo baixado não abriu (${result.error})`);
       setState({ status: 'done', bookId: result.id, existed: result.status === 'exists' });
     } catch (e) {

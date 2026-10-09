@@ -5,7 +5,8 @@ interface Backup {
   /** 1: book annotations only; 2: also notebooks. */
   version: 1 | 2;
   exportedAt: string;
-  books: { id: string; title: string; lastPage: number }[];
+  books: { id: string; title: string; lastPage: number; folderId?: string | null }[];
+  bookFolders?: Folder[];
   strokes: Stroke[];
   highlights: Highlight[];
   notes: Note[];
@@ -38,8 +39,9 @@ function fromDataUrl(url: string) {
  * notebooks in full, including their pictures and imported PDFs.
  */
 export async function createBackup(): Promise<Blob> {
-  const [books, strokes, highlights, notes, folders, notebooks, notePages, noteItems, assets] = await Promise.all([
+  const [books, bookFolders, strokes, highlights, notes, folders, notebooks, notePages, noteItems, assets] = await Promise.all([
     db.books.toArray(),
+    db.bookFolders.toArray(),
     db.strokes.toArray(),
     db.highlights.toArray(),
     db.notes.toArray(),
@@ -54,7 +56,8 @@ export async function createBackup(): Promise<Blob> {
     app: 'book-reader',
     version: 2,
     exportedAt: new Date().toISOString(),
-    books: books.map(({ id, title, lastPage }) => ({ id, title, lastPage })),
+    books: books.map(({ id, title, lastPage, folderId }) => ({ id, title, lastPage, folderId })),
+    bookFolders,
     strokes,
     highlights,
     notes,
@@ -74,8 +77,9 @@ export async function restoreBackup(file: Blob) {
   if (backup.app !== 'book-reader') throw new Error('Arquivo de backup inválido');
   const assets = (backup.noteAssets ?? []).map(({ data, ...a }) => ({ ...a, blob: fromDataUrl(data) }));
   const files = (backup.notebookFiles ?? []).map((f) => ({ bookId: f.notebookId, data: fromDataUrl(f.data) }));
-  await db.transaction('rw', [db.books, db.strokes, db.highlights, db.notes, db.folders, db.notebooks, db.notePages, db.noteItems, db.noteAssets, db.files], async () => {
+  await db.transaction('rw', [db.books, db.bookFolders, db.strokes, db.highlights, db.notes, db.folders, db.notebooks, db.notePages, db.noteItems, db.noteAssets, db.files], async () => {
     await db.folders.bulkPut(backup.folders ?? []);
+    await db.bookFolders.bulkPut(backup.bookFolders ?? []);
     await db.notebooks.bulkPut(backup.notebooks ?? []);
     await db.notePages.bulkPut(backup.notePages ?? []);
     await db.noteItems.bulkPut(backup.noteItems ?? []);
@@ -86,7 +90,9 @@ export async function restoreBackup(file: Blob) {
     await db.notes.bulkPut(backup.notes ?? []);
     for (const b of backup.books ?? []) {
       const existing = await db.books.get(b.id);
-      if (existing && existing.lastPage < b.lastPage) await db.books.update(b.id, { lastPage: b.lastPage });
+      if (!existing) continue;
+      if (existing.lastPage < b.lastPage) await db.books.update(b.id, { lastPage: b.lastPage });
+      if (b.folderId) await db.books.update(b.id, { folderId: b.folderId });
     }
   });
   const present = await db.books.bulkGet((backup.books ?? []).map((b) => b.id));
