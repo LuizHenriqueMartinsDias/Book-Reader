@@ -305,6 +305,19 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   /** Stylus and mouse use the tool; fingers navigate, unless "finger draws" is on. */
   const usesTool = (e: React.PointerEvent) => e.pointerType !== 'touch' || fingerDraws;
 
+  /**
+   * With the diagram tool, a finger that navigates can still pick things: a quick tap (no drag,
+   * which scrolls) selects the box or arrow under it, with its move and resize handles.
+   */
+  const fingerTap = useRef<{ id: number; at: Vec; time: number } | null>(null);
+  const pickAt = (p: Vec) => {
+    const editor = useNoteEditor.getState();
+    const box = nodeAt(items, p);
+    const arrow = box ? undefined : [...items].sort((a, b) => b.z - a.z).find((i) => isConnector(i) && connectorHit(i, nodeMap, p[0], p[1], (PICK_PX * 1.6) / view.zoom));
+    const ids = box ? withChildren([box.id], items) : arrow ? [arrow.id] : null;
+    editor.set({ selection: ids ? { pageId: page.id, ids } : null });
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'pen') {
       penActive.current = true;
@@ -318,7 +331,11 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       renderLive();
       return;
     }
-    if (!usesTool(e)) return;
+    if (!usesTool(e)) {
+      // A second finger means pinching or scrolling, not a tap.
+      fingerTap.current = !fingerTap.current && tool === 'diagram' ? { id: e.pointerId, at: [e.clientX, e.clientY], time: Date.now() } : null;
+      return;
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = toWorld(e);
     const editor = useNoteEditor.getState();
@@ -481,6 +498,13 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
 
   const finish = async (e: React.PointerEvent<HTMLCanvasElement>, cancelled: boolean) => {
     if (e.pointerType === 'pen') penActive.current = false;
+    const tap = fingerTap.current;
+    if (tap?.id === e.pointerId) {
+      fingerTap.current = null;
+      // Scrolling cancels the pointer; a real tap ends where it began, quickly.
+      if (!cancelled && Math.hypot(e.clientX - tap.at[0], e.clientY - tap.at[1]) < 10 && Date.now() - tap.time < 600) pickAt(toWorld(e));
+      return;
+    }
     const g = gesture.current;
     if (!g || g.id !== e.pointerId) return;
     gesture.current = null;
