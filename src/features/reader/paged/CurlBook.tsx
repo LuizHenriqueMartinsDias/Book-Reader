@@ -151,7 +151,7 @@ const CurlBook = forwardRef<BookHandle, Props>(function CurlBook(
     return [p.x - rect.left - slotX(slot, geo), p.y - rect.top];
   };
 
-  const gesture = useTurnGesture(
+  useTurnGesture(
     {
       begin: (dir, start) => {
         if (!animate) {
@@ -196,6 +196,7 @@ const CurlBook = forwardRef<BookHandle, Props>(function CurlBook(
       },
     },
     dragEnabled,
+    bookRef,
   );
 
   const cur = spreads[index];
@@ -225,7 +226,6 @@ const CurlBook = forwardRef<BookHandle, Props>(function CurlBook(
       data-reader-pages
       className="relative"
       style={{ width: (geo.double ? 2 : 1) * W, height: H, touchAction: dragEnabled ? 'none' : undefined }}
-      {...gesture}
     >
       <div className="pointer-events-none absolute inset-0 shadow-xl" style={{ left: cur.left === undefined && geo.double ? W : 0, right: cur.right === undefined && geo.double ? W : 0 }} />
       {neighbours.map((page) => {

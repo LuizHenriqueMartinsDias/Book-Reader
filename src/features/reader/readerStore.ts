@@ -19,6 +19,8 @@ interface ReaderState {
   focusNoteId: string | null;
   /** Effective CSS px per PDF point of the active view. */
   scale: number;
+  /** Paged view: the scale that fits a page/spread on screen (zoom there is relative to it). */
+  fitScale: number;
   /** Navigation registered by the active view (scroll or paged). */
   goToPage: (page: number) => void;
   next: () => void;
@@ -39,6 +41,7 @@ export const useReader = create<ReaderState>((set) => ({
   sidebarTab: 'notes',
   focusNoteId: null,
   scale: 1,
+  fitScale: 1,
   goToPage: () => {},
   next: () => {},
   prev: () => {},

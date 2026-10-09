@@ -39,8 +39,13 @@ body,
 #root {
   height: 100%;
 }
+/* No pull-to-refresh or swipe-to-go-back while reading and writing (it's the root scroller's call). */
+html {
+  overscroll-behavior: none;
+}
 body {
   margin: 0;
+  overscroll-behavior: none;
   background: var(--app-bg);
   color: var(--app-fg);
   font-family: ui-sans-serif, system-ui, sans-serif;

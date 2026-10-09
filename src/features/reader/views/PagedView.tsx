@@ -49,7 +49,8 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
   const index = Math.min(spreads.length - 1, Math.max(0, spreadIndexOf(page, double)));
 
   const fitScale = Math.min(availW / ((double ? 2 : 1) * ref.width), availH / ref.height);
-  const scale = zoom === null ? fitScale : Math.min(zoom * CSS_UNITS, MAX_ZOOM * CSS_UNITS);
+  // Here `zoom` is a multiple of the fit size (see Reader), so turning the tablet keeps its meaning.
+  const scale = zoom === null ? fitScale : Math.min(fitScale * zoom, MAX_ZOOM * CSS_UNITS);
   const zoomed = scale > fitScale * 1.01;
   const geo = useMemo(() => ({ double, slotW: ref.width * scale, slotH: ref.height * scale, scale }), [double, ref, scale]);
 
@@ -74,8 +75,8 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
 
   useEffect(() => {
     const turn = (dir: TurnDir) => () => bookRef.current?.turn(dir);
-    useReader.setState({ scale, goToPage, next: turn('next'), prev: turn('prev') });
-  }, [scale, goToPage]);
+    useReader.setState({ scale, fitScale, goToPage, next: turn('next'), prev: turn('prev') });
+  }, [scale, fitScale, goToPage]);
 
   useEffect(() => {
     const first = spreads[index] ? firstPageOf(spreads[index]) : 1;
@@ -119,10 +120,20 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
       openAt.current = 'top';
       bookRef.current?.turn(dir);
     };
+    // A sideways swipe with the page already at that edge is ours (it turns the page): keep the
+    // browser from treating it as overscroll, which on Chrome means "go back".
+    const onMove = (e: TouchEvent) => {
+      if (!start || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - start.x;
+      const dy = e.touches[0].clientY - start.y;
+      if (Math.abs(dx) > Math.abs(dy) && ((dx > 0 && start.atLeft) || (dx < 0 && start.atRight))) e.preventDefault();
+    };
     el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
     el.addEventListener('touchend', onEnd);
     return () => {
       el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
       el.removeEventListener('touchend', onEnd);
     };
   }, [zoomed]);
@@ -186,7 +197,9 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
   return (
     <div
       ref={stageRef}
-      className={`flex min-w-0 flex-1 ${zoomed ? 'overflow-auto' : 'overflow-hidden'}`}
+      data-turn-surface
+      // overscroll-contain: a swipe past the edge must turn the page, not trigger the browser's "back" gesture.
+      className={`flex min-w-0 flex-1 overscroll-contain ${zoomed ? 'overflow-auto' : 'overflow-hidden'}`}
       style={{ touchAction: zoomed ? 'pan-x pan-y' : 'none' }}
     >
       {stage.w > 0 && (

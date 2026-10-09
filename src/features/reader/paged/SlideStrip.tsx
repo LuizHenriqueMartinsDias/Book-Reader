@@ -27,6 +27,7 @@ const SlideStrip = forwardRef<BookHandle, Props>(function SlideStrip({ doc, size
   const busy = useRef(false);
   const timer = useRef(0);
   const grab = useRef<number | null>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -56,7 +57,7 @@ const SlideStrip = forwardRef<BookHandle, Props>(function SlideStrip({ doc, size
   );
   useImperativeHandle(ref, () => ({ turn }), [turn]);
 
-  const gesture = useTurnGesture(
+  useTurnGesture(
     {
       begin: (_dir, start) => {
         if (busy.current) return false;
@@ -84,6 +85,7 @@ const SlideStrip = forwardRef<BookHandle, Props>(function SlideStrip({ doc, size
       },
     },
     dragEnabled,
+    stripRef,
   );
 
   const moving = sliding || offset !== 0;
@@ -91,10 +93,10 @@ const SlideStrip = forwardRef<BookHandle, Props>(function SlideStrip({ doc, size
 
   return (
     <div
+      ref={stripRef}
       data-reader-pages
       className="relative"
       style={{ width: bookW, height: geo.slotH, touchAction: dragEnabled ? 'none' : undefined }}
-      {...gesture}
     >
       <div
         className="absolute inset-0"

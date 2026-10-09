@@ -21,9 +21,12 @@ export interface Book {
   addedAt: number;
   lastOpenedAt: number;
   lastPage: number;
-  /** Scroll mode zoom (0 = fit width) and page-by-page zoom (0/absent = fit page). */
+  /**
+   * Scroll mode zoom relative to 100% (0 = fit width), and page-by-page zoom as a multiple of
+   * the fit-page size (absent = fit), so it means the same in portrait and landscape.
+   */
   zoom: number;
-  pagedZoom?: number;
+  pagedZoomFactor?: number;
   fileSize: number;
   /** EPUB reading position (CFI) and fraction read. */
   lastLocation?: string;
