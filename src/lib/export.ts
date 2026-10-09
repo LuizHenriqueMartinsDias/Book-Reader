@@ -52,8 +52,11 @@ export async function exportAnnotatedPdf(source: ArrayBuffer, { strokes, highlig
     notes
       .filter((note) => note.page === n && note.body.trim())
       .forEach((note, k) => {
+        // A post-it goes where it's stuck, in its color; other notes beside their highlight or at the top.
         const anchor = highlights.find((h) => h.id === note.highlightId)?.rects[0];
-        const [ux, uy] = toUser(anchor ? Math.max(0, anchor[0] - 22) : 6, anchor ? anchor[1] : 6 + k * 24);
+        const [ux, uy] = note.pin
+          ? toUser(note.pin.x, note.pin.y)
+          : toUser(anchor ? Math.max(0, anchor[0] - 22) : 6, anchor ? anchor[1] : 6 + k * 24);
         const annot = doc.context.obj({
           Type: 'Annot',
           Subtype: 'Text',
@@ -62,9 +65,9 @@ export async function exportAnnotatedPdf(source: ArrayBuffer, { strokes, highlig
           T: PDFHexString.fromText('Book Reader'),
           M: PDFString.fromDate(new Date(note.updatedAt)),
           Name: PDFName.of('Comment'),
-          C: [1, 0.8, 0.2],
+          C: note.color ? hexToRgb(note.color) : [1, 0.8, 0.2],
           F: 4,
-          Open: false,
+          Open: !!note.pin && !note.collapsed,
         });
         page.node.addAnnot(doc.context.register(annot));
       });

@@ -17,7 +17,8 @@ export default function HighlightLayer({ pageNumber, scale }: { pageNumber: numb
     window.dispatchEvent(new CustomEvent('reader:open-sidebar'));
   };
 
-  const pageNotes = notes?.filter((n) => !n.highlightId || !highlights?.some((h) => h.id === n.highlightId)) ?? [];
+  // Notes stuck on the page as post-its show as themselves (StickyLayer).
+  const pageNotes = notes?.filter((n) => !n.pin && (!n.highlightId || !highlights?.some((h) => h.id === n.highlightId))) ?? [];
 
   return (
     <div className="pointer-events-none absolute inset-0">
@@ -41,7 +42,7 @@ export default function HighlightLayer({ pageNumber, scale }: { pageNumber: numb
       )}
       {highlights?.map((h) => {
         const note = notes?.find((n) => n.highlightId === h.id);
-        if (!note) return null;
+        if (!note || note.pin) return null;
         const [x, y] = h.rects[0];
         return (
           <button

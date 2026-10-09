@@ -1,10 +1,11 @@
-import { Copy, NotebookPen, StickyNote, Trash2 } from 'lucide-react';
+import { Copy, MessageSquarePlus, NotebookPen, StickyNote, Trash2 } from 'lucide-react';
 import { db, type Highlight } from '../../db/schema';
 import { newId, putNote } from '../../db/repo';
 import { useHistory } from '../../store/history';
 import { HIGHLIGHT_COLORS, useUi } from '../../store/ui';
 import { sendQuoteToNotebook } from '../notes/SendQuoteDialog';
 import { useReader } from './readerStore';
+import { pinNote } from './StickyLayer';
 
 export type MenuTarget =
   | { kind: 'selection'; text: string; createHighlights: (color: string) => Highlight[] }
@@ -64,6 +65,26 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
     onClose();
   }
 
+  /** PDF: the passage's note (made if needed) stuck beside it as a post-it, ready to write in. */
+  async function stickBeside() {
+    let h = target.kind === 'highlight' ? target.highlight : null;
+    if (target.kind === 'selection') {
+      const created = target.createHighlights(HIGHLIGHT_COLORS[0]);
+      if (created.length) await useHistory.getState().commit({ added: { highlights: created }, removed: {} });
+      h = created[0] ?? null;
+    }
+    onClose();
+    if (!h?.rects.length) return;
+    const existing = await db.notes.where('highlightId').equals(h.id).first();
+    const [x, y, w] = h.rects[0];
+    const note = pinNote(existing ?? newNote(h), x + w + 8, Math.max(4, y - 4));
+    await useHistory.getState().commit({ added: { notes: [note] }, removed: existing ? { notes: [existing] } : {} });
+    useReader.setState({ freshStickyId: note.id });
+  }
+
+  // Post-its stick on PDF pages (an EPUB's text reflows, so it has no fixed spots yet).
+  const canStick = useReader.getState().format !== 'epub';
+
   /** Highlights the passage (if it isn't yet) and sends it to a notebook with a link back here. */
   async function sendToNotebook() {
     let h = target.kind === 'highlight' ? target.highlight : null;
@@ -100,9 +121,14 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
         </button>
       ))}
       <div className="mx-1 h-6 w-px bg-[var(--border)]" />
-      <button title="Adicionar nota" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={() => highlight(current ?? HIGHLIGHT_COLORS[0], true)}>
-        <StickyNote className="size-5" />
+      <button title="Adicionar nota (no painel)" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={() => highlight(current ?? HIGHLIGHT_COLORS[0], true)}>
+        <MessageSquarePlus className="size-5" />
       </button>
+      {canStick && (
+        <button title="Colar um post-it ao lado" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={stickBeside}>
+          <StickyNote className="size-5" />
+        </button>
+      )}
       <button title="Enviar para caderno" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={sendToNotebook}>
         <NotebookPen className="size-5" />
       </button>

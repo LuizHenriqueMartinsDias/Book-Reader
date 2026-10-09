@@ -84,6 +84,13 @@ export interface Note {
   highlightId?: string;
   /** EPUB: where the note was taken (CFI). */
   cfi?: string;
+  /**
+   * PDF: stuck on the page as a post-it, at this spot and size (page view space at scale 1,
+   * like strokes); with its paper color and whether it's folded down to an icon.
+   */
+  pin?: { x: number; y: number; w: number; h: number };
+  color?: string;
+  collapsed?: boolean;
   body: string;
   createdAt: number;
   updatedAt: number;

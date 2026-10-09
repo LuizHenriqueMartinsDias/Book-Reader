@@ -1,41 +1,60 @@
 import { Minus, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { db, type StickyItem } from '../../../db/schema';
 import { STICKY_COLORS, STICKY_HEADER, STICKY_ICON, STICKY_INK } from '../../../lib/notes/sticky';
-import { useNoteEditor } from './editorStore';
-import { commitItems } from './items';
 
 const PAD = 6;
 const lineHeight = 1.35;
 
 export type StickyDrag = 'move' | 'resize';
 
+/** What a post-it card shows, in the units of the layer it's in. */
+export interface StickyLook {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: string;
+  text: string;
+  fontSize: number;
+  collapsed?: boolean;
+}
+
 interface Props {
-  item: StickyItem;
-  editing: boolean;
+  item: StickyLook;
+  /** Notebook: typing only after a tap (the pen writes on it otherwise). Book: always typeable (`live`). */
+  editing?: boolean;
+  live?: boolean;
+  /** Draw the paper here (book); in a notebook it's on the ink canvas, under the writing. */
+  paper?: boolean;
   /** Dragging by the strip (move) or the corner (resize): screen px since the press; `done` when let go. */
   onDrag: (mode: StickyDrag, dx: number, dy: number, done: 'no' | 'drop' | 'cancel') => void;
-  onChange: (next: StickyItem) => void;
+  onChange: (patch: Partial<StickyLook>) => void;
+  /** New text, when typing ends (and, live, after a pause). */
+  onText: (text: string) => void;
+  /** It needs to be this tall to fit its text. */
+  onGrow: (h: number) => void;
   onDelete: () => void;
+  onEditEnd?: () => void;
 }
 
 /**
- * A post-it's controls and text over its paper (drawn on the ink canvas): the strip to drag it
- * by with color / fold / delete, its typed text, the corner to resize it. Folded, a small icon.
+ * A post-it card: the strip to drag it by with color / fold / delete, its typed text, the corner
+ * to resize it. Folded, a small icon. Used by notebooks and by books.
  */
-export default function StickyItemView({ item, editing, onDrag, onChange, onDelete }: Props) {
+export default function StickyItemView({ item, editing = false, live = false, paper = false, onDrag, onChange, onText, onGrow, onDelete, onEditEnd }: Props) {
   const [text, setText] = useState(item.text);
   const [palette, setPalette] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const original = useRef<StickyItem | null>(null);
+  const startText = useRef(item.text);
   const drag = useRef<{ mode: StickyDrag; id: number; start: [number, number] } | null>(null);
+  const typing = editing || live;
 
   useEffect(() => setText(item.text), [item.text]);
 
   useEffect(() => {
     if (!editing) return;
-    original.current = item;
+    startText.current = item.text;
     const area = areaRef.current;
     area?.setSelectionRange(area.value.length, area.value.length);
     area?.focus({ preventScroll: true });
@@ -43,27 +62,29 @@ export default function StickyItemView({ item, editing, onDrag, onChange, onDele
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
-  // It grows to fit its text (quietly: the size follows the text, not an edit of its own).
+  // Live (book) post-its save shortly after typing stops.
+  useEffect(() => {
+    if (!live || text === item.text) return;
+    const t = setTimeout(() => onText(text.replace(/\s+$/, '')), 500);
+    return () => clearTimeout(t);
+  }, [live, text, item.text, onText]);
+
+  // It grows to fit its text.
   useLayoutEffect(() => {
     const el = bodyRef.current;
     if (!el || item.collapsed) return;
     const ro = new ResizeObserver(() => {
       const needed = STICKY_HEADER + el.scrollHeight + PAD;
-      if (needed > item.h + 1)
-        db.noteItems.update(item.id, (i) => {
-          if (i.type === 'sticky') i.h = needed;
-        });
+      if (needed > item.h + 1) onGrow(needed);
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [item.id, item.h, item.collapsed]);
+  }, [item.h, item.collapsed, onGrow]);
 
   function finish() {
-    useNoteEditor.getState().set({ editingTextId: null });
-    const before = original.current;
-    original.current = null;
     const value = text.replace(/\s+$/, '');
-    if (before && before.text !== value) commitItems([{ ...item, text: value }], [before]);
+    if (live ? value !== item.text : value !== startText.current) onText(value);
+    onEditEnd?.();
   }
 
   const grab = (mode: StickyDrag) => ({
@@ -80,7 +101,7 @@ export default function StickyItemView({ item, editing, onDrag, onChange, onDele
       const d = drag.current;
       if (d?.id !== e.pointerId) return;
       drag.current = null;
-      onDrag(d.mode, e.clientX - d.start[0], e.clientY - d.start[1], e.type === 'pointercancel' ? 'cancel' : 'drop');
+      onDrag(d.mode, e.clientX - d.start[0], e.clientY - d.start[1], 'drop');
     },
     onPointerCancel: (e: React.PointerEvent) => {
       const d = drag.current;
@@ -98,14 +119,21 @@ export default function StickyItemView({ item, editing, onDrag, onChange, onDele
         className="pointer-events-auto absolute touch-none rounded-[2px] shadow-md ring-1 ring-black/10"
         style={{ left: item.x, top: item.y, width: STICKY_ICON, height: STICKY_ICON, background: `linear-gradient(225deg, transparent 6px, ${item.color} 6px)` }}
         {...stop}
-        onClick={() => onChange({ ...item, collapsed: false })}
+        onClick={() => onChange({ collapsed: false })}
       />
     );
 
   const icon = Math.max(10, Math.min(14, STICKY_HEADER - 8));
   return (
-    <div className="absolute" style={{ left: item.x, top: item.y, width: item.w, height: item.h, color: STICKY_INK }}>
-      <div className="pointer-events-auto flex cursor-move touch-none items-center justify-end gap-1 px-1" style={{ height: STICKY_HEADER }} {...grab('move')}>
+    <div
+      className={`absolute ${paper ? 'pointer-events-auto shadow-md ring-1 ring-black/5' : ''}`}
+      style={{ left: item.x, top: item.y, width: item.w, height: item.h, color: STICKY_INK, background: paper ? item.color : undefined }}
+    >
+      <div
+        className="pointer-events-auto flex cursor-move touch-none items-center justify-end gap-1 px-1"
+        style={{ height: STICKY_HEADER, background: paper ? 'rgb(0 0 0 / 0.06)' : undefined }}
+        {...grab('move')}
+      >
         {palette ? (
           STICKY_COLORS.map((c) => (
             <button
@@ -114,7 +142,7 @@ export default function StickyItemView({ item, editing, onDrag, onChange, onDele
               {...stop}
               onClick={() => {
                 setPalette(false);
-                if (c !== item.color) onChange({ ...item, color: c });
+                if (c !== item.color) onChange({ color: c });
               }}
               className="rounded-full ring-1 ring-black/20"
               style={{ width: icon, height: icon, background: c }}
@@ -123,7 +151,7 @@ export default function StickyItemView({ item, editing, onDrag, onChange, onDele
         ) : (
           <>
             <button title="Cor" {...stop} onClick={() => setPalette(true)} className="rounded-full ring-1 ring-black/25" style={{ width: icon, height: icon, background: item.color }} />
-            <button title="Recolher" {...stop} onClick={() => onChange({ ...item, collapsed: true })} className="opacity-60 hover:opacity-100">
+            <button title="Recolher" {...stop} onClick={() => onChange({ collapsed: true })} className="opacity-60 hover:opacity-100">
               <Minus style={{ width: icon, height: icon }} />
             </button>
             <button title="Apagar post-it" {...stop} onClick={onDelete} className="opacity-60 hover:opacity-100">
@@ -133,7 +161,7 @@ export default function StickyItemView({ item, editing, onDrag, onChange, onDele
         )}
       </div>
       <div ref={bodyRef} style={{ padding: PAD, paddingTop: PAD / 2, fontSize: item.fontSize, lineHeight }}>
-        {editing ? (
+        {typing ? (
           <textarea
             ref={areaRef}
             value={text}

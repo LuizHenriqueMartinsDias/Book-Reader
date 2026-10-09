@@ -2,6 +2,7 @@ import { memo, useEffect, useRef } from 'react';
 import { pdfjs, type PageSize, type PDFDocumentProxy } from '../../lib/pdf';
 import HighlightLayer from './HighlightLayer';
 import InkLayer from './InkLayer';
+import StickyLayer from './StickyLayer';
 import { usePdfCanvas, usePdfPage, useSettledScale } from './PdfPageCanvas';
 
 interface Props {
@@ -67,6 +68,7 @@ function PageContent({ doc, pageNumber, size, scale }: Pick<Props, 'doc' | 'page
         style={{ ['--scale-factor' as string]: renderScale, transform: `scale(${scale / renderScale})` }}
       />
       <InkLayer pageNumber={pageNumber} size={size} scale={scale} />
+      <StickyLayer pageNumber={pageNumber} size={size} scale={scale} />
     </>
   );
 }

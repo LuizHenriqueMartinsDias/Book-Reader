@@ -48,7 +48,7 @@ function PdfReader({ bookId, startPage }: { bookId: string; startPage?: number }
   return <Reader book={state.book} doc={state.doc} sizes={state.sizes} startPage={startPage} />;
 }
 
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', p: 'pen', h: 'marker', e: 'eraser' };
+const TOOL_KEYS: Record<string, Tool> = { v: 'select', p: 'pen', h: 'marker', e: 'eraser', n: 'sticky' };
 
 /** Shared chrome around the active view: toolbar, sidebar, zoom, keyboard and persistence. */
 function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentProxy; sizes: PageSize[]; startPage?: number }) {

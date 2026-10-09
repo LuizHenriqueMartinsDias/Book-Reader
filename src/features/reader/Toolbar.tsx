@@ -14,6 +14,7 @@ import {
   PenTool,
   Plus,
   Redo2,
+  StickyNote,
   Sun,
   SunDim,
   Undo2,
@@ -25,6 +26,7 @@ import { download } from '../../lib/backup';
 import { useHistory } from '../../store/history';
 import { MARKER_COLORS, PEN_COLORS, useUi, type Theme, type Tool } from '../../store/ui';
 import InkSettings from '../InkSettings';
+import { STICKY_COLORS } from '../../lib/notes/sticky';
 import { useReader } from './readerStore';
 import FullscreenButton from './FullscreenButton';
 import NotebookSideButton from './NotebookSideButton';
@@ -35,6 +37,7 @@ const TOOLS: { id: Tool; icon: typeof PenLine; label: string }[] = [
   { id: 'pen', icon: PenLine, label: 'Caneta (P)' },
   { id: 'marker', icon: Highlighter, label: 'Marca-texto (H)' },
   { id: 'eraser', icon: Eraser, label: 'Borracha (E)' },
+  { id: 'sticky', icon: StickyNote, label: 'Post-it (N): toque na página para colar um' },
 ];
 const NEXT_THEME: Record<Theme, Theme> = { light: 'sepia', sepia: 'dark', dark: 'light' };
 const THEME_ICON = { light: Sun, sepia: SunDim, dark: Moon };
@@ -123,6 +126,21 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
         >
           <PenTool className="size-4" /> Caneta escreve
         </button>
+      )}
+
+      {ui.tool === 'sticky' && (
+        <div className="flex shrink-0 items-center gap-1 pl-1">
+          {STICKY_COLORS.map((c) => (
+            <button
+              key={c}
+              title="Cor do post-it"
+              onClick={() => ui.set({ stickyColor: c })}
+              className={`size-6 rounded-sm border-2 ${ui.stickyColor === c ? 'border-amber-500' : 'border-transparent'}`}
+            >
+              <span className="block size-full rounded-[2px] shadow-sm ring-1 ring-black/10" style={{ background: c }} />
+            </button>
+          ))}
+        </div>
       )}
 
       {(ui.tool === 'pen' || ui.tool === 'marker' || (ui.tool === 'select' && ui.penDetected && ui.stylusAlwaysInks)) && (

@@ -17,6 +17,8 @@ interface ReaderState {
   sidebarTab: SidebarTab;
   /** Note to scroll to and focus in the notes panel. */
   focusNoteId: string | null;
+  /** A post-it just stuck on a page: it opens for typing. */
+  freshStickyId: string | null;
   /** Effective CSS px per PDF point of the active view. */
   scale: number;
   /** Paged view: the scale that fits a page/spread on screen (zoom there is relative to it). */
@@ -40,6 +42,7 @@ export const useReader = create<ReaderState>((set) => ({
   currentCfi: null,
   sidebarTab: 'notes',
   focusNoteId: null,
+  freshStickyId: null,
   scale: 1,
   fitScale: 1,
   goToPage: () => {},

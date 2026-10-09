@@ -927,7 +927,15 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
                 item={i}
                 editing={editingTextId === i.id}
                 onDrag={dragSticky(saved)}
-                onChange={(next) => commitItems([next], [saved])}
+                onChange={(patch) => commitItems([{ ...saved, ...patch }], [saved])}
+                onText={(text) => commitItems([{ ...saved, text }], [saved])}
+                onGrow={(h) =>
+                  // Quietly: the size follows the text; it isn't an edit of its own.
+                  db.noteItems.update(i.id, (x) => {
+                    if (x.type === 'sticky') x.h = h;
+                  })
+                }
+                onEditEnd={() => useNoteEditor.getState().set({ editingTextId: null })}
                 onDelete={() => commitItems([], items.filter((x) => x.id === i.id || x.parentId === i.id))}
               />
             );

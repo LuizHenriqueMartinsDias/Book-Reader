@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Brush } from '../db/schema';
 
-export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
+/** `sticky`: a tap on a PDF page sticks a post-it there. */
+export type Tool = 'select' | 'pen' | 'marker' | 'eraser' | 'sticky';
 export type Theme = 'light' | 'sepia' | 'dark';
 /** How pages advance: continuous vertical scroll, or one spread at a time with a transition. */
 export type ViewMode = 'scroll' | 'flip' | 'slide' | 'instant';
@@ -36,6 +37,8 @@ interface UiState {
   penDetected: boolean;
   /** With a stylus, it writes even when the select tool is active; fingers keep selecting and navigating. */
   stylusAlwaysInks: boolean;
+  /** Paper color of new post-its on book pages. */
+  stickyColor: string;
   /** Ink tool the stylus uses under the select tool: the last one picked. */
   lastInkTool: 'pen' | 'marker';
   set: (patch: Partial<Omit<UiState, "set">>) => void;
@@ -60,6 +63,7 @@ export const useUi = create<UiState>()(
       penDetected: false,
       stylusAlwaysInks: true,
       lastInkTool: 'pen',
+      stickyColor: '#fef08a',
       set: (patch) =>
         set((s) => {
           const next = patch.tool === 'pen' || patch.tool === 'marker' ? { ...patch, lastInkTool: patch.tool } : patch;

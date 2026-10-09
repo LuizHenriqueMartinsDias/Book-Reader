@@ -1,4 +1,4 @@
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, decodePDFRawStream, degrees } from 'pdf-lib';
+import { PDFArray, PDFBool, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, decodePDFRawStream, degrees } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
 import type { Highlight, Note, Stroke } from '../db/schema';
 import { exportAnnotatedPdf } from './export';
@@ -60,5 +60,15 @@ describe('exportAnnotatedPdf', () => {
     const bytes = await exportAnnotatedPdf(await samplePdf(90), { strokes: [], highlights: [highlight], notes: [] });
     // Rotated 90°: view (50, 700) -> user (x1 + vy, y1 + vx) = (700, 50)
     expect(pageContent(await PDFDocument.load(bytes), 0)).toContain('700 -50');
+  });
+
+  it('puts a post-it where it is stuck, in its color, open unless folded', async () => {
+    const postit: Note = { ...note, id: 'p', highlightId: undefined, pin: { x: 300, y: 200, w: 140, h: 120 }, color: '#bfdbfe', collapsed: false };
+    const out = await PDFDocument.load(await exportAnnotatedPdf(await samplePdf(), { strokes: [], highlights: [], notes: [postit] }));
+    const annot = out.context.lookup(out.getPage(0).node.Annots()!.get(0), PDFDict);
+    const rect = annot.lookup(PDFName.of('Rect'), PDFArray).asArray().map((n) => (n as PDFNumber).asNumber());
+    expect(rect.slice(0, 2)).toEqual([300, 800 - 200 - 20]); // its top-left corner, in user space
+    expect(annot.lookup(PDFName.of('C'), PDFArray).asArray().map((n) => (n as PDFNumber).asNumber())[2]).toBeCloseTo(0xfe / 255, 3);
+    expect(annot.get(PDFName.of('Open'))).toBe(PDFBool.True);
   });
 });

@@ -1,10 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Trash2 } from 'lucide-react';
+import { Pin, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { db, type Highlight, type Note } from '../../db/schema';
 import { deleteNote, newId, putNote } from '../../db/repo';
 import { useReader } from './readerStore';
 import { jumpTo } from './Sidebar';
+import { useHistory } from '../../store/history';
+import { pinNote } from './StickyLayer';
 
 type Filter = 'page' | 'all' | 'highlights';
 
@@ -161,6 +163,26 @@ function NoteItem({ note, highlight, autoFocus }: { note: Note; highlight?: High
           <Unit /> {note.page}
         </button>
         <span className="flex items-center gap-2">
+          {note.pin ? (
+            <span title="Post-it na página" className="size-3 rounded-[2px] ring-1 ring-black/10" style={{ background: note.color }} />
+          ) : (
+            !note.cfi && (
+              <button
+                title="Colar na página como post-it"
+                className="flex items-center gap-0.5 hover:text-amber-600"
+                onClick={async () => {
+                  // Beside its highlight if it has one, else at the top right of its page.
+                  const h = note.highlightId ? await db.highlights.get(note.highlightId) : undefined;
+                  const r = h?.rects[0];
+                  const pinned = pinNote(note, r ? r[0] + r[2] + 8 : null, r ? Math.max(4, r[1] - 4) : 12);
+                  await useHistory.getState().commit({ added: { notes: [pinned] }, removed: { notes: [note] } });
+                  jumpTo(note.page);
+                }}
+              >
+                <Pin className="size-3.5" /> Colar
+              </button>
+            )
+          )}
           {new Date(note.updatedAt).toLocaleDateString()}
           <button
             title="Excluir nota"
