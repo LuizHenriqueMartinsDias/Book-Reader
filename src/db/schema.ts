@@ -44,12 +44,19 @@ export interface BookFile {
 }
 
 export type InkTool = 'pen' | 'marker';
+/**
+ * Kind of pen: `pen` follows pressure, `fineliner` keeps an even line, `brush` swells with
+ * pressure and tapers at the ends, `pencil` is grainy and a little see-through.
+ */
+export type Brush = 'pen' | 'fineliner' | 'brush' | 'pencil';
 
 export interface Stroke {
   id: string;
   bookId: string;
   page: number;
   tool: InkTool;
+  /** Pen strokes only; absent on older strokes, which are all `pen`. */
+  brush?: Brush;
   color: string;
   width: number;
   points: Point[];
@@ -166,6 +173,8 @@ interface NoteItemBase {
 export interface StrokeItem extends NoteItemBase {
   type: 'stroke';
   tool: InkTool;
+  /** Pen strokes only; absent on older strokes, which are all `pen`. */
+  brush?: Brush;
   color: string;
   width: number;
   points: Point[];

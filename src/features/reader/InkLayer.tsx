@@ -17,7 +17,7 @@ const penErases = (e: { pointerType: string; buttons: number }) => e.pointerType
 /** Current color and width settings of an ink tool. */
 function inkStyle(tool: InkTool) {
   const ui = useUi.getState();
-  return tool === 'pen' ? { tool, color: ui.penColor, width: ui.penWidth } : { tool, color: ui.markerColor, width: ui.markerWidth };
+  return tool === 'pen' ? { tool, brush: ui.penBrush, color: ui.penColor, width: ui.penWidth } : { tool, color: ui.markerColor, width: ui.markerWidth };
 }
 
 interface Props {

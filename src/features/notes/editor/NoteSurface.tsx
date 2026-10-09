@@ -118,7 +118,7 @@ function newConnector(from: NodeItem, to: ConnectorEnd): Omit<ConnectorItem, 'id
 
 function inkStyle(tool: 'pen' | 'marker') {
   const ui = useUi.getState();
-  return tool === 'pen' ? { tool, color: ui.penColor, width: ui.penWidth } : { tool, color: ui.markerColor, width: ui.markerWidth };
+  return tool === 'pen' ? { tool, brush: ui.penBrush, color: ui.penColor, width: ui.penWidth } : { tool, color: ui.markerColor, width: ui.markerWidth };
 }
 
 /**

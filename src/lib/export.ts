@@ -1,7 +1,7 @@
 import { BlendMode, PDFDocument, PDFHexString, PDFName, PDFString, rgb } from 'pdf-lib';
 import type { Highlight, Note, Stroke } from '../db/schema';
 import { viewToUserSpace, type ViewBox } from './coords';
-import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, strokeOutline } from './ink';
+import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, PENCIL_OPACITY, strokeOutline } from './ink';
 
 const HIGHLIGHT_OPACITY = 0.4;
 
@@ -45,7 +45,7 @@ export async function exportAnnotatedPdf(source: ArrayBuffer, { strokes, highlig
         x: 0,
         y: 0,
         color: rgb(r, g, b),
-        ...(s.tool === 'marker' ? { opacity: MARKER_OPACITY, blendMode: BlendMode.Multiply } : {}),
+        ...(s.tool === 'marker' ? { opacity: MARKER_OPACITY, blendMode: BlendMode.Multiply } : s.brush === 'pencil' ? { opacity: PENCIL_OPACITY } : {}),
       });
     }
 

@@ -24,6 +24,7 @@ import { getBookFile } from '../../db/repo';
 import { download } from '../../lib/backup';
 import { useHistory } from '../../store/history';
 import { MARKER_COLORS, PEN_COLORS, useUi, type Theme, type Tool } from '../../store/ui';
+import InkSettings from '../InkSettings';
 import { useReader } from './readerStore';
 import FullscreenButton from './FullscreenButton';
 import NotebookSideButton from './NotebookSideButton';
@@ -35,8 +36,6 @@ const TOOLS: { id: Tool; icon: typeof PenLine; label: string }[] = [
   { id: 'marker', icon: Highlighter, label: 'Marca-texto (H)' },
   { id: 'eraser', icon: Eraser, label: 'Borracha (E)' },
 ];
-const PEN_WIDTHS = [1, 2, 4];
-const MARKER_WIDTHS = [8, 14, 22];
 const NEXT_THEME: Record<Theme, Theme> = { light: 'sepia', sepia: 'dark', dark: 'light' };
 const THEME_ICON = { light: Sun, sepia: SunDim, dark: Moon };
 
@@ -67,8 +66,6 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
   const isPen = ui.tool === 'pen' || (ui.tool === 'select' && ui.lastInkTool === 'pen');
   const colors = isPen ? PEN_COLORS : MARKER_COLORS;
   const color = isPen ? ui.penColor : ui.markerColor;
-  const widths = isPen ? PEN_WIDTHS : MARKER_WIDTHS;
-  const width = isPen ? ui.penWidth : ui.markerWidth;
 
   async function exportPdf() {
     setExporting(true);
@@ -141,16 +138,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
             </button>
           ))}
           {divider}
-          {widths.map((w, i) => (
-            <button
-              key={w}
-              title={['Fino', 'Médio', 'Grosso'][i]}
-              onClick={() => ui.set(isPen ? { penWidth: w } : { markerWidth: w })}
-              className={`flex size-7 items-center justify-center rounded-md ${width === w ? 'bg-[var(--app-bg)]' : ''}`}
-            >
-              <span className="rounded-full bg-current" style={{ width: 4 + i * 4, height: 4 + i * 4 }} />
-            </button>
-          ))}
+          <InkSettings tool={isPen ? 'pen' : 'marker'} />
         </div>
       )}
 

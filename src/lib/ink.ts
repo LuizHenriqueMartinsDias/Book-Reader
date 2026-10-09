@@ -1,20 +1,95 @@
-import { getStroke } from 'perfect-freehand';
-import type { Point, Stroke } from '../db/schema';
+import { getStroke, type StrokeOptions } from 'perfect-freehand';
+import type { Brush, Point, Stroke } from '../db/schema';
 
 export const MARKER_OPACITY = 0.35;
+/** A pencil line lets a little of what's under it through. */
+export const PENCIL_OPACITY = 0.88;
+
+type InkLike = Pick<Stroke, 'tool' | 'width' | 'points'> & { brush?: Brush };
+
+/** How each kind of pen turns points and pressure into a shape. */
+function brushOptions(stroke: InkLike): StrokeOptions {
+  if (stroke.tool === 'marker') return { thinning: 0, smoothing: 0.5, streamline: 0.4 };
+  switch (stroke.brush ?? 'pen') {
+    case 'fineliner':
+      return { thinning: 0, smoothing: 0.5, streamline: 0.45 };
+    case 'brush': {
+      const taper = stroke.width * 5;
+      return { thinning: 0.82, smoothing: 0.6, streamline: 0.45, start: { taper, cap: true }, end: { taper, cap: true } };
+    }
+    case 'pencil':
+      return { thinning: 0.3, smoothing: 0.65, streamline: 0.5 };
+    default:
+      return { thinning: 0.6, smoothing: 0.5, streamline: 0.4 };
+  }
+}
 
 /** Outline polygon of a stroke, in the same space as its points. */
-export function strokeOutline(stroke: Pick<Stroke, 'tool' | 'width' | 'points'>, last = true) {
+export function strokeOutline(stroke: InkLike, last = true) {
   return getStroke(stroke.points, {
     size: stroke.width,
-    thinning: stroke.tool === 'pen' ? 0.6 : 0,
-    smoothing: 0.5,
-    streamline: 0.4,
     simulatePressure: false,
     start: { cap: true },
     end: { cap: true },
+    ...brushOptions(stroke),
     last,
   }) as [number, number][];
+}
+
+// Pencil grain: a tile of the ink color with speckled transparency, made once per color.
+const grainTiles = new Map<string, HTMLCanvasElement | null>();
+const grainPatterns = new WeakMap<CanvasRenderingContext2D, Map<string, CanvasPattern | null>>();
+
+function grainTile(color: string) {
+  if (grainTiles.has(color)) return grainTiles.get(color)!;
+  const size = 48;
+  const tile = document.createElement('canvas');
+  tile.width = tile.height = size;
+  const ctx = tile.getContext('2d');
+  if (!ctx) {
+    grainTiles.set(color, null);
+    return null;
+  }
+  const [r, g, b] = hexToRgb(color).map((c) => Math.round(c * 255));
+  const img = ctx.createImageData(size, size);
+  // A fixed pseudo-random sequence, so the grain looks the same every time it's drawn.
+  let seed = 7;
+  const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  for (let i = 0; i < size * size; i++) {
+    const n = rand();
+    img.data.set([r, g, b, Math.round(255 * (n < 0.12 ? 0.15 : 0.55 + 0.45 * rand()))], i * 4);
+  }
+  ctx.putImageData(img, 0, 0);
+  grainTiles.set(color, tile);
+  return tile;
+}
+
+function pencilFill(ctx: CanvasRenderingContext2D, color: string): CanvasPattern | string {
+  let byColor = grainPatterns.get(ctx);
+  if (!byColor) grainPatterns.set(ctx, (byColor = new Map()));
+  if (!byColor.has(color)) {
+    const tile = grainTile(color);
+    const pattern = tile && ctx.createPattern(tile, 'repeat');
+    // Grains of about half a point on the page.
+    pattern?.setTransform?.(new DOMMatrix().scale(0.5));
+    byColor.set(color, pattern ?? null);
+  }
+  return byColor.get(color) ?? color;
+}
+
+/** Fills a stroke's outline the way its tool and pen look. */
+export function fillInk(ctx: CanvasRenderingContext2D, path: Path2D, stroke: Pick<Stroke, 'tool' | 'color'> & { brush?: Brush }) {
+  ctx.save();
+  if (stroke.tool === 'marker') {
+    ctx.globalAlpha = MARKER_OPACITY;
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = stroke.color;
+  } else if (stroke.brush === 'pencil') {
+    ctx.globalAlpha = PENCIL_OPACITY;
+    ctx.fillStyle = pencilFill(ctx, stroke.color);
+  } else ctx.fillStyle = stroke.color;
+  ctx.fill(path);
+  ctx.restore();
 }
 
 /** SVG path data for an outline polygon (quadratic curves through midpoints). */
@@ -32,16 +107,8 @@ export function outlineToSvgPath(points: [number, number][], map = (x: number, y
   return d + ' Z';
 }
 
-export function drawStroke(ctx: CanvasRenderingContext2D, stroke: Pick<Stroke, 'tool' | 'width' | 'points' | 'color'>, last = true) {
-  const path = new Path2D(outlineToSvgPath(strokeOutline(stroke, last)));
-  ctx.save();
-  if (stroke.tool === 'marker') {
-    ctx.globalAlpha = MARKER_OPACITY;
-    ctx.globalCompositeOperation = 'multiply';
-  }
-  ctx.fillStyle = stroke.color;
-  ctx.fill(path);
-  ctx.restore();
+export function drawStroke(ctx: CanvasRenderingContext2D, stroke: InkLike & Pick<Stroke, 'color'>, last = true) {
+  fillInk(ctx, new Path2D(outlineToSvgPath(strokeOutline(stroke, last))), stroke);
 }
 
 /** True when the point is within `radius` of any segment of the stroke's centerline. */

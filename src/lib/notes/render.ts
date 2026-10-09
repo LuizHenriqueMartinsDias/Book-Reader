@@ -1,5 +1,5 @@
 import type { ConnectorItem, NodeItem, NoteItem, Paper, ShapeItem, StrokeItem } from '../../db/schema';
-import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, strokeOutline } from '../ink';
+import { fillInk, hexToRgb, outlineToSvgPath, strokeOutline } from '../ink';
 import { barbs, connectorPoints, heads, midpoint, nodesById } from './connectors';
 import { nodeRadius, type Vec } from './geometry';
 
@@ -110,14 +110,7 @@ function strokePath(s: StrokeItem) {
 }
 
 export function drawStrokeItem(ctx: CanvasRenderingContext2D, s: StrokeItem) {
-  ctx.save();
-  if (s.tool === 'marker') {
-    ctx.globalAlpha = MARKER_OPACITY;
-    ctx.globalCompositeOperation = 'multiply';
-  }
-  ctx.fillStyle = s.color;
-  ctx.fill(strokePath(s));
-  ctx.restore();
+  fillInk(ctx, strokePath(s), s);
 }
 
 /** A diagram box's outline and tint (its text is DOM in the editor; see `drawNodeText`). */

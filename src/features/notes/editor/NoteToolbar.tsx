@@ -35,6 +35,7 @@ import { updateNotebook } from '../../../db/notes';
 import { PAPER_COLORS } from '../../../lib/notes/render';
 import { useNoteHistory } from '../../../store/history';
 import { MARKER_COLORS, PEN_COLORS, useUi } from '../../../store/ui';
+import InkSettings from '../../InkSettings';
 import FullscreenButton from '../../reader/FullscreenButton';
 import { useNoteEditor, type EraserMode, type NoteTool } from './editorStore';
 
@@ -70,8 +71,6 @@ const ERASER_MODES: { id: EraserMode; label: string; title: string }[] = [
   { id: 'stroke', label: 'Traço inteiro', title: 'Encostar num traço apaga ele inteiro' },
 ];
 const ERASER_SIZES = [6, 10, 18];
-const PEN_WIDTHS = [1, 2, 4];
-const MARKER_WIDTHS = [8, 14, 22];
 const TEXT_SIZES = [12, 16, 22, 30];
 
 const btn = 'rounded-md p-2 hover:bg-[var(--app-bg)] disabled:opacity-30 disabled:hover:bg-transparent';
@@ -227,16 +226,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
                   A
                 </button>
               ))
-            : (usesMarker ? MARKER_WIDTHS : PEN_WIDTHS).map((w, i) => (
-                <button
-                  key={w}
-                  title={['Fino', 'Médio', 'Grosso'][i]}
-                  onClick={() => ui.set(usesMarker ? { markerWidth: w } : { penWidth: w })}
-                  className={`flex size-7 items-center justify-center rounded-md ${(usesMarker ? ui.markerWidth : ui.penWidth) === w ? 'bg-[var(--app-bg)]' : ''}`}
-                >
-                  <span className="rounded-full bg-current" style={{ width: 4 + i * 4, height: 4 + i * 4 }} />
-                </button>
-              ))}
+            : <InkSettings tool={usesMarker ? 'marker' : 'pen'} brushes={editor.tool === 'pen'} />}
         </div>
       )}
 
