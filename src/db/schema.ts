@@ -158,6 +158,8 @@ interface NoteItemBase {
   /** Stacking order within the page. */
   z: number;
   createdAt: number;
+  /** Ink written inside a diagram box: the box's id, so it moves, resizes and goes with it. */
+  parentId?: string;
 }
 
 /** All note item coordinates are in page points from the top-left corner. */
@@ -204,7 +206,26 @@ export interface ImageItem extends NoteItemBase {
   assetId: string;
 }
 
-export type NoteItem = StrokeItem | ShapeItem | TextItem | ImageItem;
+export type NodeShape = 'rect' | 'round' | 'ellipse' | 'diamond';
+
+/** A diagram box: an outlined shape with typed text centered in it (and maybe handwriting, by `parentId`). */
+export interface NodeItem extends NoteItemBase {
+  type: 'node';
+  shape: NodeShape;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Outline color; a filled box gets a light tint of it. */
+  color: string;
+  filled: boolean;
+  /** Outline width. */
+  width: number;
+  text: string;
+  fontSize: number;
+}
+
+export type NoteItem = StrokeItem | ShapeItem | TextItem | ImageItem | NodeItem;
 
 export interface NoteAsset {
   id: string;

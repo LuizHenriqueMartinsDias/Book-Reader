@@ -17,12 +17,14 @@ interface Props {
   onDuplicate: () => void;
   onCopy: () => void;
   onDelete: () => void;
+  /** A tap on the selection without moving it (a selected diagram box: edit its text). */
+  onTap?: () => void;
 }
 
 const HANDLE = 22;
 
 /** Dashed box around the lasso selection: drag to move, corner to resize, plus quick actions. */
-export default function SelectionOverlay({ items, view, rotation, preview, onPreview, onCommit, onRecolor, onDuplicate, onCopy, onDelete }: Props) {
+export default function SelectionOverlay({ items, view, rotation, preview, onPreview, onCommit, onRecolor, onDuplicate, onCopy, onDelete, onTap }: Props) {
   const drag = useRef<{ mode: 'move' | 'resize'; start: [number, number]; id: number } | null>(null);
   const box = unionBox(items.map(bboxOf));
   if (!box) return null;
@@ -62,7 +64,10 @@ export default function SelectionOverlay({ items, view, rotation, preview, onPre
     const tr = transformFor(e);
     drag.current = null;
     if (Math.abs(tr.dx) + Math.abs(tr.dy) > 0.5 || Math.abs(tr.scale - 1) > 0.005) onCommit(tr);
-    else onPreview(null);
+    else {
+      onPreview(null);
+      onTap?.();
+    }
   };
 
   const actionsAbove = top > 56;

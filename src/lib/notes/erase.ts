@@ -66,7 +66,7 @@ export function eraseItem(item: NoteItem, x: number, y: number, radius: number, 
   const reach = radius + item.width / 2;
   const cut = lines.map((points) => cutPoints(points, x, y, reach));
   if (cut.every((c) => c === null)) return null;
-  const base = { notebookId: item.notebookId, pageId: item.pageId, z: item.z, createdAt: item.createdAt, color: item.color, width: item.width };
+  const base = { notebookId: item.notebookId, pageId: item.pageId, z: item.z, createdAt: item.createdAt, color: item.color, width: item.width, ...(item.parentId ? { parentId: item.parentId } : {}) };
   const tool = item.type === 'stroke' ? item.tool : 'pen';
   return cut.flatMap((runs, i) => runs ?? [lines[i]]).map((points) => ({ ...base, id: newId(), type: 'stroke', tool, points }));
 }

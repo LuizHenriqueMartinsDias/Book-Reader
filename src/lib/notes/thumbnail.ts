@@ -1,6 +1,6 @@
 import { db, type NoteItem, type Notebook, type NotePage } from '../../db/schema';
 import { bboxOf, unionBox } from './geometry';
-import { drawItems, PAPER_SPACING, paperInk } from './render';
+import { drawItems, drawNodeText, PAPER_SPACING, paperInk } from './render';
 
 /** Small picture of a page (or of a canvas' content) for the notebook's cover. */
 export async function renderThumbnail(notebook: Notebook, page: NotePage, items: NoteItem[], width = 240) {
@@ -48,5 +48,6 @@ export async function renderThumbnail(notebook: Notebook, page: NotePage, items:
     t.text.split('\n').forEach((line, i) => ctx.fillText(line, t.x + 4, t.y + t.fontSize * (1 + i * 1.35)));
   }
   drawItems(ctx, items);
+  for (const n of items) if (n.type === 'node') drawNodeText(ctx, n);
   return canvas.toDataURL('image/webp', 0.75);
 }

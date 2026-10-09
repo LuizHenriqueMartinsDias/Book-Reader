@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { NoteItem, ShapeKind } from '../../../db/schema';
+import type { NodeShape, NoteItem, ShapeKind } from '../../../db/schema';
 import type { Ruler } from '../../../lib/notes/ruler';
 
-export type NoteTool = 'pen' | 'marker' | 'eraser' | 'lasso' | 'text' | 'shape';
+export type NoteTool = 'pen' | 'marker' | 'eraser' | 'lasso' | 'text' | 'shape' | 'diagram';
 /** `stroke`: touching ink deletes the whole stroke. `partial`: rubs out only what's under it. */
 export type EraserMode = 'stroke' | 'partial';
 
@@ -17,6 +17,9 @@ interface NoteEditorState {
   shape: ShapeKind;
   textSize: number;
   eraserMode: EraserMode;
+  /** Diagram tool: the box shape it makes and whether boxes get a tint. */
+  nodeShape: NodeShape;
+  nodeFilled: boolean;
   /** Eraser radius in screen px. */
   eraserSize: number;
   /** Lasso selection (on one page at a time). */
@@ -51,6 +54,8 @@ export const useNoteEditor = create<NoteEditorState>()(
       shape: 'line',
       textSize: 16,
       eraserMode: 'stroke',
+      nodeShape: 'round',
+      nodeFilled: true,
       eraserSize: 10,
       selection: null,
       clipboard: null,
@@ -66,6 +71,18 @@ export const useNoteEditor = create<NoteEditorState>()(
       straightenCanvas: null,
       set: (patch) => set(patch.tool ? { selection: null, editingTextId: null, ...patch } : patch),
     }),
-    { name: 'book-reader-notes', partialize: ({ tool, shape, textSize, eraserMode, eraserSize, fingerDraws }) => ({ tool, shape, textSize, eraserMode, eraserSize, fingerDraws }) },
+    {
+      name: 'book-reader-notes',
+      partialize: ({ tool, shape, textSize, eraserMode, eraserSize, nodeShape, nodeFilled, fingerDraws }) => ({
+        tool,
+        shape,
+        textSize,
+        eraserMode,
+        eraserSize,
+        nodeShape,
+        nodeFilled,
+        fingerDraws,
+      }),
+    },
   ),
 );

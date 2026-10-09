@@ -22,7 +22,7 @@ import PagedNotebook from './PagedNotebook';
 import StretchPageDialog from './StretchPageDialog';
 import RulerOverlay from './RulerOverlay';
 
-const TOOL_KEYS: Record<string, NoteTool> = { p: 'pen', h: 'marker', e: 'eraser', l: 'lasso', t: 'text', s: 'shape' };
+const TOOL_KEYS: Record<string, NoteTool> = { p: 'pen', h: 'marker', e: 'eraser', l: 'lasso', t: 'text', s: 'shape', d: 'diagram' };
 
 interface Props {
   notebookId: string;

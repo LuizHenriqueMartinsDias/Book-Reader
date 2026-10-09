@@ -38,6 +38,16 @@ describe('exportNotebookPdf', () => {
     expect(out.getTitle()).toBe('Teste');
   });
 
+  it('draws diagram boxes with their text, under the ink', async () => {
+    const nb = await withItems('paged', (notebookId, pageId) => [
+      { ...base, id: 'n', notebookId, pageId, type: 'node', shape: 'diamond', x: 100, y: 100, w: 160, h: 100, color: '#2563eb', filled: true, width: 2, text: 'Decisão?\nsim ou não', fontSize: 14 },
+      { ...base, id: 'r', notebookId, pageId, type: 'node', shape: 'round', x: 100, y: 300, w: 160, h: 60, color: '#000000', filled: false, width: 2, text: '', fontSize: 14 },
+      { ...base, z: 2, id: 's', notebookId, pageId, parentId: 'r', type: 'stroke', tool: 'pen', color: '#000000', width: 2, points: [[120, 320, 0.5], [200, 340, 0.5]] },
+    ]);
+    const out = await PDFDocument.load(await exportNotebookPdf(nb.id));
+    expect(out.getPageCount()).toBe(1);
+  });
+
   it('fits an infinite canvas onto one page around its content', async () => {
     const nb = await withItems('canvas', (notebookId, pageId) => [
       { ...base, id: 's', notebookId, pageId, type: 'stroke', tool: 'pen', color: '#000000', width: 2, points: [[-500, -200, 0.5], [1500, 900, 0.5]] },

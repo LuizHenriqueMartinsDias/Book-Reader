@@ -26,7 +26,13 @@ export async function cloneItems(items: NoteItem[], pageId: string, offset: numb
         return { ...i, x: (i as { x: number }).x + offset, y: (i as { y: number }).y + offset };
     }
   };
-  return items.map((item, k) => ({ ...shift(item), id: newId(), pageId, z: z + 1 + k, createdAt: Date.now() }));
+  const ids = new Map(items.map((i) => [i.id, newId()]));
+  // Writing copied with its box belongs to the copy of the box.
+  return items.map((item, k) => {
+    const copy = { ...shift(item), id: ids.get(item.id)!, pageId, z: z + 1 + k, createdAt: Date.now() };
+    if (item.parentId && ids.has(item.parentId)) copy.parentId = ids.get(item.parentId);
+    return copy;
+  });
 }
 
 /** Stretches pages by `sides` (undoable; see `stretchPage`), moving their items along. */

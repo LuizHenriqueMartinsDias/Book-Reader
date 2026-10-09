@@ -1,11 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { db, type ImageItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
+import { db, type ImageItem, type NodeItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { drawStroke } from '../../../lib/ink';
+import { attach, isNode, MIN_NODE, NODE_SIZE, nodeAt, withChildren } from '../../../lib/notes/diagram';
 import { eraseItem } from '../../../lib/notes/erase';
 import { bboxOf, eraserHits, itemsInLasso, screenToLocal, transformItems, type Transform, type Vec } from '../../../lib/notes/geometry';
-import { defaultInk, drawItems, drawShape } from '../../../lib/notes/render';
+import { defaultInk, drawItems, drawNode, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
 import { useUi } from '../../../store/ui';
@@ -13,6 +14,7 @@ import { sizeCanvas } from '../../reader/canvasSize';
 import { useNoteEditor } from './editorStore';
 import ImageItemView from './ImageItemView';
 import { cloneItems, commitItems } from './items';
+import NodeItemView from './NodeItemView';
 import SelectionOverlay from './SelectionOverlay';
 import TextItemView from './TextItemView';
 
@@ -49,10 +51,30 @@ type Gesture =
   | { kind: 'erase'; id: number; at: Vec; stylus: boolean }
   | { kind: 'lasso'; id: number; points: Vec[] }
   | { kind: 'shape'; id: number; from: Vec; to: Vec }
-  | { kind: 'text'; id: number; at: Vec };
+  | { kind: 'text'; id: number; at: Vec }
+  /** Diagram tool: dragging a box (`hit`) moves it; elsewhere it makes a box from `from` to `to`. */
+  | { kind: 'diagram'; id: number; from: Vec; to: Vec; hit: NodeItem | null };
 
 /** The stylus' eraser end (32) or side button (2) is down: it erases while held. */
 const penErases = (e: { pointerType: string; buttons: number }) => e.pointerType === 'pen' && (e.buttons & 34) !== 0;
+
+/** Ink color for new things: the pen's, or the paper's default ink when the pen has the default. */
+function inkColor(notebook: Notebook) {
+  const pen = useUi.getState().penColor;
+  return pen === '#1f2937' ? defaultInk(notebook.paper) : pen;
+}
+
+/** A new diagram box spanning `from`–`to`, or of the usual size centered at `from` after a tap. */
+function newNode(from: Vec, to: Vec, zoom: number, notebook: Notebook): Omit<NodeItem, 'id' | 'notebookId' | 'pageId' | 'z' | 'createdAt'> {
+  const { nodeShape, nodeFilled, textSize } = useNoteEditor.getState();
+  const w = Math.abs(to[0] - from[0]);
+  const h = Math.abs(to[1] - from[1]);
+  const box =
+    w * zoom >= MIN_NODE && h * zoom >= MIN_NODE
+      ? { x: Math.min(from[0], to[0]), y: Math.min(from[1], to[1]), w, h }
+      : { x: from[0] - NODE_SIZE[nodeShape].w / 2, y: from[1] - NODE_SIZE[nodeShape].h / 2, ...NODE_SIZE[nodeShape] };
+  return { type: 'node', shape: nodeShape, ...box, color: inkColor(notebook), filled: nodeFilled, width: 2, text: '', fontSize: textSize };
+}
 
 function inkStyle(tool: 'pen' | 'marker') {
   const ui = useUi.getState();
@@ -176,6 +198,8 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         ctx.arc(g.at[0], g.at[1], useNoteEditor.getState().eraserSize / view.zoom, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
+      } else if (g.kind === 'diagram' && !g.hit && (g.to[0] !== g.from[0] || g.to[1] !== g.from[1])) {
+        drawNode(ctx, { ...newNode(g.from, g.to, view.zoom, notebook), id: '', notebookId: '', pageId: '', z: 0, createdAt: 0 });
       } else if (g.kind === 'lasso' && g.points.length > 1) {
         ctx.save();
         ctx.strokeStyle = '#0ea5e9';
@@ -196,7 +220,8 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     if (eraserMode === 'stroke') {
       const hits = eraserHits(live, x, y, radius);
       if (!hits.length) return;
-      erasingRef.current = new Set([...erasingRef.current, ...hits.map((i) => i.id)]);
+      // Erasing a box erases what's written in it.
+      erasingRef.current = new Set([...erasingRef.current, ...withChildren(hits.map((i) => i.id), items)]);
       setErasing(erasingRef.current);
       return;
     }
@@ -265,6 +290,13 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       gesture.current = { kind: 'shape', id, from: p, to: p };
     } else if (tool === 'text') {
       gesture.current = { kind: 'text', id, at: p };
+    } else if (tool === 'diagram') {
+      // A tap while typing in a box just ends the typing (the text box loses focus).
+      if (editor.editingTextId) return;
+      // On a box: select it (with its writing) and drag to move; elsewhere: make a box.
+      const hit = nodeAt(items, p) ?? null;
+      if (hit) editor.set({ selection: { pageId: page.id, ids: withChildren([hit.id], items) } });
+      gesture.current = { kind: 'diagram', id, from: p, to: p, hit };
     }
     renderLive();
   };
@@ -315,8 +347,9 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
           if (Math.hypot(p[0] - last[0], p[1] - last[1]) * view.zoom > 2) armHold();
         }
       } else if (g.kind === 'lasso') g.points.push(p);
-      else if (g.kind === 'shape') g.to = p;
+      else if (g.kind === 'shape' || g.kind === 'diagram') g.to = p;
     }
+    if (g.kind === 'diagram' && g.hit) setPreview(dragOf(g));
     renderLive();
   };
 
@@ -336,7 +369,8 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     // Paint right away so nothing flickers before the database query catches up.
     const ctx = inkRef.current?.getContext('2d');
     if (ctx) drawItems(ctx, [item]);
-    await commitItems([item]);
+    // Written inside a diagram box: it belongs to the box.
+    await commitItems([attach(item, items)]);
   };
 
   /**
@@ -359,6 +393,17 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     }
   };
 
+  const dragOf = (g: Extract<Gesture, { kind: 'diagram' }>): Transform => ({ dx: g.to[0] - g.from[0], dy: g.to[1] - g.from[1], scale: 1, origin: g.from });
+
+  /** Makes a box; loose writing already inside it becomes its content. Then types in it. */
+  const createNode = async (g: Extract<Gesture, { kind: 'diagram' }>) => {
+    const node: NodeItem = { ...newNode(g.from, g.to, view.zoom, notebook), id: newId(), notebookId: notebook.id, pageId: page.id, z: nextZ(), createdAt: Date.now() };
+    const loose = items.filter((i) => !i.parentId && (i.type === 'stroke' || i.type === 'shape'));
+    const adopted = loose.map((i) => attach(i, [node])).filter((i) => i.parentId === node.id);
+    await commitItems([node, ...adopted], loose.filter((i) => adopted.some((a) => a.id === i.id)));
+    useNoteEditor.getState().set({ editingTextId: node.id });
+  };
+
   const finish = async (e: React.PointerEvent<HTMLCanvasElement>, cancelled: boolean) => {
     if (e.pointerType === 'pen') penActive.current = false;
     const g = gesture.current;
@@ -369,6 +414,12 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     const base = { notebookId: notebook.id, pageId: page.id, z: nextZ(), createdAt: Date.now(), id: newId() };
 
     if (g.kind === 'erase') return saveErase();
+    if (g.kind === 'diagram' && g.hit) {
+      const t = dragOf(g);
+      if (!cancelled && Math.hypot(t.dx, t.dy) * view.zoom > 3) actions.onCommit(t);
+      else setPreview(null);
+      return;
+    }
     if (cancelled) return;
 
     if (g.kind === 'ink') {
@@ -378,8 +429,11 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       const style = inkStyle('pen');
       const shape = useNoteEditor.getState().shape;
       await commitItems([{ ...base, type: 'shape', shape, x1: g.from[0], y1: g.from[1], x2: g.to[0], y2: g.to[1], color: style.color, width: style.width }]);
+    } else if (g.kind === 'diagram') {
+      await createNode(g);
     } else if (g.kind === 'lasso') {
-      const ids = itemsInLasso(items, g.points).map((i) => i.id);
+      // A box comes with what's written in it.
+      const ids = withChildren(itemsInLasso(items, g.points).map((i) => i.id), items);
       useNoteEditor.getState().set({ selection: ids.length ? { pageId: page.id, ids } : null });
     } else if (g.kind === 'text') {
       const [x, y] = g.at;
@@ -395,11 +449,16 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         useNoteEditor.getState().set({ editingTextId: hit.id });
         return;
       }
+      // Tapping a diagram box types in it.
+      const box = nodeAt(items, g.at);
+      if (box) {
+        useNoteEditor.getState().set({ editingTextId: box.id });
+        return;
+      }
       const editor = useNoteEditor.getState();
       const fontSize = editor.textSize;
       const right = infinite ? x + 320 : page.width - 24;
-      const ui = useUi.getState();
-      const color = ui.penColor === '#1f2937' ? defaultInk(notebook.paper) : ui.penColor;
+      const color = inkColor(notebook);
       const item: TextItem = { ...base, type: 'text', x, y: y - fontSize * 0.7, w: Math.max(120, Math.min(360, right - x)), text: '', fontSize, color };
       // Saved right away so it shows; it enters the undo history once something is typed.
       await db.noteItems.add(item);
@@ -428,10 +487,20 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   const actions = {
     onCommit: (t: Transform) => {
       setPreview(null);
-      replaceSelected(transformItems(selected, t));
+      // Writing moved without its box joins whatever box it lands in (or none).
+      const ids = new Set(selected.map((i) => i.id));
+      const next = transformItems(selected, t);
+      const all = [...items.filter((i) => !ids.has(i.id)), ...next];
+      replaceSelected(next.map((i) => ((i.type === 'stroke' || i.type === 'shape') && !(i.parentId && ids.has(i.parentId)) ? attach(i, all) : i)));
     },
     onRecolor: (color: string) =>
-      replaceSelected(selected.map((i) => (i.type === 'stroke' || i.type === 'shape' || i.type === 'text' ? { ...i, color } : i))),
+      replaceSelected(selected.map((i) => (i.type === 'image' ? i : { ...i, color }))),
+    onTap: () => {
+      // Tapping a selected box again types in it.
+      const boxes = selected.filter(isNode);
+      if (boxes.length !== 1) return;
+      useNoteEditor.getState().set({ selection: null, editingTextId: boxes[0].id });
+    },
     onDuplicate: async () => {
       const copies = await cloneItems(selected, page.id, 20);
       await commitItems(copies);
@@ -446,6 +515,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
 
   const images = shown.filter((i): i is ImageItem => i.type === 'image').sort((a, b) => a.z - b.z);
   const texts = shown.filter((i): i is TextItem => i.type === 'text').sort((a, b) => a.z - b.z);
+  const nodes = shown.filter(isNode).sort((a, b) => a.z - b.z);
   const touchAction = infinite || fingerDraws ? 'none' : 'pan-x pan-y';
   const worldTransform = `translate(${-view.x * view.zoom}px, ${-view.y * view.zoom}px) scale(${view.zoom})`;
   const cursor = tool === 'text' ? 'text' : tool === 'eraser' ? 'cell' : 'crosshair';
@@ -480,6 +550,9 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       />
       {/* Text is above the input canvas but lets pointers through, except the box being typed in. */}
       <div className="pointer-events-none absolute top-0 left-0 origin-top-left" style={{ transform: worldTransform }}>
+        {nodes.map((i) => (
+          <NodeItemView key={i.id} item={i} editing={editingTextId === i.id} />
+        ))}
         {texts.map((i) => (
           <TextItemView key={i.id} item={i} editing={editingTextId === i.id} original={editingTextId === i.id ? editOriginal.current : null} />
         ))}

@@ -5,10 +5,11 @@ import { getBookFile } from '../../db/repo';
 import { userToDisplayMatrix, viewToUserSpace } from '../coords';
 import { viewBoxOf } from '../export';
 import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, strokeOutline } from '../ink';
-import { bboxOf, shapePoints, unionBox } from './geometry';
+import { nodeTextBox } from './diagram';
+import { bboxOf, nodeOutline, shapePoints, unionBox } from './geometry';
 import { hasMargins, marginsOf, pdfBox } from './margins';
 import { toPngBytes } from './images';
-import { arrowHead, PAPER_SPACING } from './render';
+import { arrowHead, NODE_FILL_OPACITY, PAPER_SPACING } from './render';
 
 type ToUser = (x: number, y: number) => [number, number];
 const color = (hex: string) => rgb(...hexToRgb(hex));
@@ -71,9 +72,9 @@ export async function exportNotebookPdf(notebookId: string, loadImage: (blob: Bl
   return doc.save();
 }
 
-/** Same stacking as on screen: images, then ink and shapes, then text; by `z` within each. */
+/** Same stacking as on screen: images, diagram boxes, then ink and shapes, then text; by `z` within each. */
 export function layered(items: NoteItem[]) {
-  const layer = (i: NoteItem) => (i.type === 'image' ? 0 : i.type === 'text' ? 2 : 1);
+  const layer = (i: NoteItem) => (i.type === 'image' ? 0 : i.type === 'node' ? 0.5 : i.type === 'text' ? 2 : 1);
   return [...items].sort((a, b) => layer(a) - layer(b) || a.z - b.z);
 }
 
@@ -129,6 +130,23 @@ async function drawItem(doc: PDFDocument, page: PDFPage, font: PDFFont, item: No
         const [ux, uy] = toUser(item.x + 4, y - size * 0.22);
         page.drawText(line, { x: ux, y: uy, size, font, color: color(item.color) });
         y += size * 1.35;
+      }
+      return;
+    }
+    case 'node': {
+      const d = `${path(nodeOutline(item))} Z`;
+      if (item.filled) page.drawSvgPath(d, { x: 0, y: 0, color: color(item.color), opacity: NODE_FILL_OPACITY });
+      page.drawSvgPath(d, { x: 0, y: 0, borderColor: color(item.color), borderWidth: item.width, borderLineCap: LineCapStyle.Round });
+      // The text, wrapped and centered in the box like on screen.
+      const size = item.fontSize;
+      const box = nodeTextBox(item);
+      const lines = item.text ? wrapText(item.text, font, size, box.w) : [];
+      const lh = size * 1.3;
+      let y = item.y + item.h / 2 - (lines.length * lh) / 2 + size * 0.95;
+      for (const line of lines) {
+        const [ux, uy] = toUser(item.x + item.w / 2 - font.widthOfTextAtSize(line, size) / 2, y);
+        page.drawText(line, { x: ux, y: uy, size, font, color: color(item.color) });
+        y += lh;
       }
       return;
     }

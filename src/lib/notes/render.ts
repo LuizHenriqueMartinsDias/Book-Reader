@@ -1,5 +1,9 @@
-import type { NoteItem, Paper, ShapeItem, StrokeItem } from '../../db/schema';
-import { MARKER_OPACITY, outlineToSvgPath, strokeOutline } from '../ink';
+import type { NodeItem, NoteItem, Paper, ShapeItem, StrokeItem } from '../../db/schema';
+import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, strokeOutline } from '../ink';
+import { nodeRadius } from './geometry';
+
+/** How strong a filled box's tint of its outline color is. */
+export const NODE_FILL_OPACITY = 0.14;
 
 export const PAPER_COLORS = ['#ffffff', '#fdf6e3', '#f1f5f9', '#1f2937'];
 
@@ -115,11 +119,54 @@ export function drawStrokeItem(ctx: CanvasRenderingContext2D, s: StrokeItem) {
   ctx.restore();
 }
 
-/** Draws the ink of a page (strokes and shapes) in stacking order; text and images are DOM. */
+/** A diagram box's outline and tint (its text is DOM in the editor; see `drawNodeText`). */
+export function drawNode(ctx: CanvasRenderingContext2D, n: NodeItem) {
+  const { x, y, w, h } = n;
+  const path = new Path2D();
+  if (n.shape === 'rect') path.rect(x, y, w, h);
+  else if (n.shape === 'round') path.roundRect(x, y, w, h, nodeRadius(n));
+  else if (n.shape === 'ellipse') path.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+  else {
+    path.moveTo(x + w / 2, y);
+    path.lineTo(x + w, y + h / 2);
+    path.lineTo(x + w / 2, y + h);
+    path.lineTo(x, y + h / 2);
+    path.closePath();
+  }
+  ctx.save();
+  if (n.filled) {
+    const [r, g, b] = hexToRgb(n.color).map((c) => Math.round(c * 255));
+    ctx.fillStyle = `rgb(${r} ${g} ${b} / ${NODE_FILL_OPACITY})`;
+    ctx.fill(path);
+  }
+  ctx.strokeStyle = n.color;
+  ctx.lineWidth = n.width;
+  ctx.lineJoin = 'round';
+  ctx.stroke(path);
+  ctx.restore();
+}
+
+/** A box's text on a canvas (thumbnails and previews; the editor uses an editable DOM box). */
+export function drawNodeText(ctx: CanvasRenderingContext2D, n: NodeItem) {
+  if (!n.text) return;
+  const lines = n.text.split('\n');
+  const lh = n.fontSize * 1.3;
+  ctx.save();
+  ctx.fillStyle = n.color;
+  ctx.font = `${n.fontSize}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  lines.forEach((line, i) => ctx.fillText(line, n.x + n.w / 2, n.y + n.h / 2 + (i - (lines.length - 1) / 2) * lh, n.w * 0.9));
+  ctx.restore();
+}
+
+/** Draws the ink of a page in stacking order, diagram boxes first (under the writing in them); text and images are DOM. */
 export function drawItems(ctx: CanvasRenderingContext2D, items: NoteItem[], hidden?: Set<string>) {
-  for (const item of [...items].sort((a, b) => a.z - b.z)) {
+  const sorted = [...items].sort((a, b) => Number(b.type === 'node') - Number(a.type === 'node') || a.z - b.z);
+  for (const item of sorted) {
     if (hidden?.has(item.id)) continue;
     if (item.type === 'stroke') drawStrokeItem(ctx, item);
     else if (item.type === 'shape') drawShape(ctx, item);
+    else if (item.type === 'node') drawNode(ctx, item);
   }
 }

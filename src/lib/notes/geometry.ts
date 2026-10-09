@@ -1,4 +1,4 @@
-import type { NoteItem, Point } from '../../db/schema';
+import type { NodeItem, NoteItem, Point } from '../../db/schema';
 import { strokeHit } from '../ink';
 
 export type Vec = [number, number];
@@ -36,6 +36,10 @@ export function bboxOf(item: NoteItem): Box {
       return { x: item.x, y: item.y, w: item.w, h: item.h ?? estimateTextHeight(item.text, item.fontSize, item.w) };
     case 'image':
       return { x: item.x, y: item.y, w: item.w, h: item.h };
+    case 'node': {
+      const pad = item.width / 2;
+      return { x: item.x - pad, y: item.y - pad, w: item.w + 2 * pad, h: item.h + 2 * pad };
+    }
   }
 }
 
@@ -93,6 +97,8 @@ export function transformItems(items: NoteItem[], { dx, dy, scale, origin }: Tra
         return { ...item, x: tx(item.x), y: ty(item.y), w: item.w * scale, h: item.h && item.h * scale, fontSize: item.fontSize * scale };
       case 'image':
         return { ...item, x: tx(item.x), y: ty(item.y), w: item.w * scale, h: item.h * scale };
+      case 'node':
+        return { ...item, x: tx(item.x), y: ty(item.y), w: item.w * scale, h: item.h * scale, width: item.width * scale, fontSize: item.fontSize * scale };
     }
   });
 }
@@ -112,11 +118,41 @@ export function shapePoints(item: Extract<NoteItem, { type: 'shape' }>): Point[]
   });
 }
 
-/** Ink the eraser touches: strokes and shapes (text and images need the lasso to delete). */
+/**
+ * Outline of a diagram box as a closed polygon (first point repeated at the end), for drawing
+ * it in a PDF, hit-testing and telling what's inside.
+ */
+export function nodeOutline(n: Pick<NodeItem, 'shape' | 'x' | 'y' | 'w' | 'h'>): Vec[] {
+  const { x, y, w, h } = n;
+  const close = (pts: Vec[]) => [...pts, pts[0]];
+  if (n.shape === 'rect') return close([[x, y], [x + w, y], [x + w, y + h], [x, y + h]]);
+  if (n.shape === 'diamond') return close([[x + w / 2, y], [x + w, y + h / 2], [x + w / 2, y + h], [x, y + h / 2]]);
+  if (n.shape === 'ellipse') {
+    return close(Array.from({ length: 64 }, (_, i): Vec => {
+      const t = (i / 64) * Math.PI * 2;
+      return [x + w / 2 + (w / 2) * Math.cos(t), y + h / 2 + (h / 2) * Math.sin(t)];
+    }));
+  }
+  // Rounded rectangle: a quarter circle at each corner.
+  const r = nodeRadius(n);
+  const corner = (cx: number, cy: number, from: number): Vec[] =>
+    Array.from({ length: 7 }, (_, i): Vec => {
+      const t = ((from + i * 15) * Math.PI) / 180;
+      return [cx + r * Math.cos(t), cy + r * Math.sin(t)];
+    });
+  return close([...corner(x + w - r, y + r, 270), ...corner(x + w - r, y + h - r, 0), ...corner(x + r, y + h - r, 90), ...corner(x + r, y + r, 180)]);
+}
+
+/** Corner radius of a rounded box. */
+export const nodeRadius = (n: Pick<NodeItem, 'w' | 'h'>) => Math.min(16, n.w / 4, n.h / 4);
+
+/** Ink the eraser touches: strokes, shapes and box outlines (text and images need the lasso to delete). */
 export function eraserHits(items: NoteItem[], x: number, y: number, radius: number) {
   return items.filter((i) => {
     if (i.type === 'stroke') return strokeHit(i.points, x, y, radius + i.width / 2);
     if (i.type === 'shape') return strokeHit(shapePoints(i), x, y, radius + i.width / 2);
+    // A box is erased by its outline, so erasing what's written inside it leaves the box.
+    if (i.type === 'node') return strokeHit(nodeOutline(i).map(([px, py]): Point => [px, py, 0.5]), x, y, radius + i.width / 2);
     return false;
   });
 }

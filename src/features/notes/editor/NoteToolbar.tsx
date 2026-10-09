@@ -4,6 +4,7 @@ import {
   BookOpen,
   Circle,
   ClipboardPaste,
+  Diamond,
   Eraser,
   Expand,
   FileDown,
@@ -13,6 +14,7 @@ import {
   Lasso,
   Loader2,
   Minus,
+  PaintBucket,
   PenLine,
   Ruler,
   Plus,
@@ -20,13 +22,15 @@ import {
   RotateCcw,
   Shapes,
   Square,
+  SquareRoundCorner,
   StickyNote,
   Type,
   Undo2,
+  Workflow,
   X,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { Notebook, PaperStyle, ShapeKind } from '../../../db/schema';
+import type { NodeShape, Notebook, PaperStyle, ShapeKind } from '../../../db/schema';
 import { updateNotebook } from '../../../db/notes';
 import { PAPER_COLORS } from '../../../lib/notes/render';
 import { useNoteHistory } from '../../../store/history';
@@ -41,6 +45,13 @@ const TOOLS: { id: NoteTool; icon: typeof PenLine; label: string }[] = [
   { id: 'lasso', icon: Lasso, label: 'Laço: selecionar e mover (L)' },
   { id: 'text', icon: Type, label: 'Texto (T)' },
   { id: 'shape', icon: Shapes, label: 'Formas (S)' },
+  { id: 'diagram', icon: Workflow, label: 'Diagrama (D): toque para criar uma caixa, arraste para mover' },
+];
+const NODE_SHAPES: { id: NodeShape; icon: typeof Square; label: string }[] = [
+  { id: 'round', icon: SquareRoundCorner, label: 'Caixa arredondada' },
+  { id: 'rect', icon: Square, label: 'Caixa' },
+  { id: 'ellipse', icon: Circle, label: 'Elipse' },
+  { id: 'diamond', icon: Diamond, label: 'Losango (decisão)' },
 ];
 const SHAPES: { id: ShapeKind; icon: typeof Minus; label: string }[] = [
   { id: 'line', icon: Minus, label: 'Linha' },
@@ -93,7 +104,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
 
   const rotated = Object.values(editor.pageRotation).some((r) => r !== 0) || editor.canvasRotation !== 0;
   const usesMarker = editor.tool === 'marker';
-  const showsInk = ['pen', 'marker', 'shape', 'text'].includes(editor.tool);
+  const showsInk = ['pen', 'marker', 'shape', 'text', 'diagram'].includes(editor.tool);
   const colors = usesMarker ? MARKER_COLORS : PEN_COLORS;
   const color = usesMarker ? ui.markerColor : ui.penColor;
   const setColor = (c: string) => ui.set(usesMarker ? { markerColor: c } : { penColor: c });
@@ -148,6 +159,28 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
         </div>
       )}
 
+      {editor.tool === 'diagram' && (
+        <div className="flex shrink-0 items-center gap-0.5 pl-1">
+          {NODE_SHAPES.map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              title={label}
+              onClick={() => editor.set({ nodeShape: id })}
+              className={`rounded-md p-1.5 ${editor.nodeShape === id ? 'bg-[var(--app-bg)] text-amber-600' : ''}`}
+            >
+              <Icon className="size-4" />
+            </button>
+          ))}
+          <button
+            title={editor.nodeFilled ? 'Caixas com fundo colorido' : 'Caixas sem fundo'}
+            onClick={() => editor.set({ nodeFilled: !editor.nodeFilled })}
+            className={`rounded-md p-1.5 ${editor.nodeFilled ? 'bg-[var(--app-bg)] text-amber-600' : 'opacity-60'}`}
+          >
+            <PaintBucket className="size-4" />
+          </button>
+        </div>
+      )}
+
       {editor.tool === 'eraser' && (
         <div className="flex shrink-0 items-center gap-0.5 pl-1">
           {ERASER_MODES.map(({ id, label, title }) => (
@@ -182,7 +215,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
             </button>
           ))}
           {divider}
-          {editor.tool === 'text'
+          {editor.tool === 'text' || editor.tool === 'diagram'
             ? TEXT_SIZES.map((size) => (
                 <button
                   key={size}

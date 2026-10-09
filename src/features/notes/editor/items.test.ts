@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createNotebook, getPages } from '../../../db/notes';
 import { db, type StrokeItem, type TextItem } from '../../../db/schema';
 import { useNoteHistory } from '../../../store/history';
-import { commitStretch } from './items';
+import { cloneItems, commitStretch } from './items';
 
 describe('commitStretch', () => {
   beforeEach(async () => {
@@ -36,5 +36,15 @@ describe('commitStretch', () => {
     await commitStretch([page], { top: 56, right: 300, bottom: 0, left: 0 });
     expect((await getPages(nb.id)).map((p) => [p.width, p.height])).toEqual([[895, 898]]);
     expect(await db.noteItems.get('t')).toMatchObject({ x: 50, y: 140 });
+  });
+
+  it('copies writing along with its box, belonging to the copy', async () => {
+    const box = { id: 'b', notebookId: 'n', pageId: 'p', z: 1, createdAt: 0, type: 'node' as const, shape: 'rect' as const, x: 0, y: 0, w: 100, h: 50, color: '#000', filled: false, width: 2, text: 'A', fontSize: 16 };
+    const ink: StrokeItem = { id: 's', notebookId: 'n', pageId: 'p', z: 2, createdAt: 0, parentId: 'b', type: 'stroke', tool: 'pen', color: '#000', width: 2, points: [[10, 10, 0.5]] };
+    const [boxCopy, inkCopy] = await cloneItems([box, ink], 'p', 20);
+    expect(boxCopy.id).not.toBe('b');
+    expect(inkCopy.parentId).toBe(boxCopy.id);
+    const [alone] = await cloneItems([ink], 'p', 20);
+    expect(alone.parentId).toBe('b');
   });
 });
