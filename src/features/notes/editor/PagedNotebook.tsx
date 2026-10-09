@@ -4,6 +4,7 @@ import { addPage, deletePage, movePage } from '../../../db/notes';
 import { db, type Notebook, type NotePage } from '../../../db/schema';
 import { snapQuarter, type Vec } from '../../../lib/notes/geometry';
 import { paperCss } from '../../../lib/notes/render';
+import { appliedTurn, classify, initialTwoFinger, rotates, zooms, type TwoFingerState } from '../../../lib/notes/twoFinger';
 import { CSS_UNITS, type PDFDocumentProxy } from '../../../lib/pdf';
 import PdfPageCanvas from '../../reader/PdfPageCanvas';
 import type { ZoomChange, ZoomMode } from '../../reader/views/types';
@@ -178,15 +179,13 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
   );
 }
 
-/** How far (relative) the fingers must spread or pinch before it counts as zooming. */
-const ZOOM_START = 0.06;
-/** Degrees the fingers must turn (before any zoom) to rotate the page instead. */
-const TWIST_START = 12;
-/** Pixels the fingers must travel together to scroll. */
+/** Pixels the fingers must travel together (without spreading or turning) to scroll. */
 const PAN_START = 8;
 
 type TwoFinger = {
-  mode: 'pending' | 'zoom' | 'rotate' | 'pan';
+  /** Zoom and/or rotation (see twoFinger.ts); `pan` when the fingers just moved together. */
+  tf: TwoFingerState;
+  pan: boolean;
   dist: number;
   angle: number;
   mid: Vec;
@@ -201,9 +200,9 @@ type TwoFinger = {
 };
 
 /**
- * Two fingers do one thing at a time: zoom (spread/pinch, previewed with a CSS transform so it
- * stays smooth, then re-rendered sharp around the fingers), rotate the page under them (turning
- * first), or scroll (moving together).
+ * Two fingers zoom (previewed with a CSS transform so it stays smooth, then re-rendered sharp
+ * around the fingers), rotate the page under them, or scroll (moving together); see
+ * twoFinger.ts for how zoom and rotation are told apart.
  */
 function useTwoFingerGestures(
   scrollRef: React.RefObject<HTMLDivElement | null>,
@@ -230,7 +229,8 @@ function useTwoFingerGestures(
       const box = document.elementFromPoint(t.mid[0], t.mid[1])?.closest<HTMLElement>('[data-page-box]');
       const pageId = box?.dataset.pageBox ?? null;
       g = {
-        mode: 'pending',
+        tf: initialTwoFinger(),
+        pan: false,
         ...t,
         lastMid: t.mid,
         scroll: [el.scrollLeft, el.scrollTop],
@@ -249,27 +249,29 @@ function useTwoFingerGestures(
       const ratio = t.dist / g.dist;
       const turn = ((t.angle - g.angle + 540) % 360) - 180;
       const moved = Math.hypot(t.mid[0] - g.mid[0], t.mid[1] - g.mid[1]);
-      if (g.mode === 'pending') {
-        if (Math.abs(ratio - 1) > ZOOM_START) g.mode = 'zoom';
-        else if (Math.abs(turn) > TWIST_START && g.pageId) g.mode = 'rotate';
-        else if (moved > PAN_START) g.mode = 'pan';
+      if (!g.pan) {
+        g.tf = classify(g.tf, ratio, turn, !!g.pageId);
+        if (g.tf.mode === 'pending' && moved > PAN_START) g.pan = true;
       }
       g.lastMid = t.mid;
 
-      if (g.mode === 'zoom') {
+      if (g.pan) {
+        el.scrollLeft = g.scroll[0] - (t.mid[0] - g.mid[0]);
+        el.scrollTop = g.scroll[1] - (t.mid[1] - g.mid[1]);
+        return;
+      }
+      if (zooms(g.tf)) {
         const target = Math.min(MAX_ZOOM * CSS_UNITS, Math.max(MIN_ZOOM * CSS_UNITS, g.scale * ratio));
         g.k = target / g.scale;
         const content = contentRef.current!;
         // Scale around the starting midpoint (in content coordinates) and follow the fingers.
         content.style.transformOrigin = `${g.mid[0] - g.origin[0]}px ${g.mid[1] - g.origin[1]}px`;
         content.style.transform = `translate(${t.mid[0] - g.mid[0]}px, ${t.mid[1] - g.mid[1]}px) scale(${g.k})`;
-      } else if (g.mode === 'rotate' && g.pageId) {
-        const rotation = snapQuarter(g.baseRotation + turn);
+      }
+      if (rotates(g.tf) && g.pageId) {
+        const rotation = snapQuarter(g.baseRotation + appliedTurn(g.tf, turn));
         const editor = useNoteEditor.getState();
         editor.set({ pageRotation: { ...editor.pageRotation, [g.pageId]: rotation }, rotationHint: rotation });
-      } else if (g.mode === 'pan') {
-        el.scrollLeft = g.scroll[0] - (t.mid[0] - g.mid[0]);
-        el.scrollTop = g.scroll[1] - (t.mid[1] - g.mid[1]);
       }
     };
 
@@ -277,8 +279,8 @@ function useTwoFingerGestures(
       if (!g || e.touches.length >= 2) return;
       const done = g;
       g = null;
-      if (done.mode === 'rotate') useNoteEditor.getState().set({ rotationHint: null });
-      if (done.mode !== 'zoom') return;
+      if (rotates(done.tf)) useNoteEditor.getState().set({ rotationHint: null });
+      if (!zooms(done.tf)) return;
       const content = contentRef.current!;
       const r = el.getBoundingClientRect();
       // The spot that was under the fingers at the start goes where the fingers ended.
