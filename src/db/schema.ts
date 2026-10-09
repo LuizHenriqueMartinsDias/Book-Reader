@@ -278,7 +278,24 @@ export interface ConnectorItem extends NoteItemBase {
   fontSize: number;
 }
 
-export type NoteItem = StrokeItem | ShapeItem | TextItem | ImageItem | NodeItem | ConnectorItem;
+/**
+ * A post-it: colored paper over the page with typed text, and handwriting (by `parentId`) that
+ * moves with it. It grows to fit its text; collapsed, it's just a small folded icon.
+ */
+export interface StickyItem extends NoteItemBase {
+  type: 'sticky';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Paper color. */
+  color: string;
+  text: string;
+  fontSize: number;
+  collapsed?: boolean;
+}
+
+export type NoteItem = StrokeItem | ShapeItem | TextItem | ImageItem | NodeItem | ConnectorItem | StickyItem;
 
 export interface NoteAsset {
   id: string;

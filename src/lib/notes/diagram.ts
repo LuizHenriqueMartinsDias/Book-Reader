@@ -1,7 +1,8 @@
-import type { NodeItem, NodeShape, NoteItem } from '../../db/schema';
+import type { NodeItem, NodeShape, NoteItem, StickyItem } from '../../db/schema';
 import { attachedTo, isConnector } from './connectors';
 import { nodeOutline, pointInPolygon, unionBox, type Box, type Vec } from './geometry';
 import { closedFit } from './shapes';
+import { isSticky } from './sticky';
 
 /**
  * Diagram boxes: sizes, what's inside one, and the handwriting that belongs to it. Ink written
@@ -45,13 +46,28 @@ function inkPoints(i: NoteItem): Vec[] | null {
   return null;
 }
 
-/** The box a stroke or shape was written in (most of it inside; the topmost box wins), if any. */
+/** What writing can belong to: diagram boxes and open post-its (which lie over everything else). */
+function containers(items: NoteItem[]) {
+  const all = items.filter((i): i is NodeItem | StickyItem => isNode(i) || (isSticky(i) && !i.collapsed));
+  return all.sort((a, b) => Number(isSticky(b)) - Number(isSticky(a)) || b.z - a.z);
+}
+
+const outlineOf = (c: NodeItem | StickyItem): Vec[] =>
+  isSticky(c)
+    ? [
+        [c.x, c.y],
+        [c.x + c.w, c.y],
+        [c.x + c.w, c.y + c.h],
+        [c.x, c.y + c.h],
+      ]
+    : nodeOutline(c);
+
+/** The box or post-it a stroke or shape was written in (most of it inside; the one on top wins), if any. */
 export function parentFor(ink: NoteItem, items: NoteItem[]): string | undefined {
   const pts = inkPoints(ink);
   if (!pts?.length) return undefined;
-  const nodes = items.filter((i): i is NodeItem => isNode(i) && i.id !== ink.id).sort((a, b) => b.z - a.z);
-  return nodes.find((n) => {
-    const outline = nodeOutline(n);
+  return containers(items.filter((i) => i.id !== ink.id)).find((c) => {
+    const outline = outlineOf(c);
     return pts.filter((p) => pointInPolygon(p, outline)).length >= pts.length * 0.6;
   })?.id;
 }

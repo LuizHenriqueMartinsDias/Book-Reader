@@ -1,5 +1,6 @@
 import type { NodeItem, NoteItem, Point } from '../../db/schema';
 import { strokeHit } from '../ink';
+import { stickyBox } from './sticky';
 
 export type Vec = [number, number];
 export interface Box {
@@ -40,6 +41,8 @@ export function bboxOf(item: NoteItem): Box {
       const pad = item.width / 2;
       return { x: item.x - pad, y: item.y - pad, w: item.w + 2 * pad, h: item.h + 2 * pad };
     }
+    case 'sticky':
+      return stickyBox(item);
     case 'connector': {
       // From where its ends last were (the path itself depends on the boxes; see connectors.ts).
       const x = Math.min(item.from.x, item.to.x);
@@ -105,6 +108,8 @@ export function transformItems(items: NoteItem[], { dx, dy, scale, origin }: Tra
         return { ...item, x: tx(item.x), y: ty(item.y), w: item.w * scale, h: item.h * scale };
       case 'node':
         return { ...item, x: tx(item.x), y: ty(item.y), w: item.w * scale, h: item.h * scale, width: item.width * scale, fontSize: item.fontSize * scale };
+      case 'sticky':
+        return { ...item, x: tx(item.x), y: ty(item.y), w: item.w * scale, h: item.h * scale, fontSize: item.fontSize * scale };
       case 'connector':
         return {
           ...item,

@@ -119,7 +119,7 @@ export async function searchNotebooks(query: string) {
   const notebooks = await db.notebooks.orderBy('updatedAt').reverse().toArray();
   if (!q) return notebooks;
   const textHits = new Set(
-    (await db.noteItems.filter((i: NoteItem) => (i.type === 'text' || i.type === 'node') && i.text.toLowerCase().includes(q)).toArray()).map((i) => i.notebookId),
+    (await db.noteItems.filter((i: NoteItem) => (i.type === 'text' || i.type === 'node' || i.type === 'sticky') && i.text.toLowerCase().includes(q)).toArray()).map((i) => i.notebookId),
   );
   return notebooks.filter((n) => n.title.toLowerCase().includes(q) || textHits.has(n.id));
 }

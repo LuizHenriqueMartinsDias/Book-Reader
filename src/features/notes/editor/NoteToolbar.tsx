@@ -8,6 +8,7 @@ import {
   Eraser,
   Expand,
   FileDown,
+  FileText,
   Hand,
   Highlighter,
   ImagePlus,
@@ -33,6 +34,7 @@ import { useRef, useState } from 'react';
 import type { NodeShape, Notebook, PaperStyle, ShapeKind } from '../../../db/schema';
 import { updateNotebook } from '../../../db/notes';
 import { PAPER_COLORS } from '../../../lib/notes/render';
+import { STICKY_COLORS } from '../../../lib/notes/sticky';
 import { useNoteHistory } from '../../../store/history';
 import { MARKER_COLORS, PEN_COLORS, useUi } from '../../../store/ui';
 import InkSettings from '../../InkSettings';
@@ -48,6 +50,7 @@ const TOOLS: { id: NoteTool; icon: typeof PenLine; label: string }[] = [
   { id: 'text', icon: Type, label: 'Texto (T)' },
   { id: 'shape', icon: Shapes, label: 'Formas (S)' },
   { id: 'diagram', icon: Workflow, label: 'Diagrama (D): toque para criar uma caixa, arraste para mover' },
+  { id: 'sticky', icon: StickyNote, label: 'Post-it (N): toque para colar um na página' },
 ];
 const NODE_SHAPES: { id: NodeShape; icon: typeof Square; label: string }[] = [
   { id: 'round', icon: SquareRoundCorner, label: 'Caixa arredondada' },
@@ -183,6 +186,21 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
         </div>
       )}
 
+      {editor.tool === 'sticky' && (
+        <div className="flex shrink-0 items-center gap-1 pl-1">
+          {STICKY_COLORS.map((c) => (
+            <button
+              key={c}
+              title="Cor do post-it"
+              onClick={() => editor.set({ stickyColor: c })}
+              className={`size-6 rounded-sm border-2 ${editor.stickyColor === c ? 'border-amber-500' : 'border-transparent'}`}
+            >
+              <span className="block size-full rounded-[2px] shadow-sm ring-1 ring-black/10" style={{ background: c }} />
+            </button>
+          ))}
+        </div>
+      )}
+
       {editor.tool === 'eraser' && (
         <div className="flex shrink-0 items-center gap-0.5 pl-1">
           {ERASER_MODES.map(({ id, label, title }) => (
@@ -302,7 +320,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
         {divider}
         <div className="relative">
           <button className={`${btn} ${paperOpen ? 'bg-[var(--app-bg)]' : ''}`} title="Papel" onClick={() => setPaperOpen((o) => !o)}>
-            <StickyNote className="size-5" />
+            <FileText className="size-5" />
           </button>
           {paperOpen && (
             <>

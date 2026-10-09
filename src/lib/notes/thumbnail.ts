@@ -2,7 +2,7 @@ import { db, type NoteItem, type Notebook, type NotePage } from '../../db/schema
 import { bboxOf, unionBox } from './geometry';
 import { pdfBox } from './margins';
 import { connectorPoints, nodesById } from './connectors';
-import { drawConnectorLabel, drawItems, drawNodeText, PAPER_SPACING, paperInk } from './render';
+import { drawConnectorLabel, drawItems, drawNodeText, drawStickyText, PAPER_SPACING, paperInk } from './render';
 
 /** Small picture of a page (or of a canvas' content) for the notebook's cover. */
 export async function renderThumbnail(notebook: Notebook, page: NotePage, items: NoteItem[], width = 240) {
@@ -65,6 +65,7 @@ export async function renderThumbnail(notebook: Notebook, page: NotePage, items:
   const nodes = nodesById(items);
   for (const n of items) {
     if (n.type === 'node') drawNodeText(ctx, n);
+    else if (n.type === 'sticky') drawStickyText(ctx, n);
     else if (n.type === 'connector') drawConnectorLabel(ctx, n, connectorPoints(n, nodes), notebook.paper.color);
   }
   return canvas.toDataURL('image/webp', 0.75);

@@ -7,6 +7,7 @@ import { viewBoxOf } from '../export';
 import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, PENCIL_OPACITY, strokeOutline } from '../ink';
 import { barbs, connectorPoints, heads, midpoint, nodesById } from './connectors';
 import { nodeTextBox } from './diagram';
+import { isSticky, STICKY_HEADER, STICKY_ICON, STICKY_INK } from './sticky';
 import { bboxOf, nodeOutline, shapePoints, unionBox } from './geometry';
 import { hasMargins, marginsOf, pdfBox } from './margins';
 import { toPngBytes } from './images';
@@ -98,8 +99,12 @@ export async function exportNotebookPdf(notebookId: string, loadImage: (blob: Bl
 
 /** Same stacking as on screen: images, diagram boxes and arrows, then ink and shapes, then text; by `z` within each. */
 export function layered(items: NoteItem[]) {
-  const layer = (i: NoteItem) => (i.type === 'image' ? 0 : i.type === 'node' ? 0.5 : i.type === 'connector' ? 0.75 : i.type === 'text' ? 2 : 1);
-  return [...items].sort((a, b) => layer(a) - layer(b) || a.z - b.z);
+  // Post-its lie over the ink, with what's written on them on top (as on screen); folded ones hide it.
+  const stickies = new Map(items.filter(isSticky).map((s) => [s.id, s]));
+  const onSticky = (i: NoteItem) => !!i.parentId && stickies.has(i.parentId);
+  const layer = (i: NoteItem) =>
+    i.type === 'image' ? 0 : i.type === 'node' ? 0.5 : i.type === 'connector' ? 0.75 : i.type === 'text' ? 2 : i.type === 'sticky' ? 1.5 : onSticky(i) ? 1.6 : 1;
+  return [...items].filter((i) => !(i.parentId && stickies.get(i.parentId)?.collapsed)).sort((a, b) => layer(a) - layer(b) || a.z - b.z);
 }
 
 function drawPaper(page: PDFPage, paper: Paper, w: number, h: number) {
@@ -180,6 +185,24 @@ async function drawItem(
         const [ux, uy] = toUser(item.x + item.w / 2 - font.widthOfTextAtSize(line, size) / 2, y);
         page.drawText(line, { x: ux, y: uy, size, font, color: color(item.color) });
         y += lh;
+      }
+      return;
+    }
+    case 'sticky': {
+      const [x, y] = toUser(item.x, item.y + (item.collapsed ? STICKY_ICON : item.h));
+      if (item.collapsed) {
+        page.drawRectangle({ x, y, width: STICKY_ICON, height: STICKY_ICON, color: color(item.color), borderColor: rgb(0, 0, 0), borderOpacity: 0.25, borderWidth: 0.5 });
+        return;
+      }
+      page.drawRectangle({ x, y, width: item.w, height: item.h, color: color(item.color), borderColor: rgb(0, 0, 0), borderOpacity: 0.15, borderWidth: 0.5 });
+      const [hx, hy] = toUser(item.x, item.y + STICKY_HEADER);
+      page.drawRectangle({ x: hx, y: hy, width: item.w, height: Math.min(STICKY_HEADER, item.h), color: rgb(0, 0, 0), opacity: 0.06 });
+      const size = item.fontSize;
+      let ty = item.y + STICKY_HEADER + 6 + size;
+      for (const line of item.text ? wrapText(item.text, font, size, item.w - 12) : []) {
+        const [lx, ly] = toUser(item.x + 6, ty);
+        page.drawText(line, { x: lx, y: ly, size, font, color: color(STICKY_INK) });
+        ty += size * 1.35;
       }
       return;
     }

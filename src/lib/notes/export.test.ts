@@ -50,6 +50,15 @@ describe('exportNotebookPdf', () => {
     expect(out.getPageCount()).toBe(1);
   });
 
+  it('draws post-its, open and folded', async () => {
+    const nb = await withItems('paged', (notebookId, pageId) => [
+      { ...base, id: 'a', notebookId, pageId, type: 'sticky', x: 300, y: 100, w: 150, h: 150, color: '#fef08a', text: 'Revisar o capítulo 3 antes da prova', fontSize: 14 },
+      { ...base, id: 'b', notebookId, pageId, type: 'sticky', x: 300, y: 400, w: 150, h: 150, color: '#bfdbfe', text: 'escondido', fontSize: 14, collapsed: true },
+      { ...base, z: 2, id: 'w', notebookId, pageId, parentId: 'a', type: 'stroke', tool: 'pen', color: '#000000', width: 2, points: [[320, 200, 0.5], [400, 210, 0.5]] },
+    ]);
+    expect((await PDFDocument.load(await exportNotebookPdf(nb.id))).getPageCount()).toBe(1);
+  });
+
   it('fits an infinite canvas onto one page around its content', async () => {
     const nb = await withItems('canvas', (notebookId, pageId) => [
       { ...base, id: 's', notebookId, pageId, type: 'stroke', tool: 'pen', color: '#000000', width: 2, points: [[-500, -200, 0.5], [1500, 900, 0.5]] },

@@ -1,7 +1,8 @@
-import type { ConnectorItem, NodeItem, NoteItem, Paper, ShapeItem, StrokeItem } from '../../db/schema';
+import type { ConnectorItem, NodeItem, NoteItem, Paper, ShapeItem, StickyItem, StrokeItem } from '../../db/schema';
 import { fillInk, hexToRgb, outlineToSvgPath, strokeOutline } from '../ink';
 import { barbs, connectorPoints, heads, midpoint, nodesById } from './connectors';
 import { nodeRadius, type Vec } from './geometry';
+import { isSticky, STICKY_HEADER, STICKY_INK } from './sticky';
 
 /** How strong a filled box's tint of its outline color is. */
 export const NODE_FILL_OPACITY = 0.14;
@@ -191,15 +192,68 @@ export function drawConnectorLabel(ctx: CanvasRenderingContext2D, c: ConnectorIt
   ctx.restore();
 }
 
-/** Stacking layers on a page's canvas: diagram boxes, then their arrows, then ink. */
-const canvasLayer = (i: NoteItem) => (i.type === 'node' ? 0 : i.type === 'connector' ? 1 : 2);
+/** A post-it's paper (open ones only; a collapsed one is a DOM icon), with a slightly darker strip to drag it by. */
+export function drawSticky(ctx: CanvasRenderingContext2D, s: StickyItem) {
+  ctx.save();
+  ctx.shadowColor = 'rgb(0 0 0 / 0.2)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = s.color;
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = 'rgb(0 0 0 / 0.06)';
+  ctx.fillRect(s.x, s.y, s.w, Math.min(STICKY_HEADER, s.h));
+  ctx.restore();
+}
 
-/** Draws the ink of a page in stacking order, diagram boxes and arrows first (under the writing); text and images are DOM. */
+/** A post-it's text on a canvas (thumbnails; the editor uses an editable DOM box), wrapped to its width. */
+export function drawStickyText(ctx: CanvasRenderingContext2D, s: StickyItem) {
+  if (s.collapsed || !s.text) return;
+  ctx.save();
+  ctx.fillStyle = STICKY_INK;
+  ctx.font = `${s.fontSize}px system-ui, sans-serif`;
+  const pad = 6;
+  let y = s.y + STICKY_HEADER + pad + s.fontSize;
+  for (const paragraph of s.text.split('\n')) {
+    let line = '';
+    for (const word of paragraph.split(' ')) {
+      const next = line ? `${line} ${word}` : word;
+      if (line && ctx.measureText(next).width > s.w - 2 * pad) {
+        ctx.fillText(line, s.x + pad, y);
+        y += s.fontSize * 1.35;
+        line = word;
+      } else line = next;
+    }
+    ctx.fillText(line, s.x + pad, y);
+    y += s.fontSize * 1.35;
+  }
+  ctx.restore();
+}
+
+/**
+ * Stacking on a page's canvas: diagram boxes, their arrows, ink, then post-its (paper over the
+ * page) with the writing on them on top.
+ */
+function canvasLayer(i: NoteItem, stickies: Map<string, StickyItem>) {
+  if (i.type === 'node') return 0;
+  if (i.type === 'connector') return 1;
+  if (i.type === 'sticky') return 3;
+  return i.parentId && stickies.has(i.parentId) ? 4 : 2;
+}
+
+/** Draws the ink of a page in stacking order (see `canvasLayer`); text and images are DOM. */
 export function drawItems(ctx: CanvasRenderingContext2D, items: NoteItem[], hidden?: Set<string>) {
-  const sorted = [...items].sort((a, b) => canvasLayer(a) - canvasLayer(b) || a.z - b.z);
+  const stickies = new Map(items.filter(isSticky).map((s) => [s.id, s]));
+  const sorted = [...items].sort((a, b) => canvasLayer(a, stickies) - canvasLayer(b, stickies) || a.z - b.z);
   let nodes: ReturnType<typeof nodesById> | null = null;
   for (const item of sorted) {
     if (hidden?.has(item.id)) continue;
+    // What's written on a collapsed post-it is folded away with it.
+    if (item.parentId && stickies.get(item.parentId)?.collapsed) continue;
+    if (item.type === 'sticky') {
+      if (!item.collapsed) drawSticky(ctx, item);
+      continue;
+    }
     if (item.type === 'stroke') drawStrokeItem(ctx, item);
     else if (item.type === 'shape') drawShape(ctx, item);
     else if (item.type === 'node') drawNode(ctx, item);

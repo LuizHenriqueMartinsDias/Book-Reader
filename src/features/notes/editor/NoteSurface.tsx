@@ -1,13 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeftRight, ArrowRight, Minus, Network, Plus, Spline, Type, Waypoints } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { db, type ConnectorEnd, type ConnectorItem, type ImageItem, type NodeItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
+import { db, type ConnectorEnd, type ConnectorItem, type ImageItem, type NodeItem, type StickyItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { drawStroke } from '../../../lib/ink';
 import { attachedTo, connectorHit, connectorPoints, isConnector, midpoint, nodesById, settle, SIDES, sideDir, sidePoint, type Side } from '../../../lib/notes/connectors';
 import { attach, isNode, layoutTree, NODE_SIZE, nodeAt, readSketch, snapMove, withChildren, withDependents } from '../../../lib/notes/diagram';
 import { eraseItem } from '../../../lib/notes/erase';
-import { bboxOf, eraserHits, itemsInLasso, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
+import { isSticky, STICKY_HEADER, STICKY_SIZE } from '../../../lib/notes/sticky';
+import { bboxOf, eraserHits, itemsInLasso, rotateVec, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
 import { defaultInk, drawConnector, drawItems, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
@@ -16,6 +17,7 @@ import { sizeCanvas } from '../../reader/canvasSize';
 import { useNoteEditor } from './editorStore';
 import ImageItemView from './ImageItemView';
 import ConnectorLabelView from './ConnectorLabelView';
+import StickyItemView, { type StickyDrag } from './StickyItemView';
 import { cloneItems, commitItems } from './items';
 import NodeItemView from './NodeItemView';
 import SelectionOverlay from './SelectionOverlay';
@@ -55,6 +57,8 @@ type Gesture =
   | { kind: 'lasso'; id: number; points: Vec[] }
   | { kind: 'shape'; id: number; from: Vec; to: Vec }
   | { kind: 'text'; id: number; at: Vec }
+  /** Post-it tool: a tap on one types in it, elsewhere sticks a new one. */
+  | { kind: 'sticky'; id: number; at: Vec }
   /**
    * Diagram tool: a tap on a box (`hit`) selects it, on paper makes a box; on an arrow
    * (`picked`) it selects the arrow. Drawing (`points`) is read as a box, an arrow or writing.
@@ -97,6 +101,15 @@ function tapBox(at: Vec): NodeBox {
 function newNode(box: NodeBox, notebook: Notebook): Omit<NodeItem, 'id' | 'notebookId' | 'pageId' | 'z' | 'createdAt'> {
   const { nodeFilled, textSize } = useNoteEditor.getState();
   return { type: 'node', ...box, color: inkColor(notebook), filled: nodeFilled, width: 2, text: '', fontSize: textSize };
+}
+
+/** A post-it dragged (with its writing) or resized by (dx, dy) page points: the items that change. */
+function stickyChange(sticky: StickyItem, { mode, dx, dy }: { mode: StickyDrag; dx: number; dy: number }, items: NoteItem[]): NoteItem[] {
+  if (mode === 'resize') return [{ ...sticky, w: Math.max(80, sticky.w + dx), h: Math.max(STICKY_HEADER + 30, sticky.h + dy) }];
+  return transformItems(
+    items.filter((i) => i.id === sticky.id || i.parentId === sticky.id),
+    { dx, dy, scale: 1, origin: [0, 0] },
+  );
 }
 
 /** A new arrow from a box to `to`, styled like the last ones. */
@@ -154,7 +167,15 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   const selected = useMemo(() => (selection ? items.filter((i) => selection.ids.includes(i.id)) : []), [items, selection]);
   // While dragging a selection, show the moved copies in place of the originals.
   const moved = useMemo(() => (preview ? new Map(transformItems(selected, preview).map((i) => [i.id, i])) : null), [preview, selected]);
-  const shown = useMemo(() => (moved ? items.map((i) => moved.get(i.id) ?? i) : items), [items, moved]);
+  // A post-it being dragged by its strip (with its writing) or resized by its corner, in page points.
+  const [stickyEdit, setStickyEdit] = useState<{ id: string; mode: StickyDrag; dx: number; dy: number } | null>(null);
+  const shown = useMemo(() => {
+    const list = moved ? items.map((i) => moved.get(i.id) ?? i) : items;
+    const edited = stickyEdit && list.find((i): i is StickyItem => i.id === stickyEdit.id && isSticky(i));
+    if (!stickyEdit || !edited) return list;
+    const changed = new Map(stickyChange(edited, stickyEdit, list).map((i) => [i.id, i]));
+    return list.map((i) => changed.get(i.id) ?? i);
+  }, [items, moved, stickyEdit]);
   // Boxes as they're shown (also mid-drag), for the arrows to follow.
   const nodeMap = useMemo(() => nodesById(shown), [shown]);
 
@@ -369,6 +390,10 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       gesture.current = { kind: 'shape', id, from: p, to: p };
     } else if (tool === 'text') {
       gesture.current = { kind: 'text', id, at: p };
+    } else if (tool === 'sticky') {
+      // A tap while typing just ends the typing.
+      if (wasTyping) return;
+      gesture.current = { kind: 'sticky', id, at: p };
     } else if (tool === 'diagram') {
       // A tap while typing in a box just ends the typing.
       if (wasTyping) return;
@@ -535,6 +560,23 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       await commitItems([{ ...base, type: 'shape', shape, x1: g.from[0], y1: g.from[1], x2: g.to[0], y2: g.to[1], color: style.color, width: style.width }]);
     } else if (g.kind === 'diagram') {
       await finishDiagram(g);
+    } else if (g.kind === 'sticky') {
+      const on = stickyAt(g.at);
+      if (on) return useNoteEditor.getState().set({ editingTextId: on.id });
+      const { stickyColor, textSize } = useNoteEditor.getState();
+      const sticky: StickyItem = {
+        ...base,
+        type: 'sticky',
+        x: g.at[0] - STICKY_SIZE / 2,
+        y: g.at[1] - STICKY_HEADER / 2,
+        w: STICKY_SIZE,
+        h: STICKY_SIZE,
+        color: stickyColor,
+        text: '',
+        fontSize: Math.max(12, textSize - 2),
+      };
+      await commitItems([sticky]);
+      useNoteEditor.getState().set({ editingTextId: sticky.id });
     } else if (g.kind === 'lasso') {
       // A box comes with what's written in it.
       const ids = withChildren(itemsInLasso(items, g.points).map((i) => i.id), items);
@@ -553,7 +595,12 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         useNoteEditor.getState().set({ editingTextId: hit.id });
         return;
       }
-      // Tapping a diagram box types in it.
+      // Tapping a post-it or a diagram box types in it.
+      const note = stickyAt(g.at);
+      if (note) {
+        useNoteEditor.getState().set({ editingTextId: note.id });
+        return;
+      }
       const box = nodeAt(items, g.at);
       if (box) {
         useNoteEditor.getState().set({ editingTextId: box.id });
@@ -569,6 +616,24 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       editOriginal.current = null;
       editor.set({ editingTextId: item.id });
     }
+  };
+
+  /** The open post-it on top under a point. */
+  const stickyAt = ([x, y]: Vec) =>
+    items
+      .filter((i): i is StickyItem => isSticky(i) && !i.collapsed)
+      .sort((a, b) => b.z - a.z)
+      .find((n) => x >= n.x && x <= n.x + n.w && y >= n.y && y <= n.y + n.h);
+
+  /** A post-it's strip or corner being dragged: preview it, then save it when let go. */
+  const dragSticky = (sticky: StickyItem) => (mode: StickyDrag, sx: number, sy: number, done: 'no' | 'drop' | 'cancel') => {
+    const [dx, dy] = rotateVec([sx, sy], -rotation).map((v) => v / view.zoom);
+    if (done === 'no') return setStickyEdit({ id: sticky.id, mode, dx, dy });
+    setStickyEdit(null);
+    if (done === 'cancel' || Math.hypot(sx, sy) < 2) return;
+    // Exactly the items that change: resizing leaves the writing where it is.
+    const after = stickyChange(sticky, { mode, dx, dy }, items);
+    commitItems(after, items.filter((i) => after.some((a) => a.id === i.id)));
   };
 
   /** Saves boxes and arrows as one undoable step, settling the arrows' ends. */
@@ -850,6 +915,23 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         {texts.map((i) => (
           <TextItemView key={i.id} item={i} editing={editingTextId === i.id} original={editingTextId === i.id ? editOriginal.current : null} />
         ))}
+        {/* Post-its lie over the page, their controls and text over their paper. */}
+        {shown
+          .filter(isSticky)
+          .sort((a, b) => a.z - b.z)
+          .map((i) => {
+            const saved = items.find((x) => x.id === i.id) as StickyItem;
+            return (
+              <StickyItemView
+                key={i.id}
+                item={i}
+                editing={editingTextId === i.id}
+                onDrag={dragSticky(saved)}
+                onChange={(next) => commitItems([next], [saved])}
+                onDelete={() => commitItems([], items.filter((x) => x.id === i.id || x.parentId === i.id))}
+              />
+            );
+          })}
       </div>
       {selected.length > 0 && (
         <SelectionOverlay items={selected} view={view} rotation={rotation} preview={preview} onPreview={setPreview} extra={extra} clearance={handles ? 30 : 0} snap={snap} {...actions} />

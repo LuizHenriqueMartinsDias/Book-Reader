@@ -2,8 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ConnectorArrows, ConnectorRoute, NodeShape, NoteItem, ShapeKind } from '../../../db/schema';
 import type { Ruler } from '../../../lib/notes/ruler';
+import { STICKY_COLORS } from '../../../lib/notes/sticky';
 
-export type NoteTool = 'pen' | 'marker' | 'eraser' | 'lasso' | 'text' | 'shape' | 'diagram';
+export type NoteTool = 'pen' | 'marker' | 'eraser' | 'lasso' | 'text' | 'shape' | 'diagram' | 'sticky';
 /** `stroke`: touching ink deletes the whole stroke. `partial`: rubs out only what's under it. */
 export type EraserMode = 'stroke' | 'partial';
 
@@ -23,6 +24,8 @@ interface NoteEditorState {
   /** How new diagram arrows look (the last ones picked). */
   connectorRoute: ConnectorRoute;
   connectorArrows: ConnectorArrows;
+  /** Paper color of new post-its. */
+  stickyColor: string;
   /** Eraser radius in screen px. */
   eraserSize: number;
   /** Lasso selection (on one page at a time). */
@@ -61,6 +64,7 @@ export const useNoteEditor = create<NoteEditorState>()(
       nodeFilled: true,
       connectorRoute: 'straight',
       connectorArrows: 'end',
+      stickyColor: STICKY_COLORS[0],
       eraserSize: 10,
       selection: null,
       clipboard: null,
@@ -78,7 +82,7 @@ export const useNoteEditor = create<NoteEditorState>()(
     }),
     {
       name: 'book-reader-notes',
-      partialize: ({ tool, shape, textSize, eraserMode, eraserSize, nodeShape, nodeFilled, connectorRoute, connectorArrows, fingerDraws }) => ({
+      partialize: ({ tool, shape, textSize, eraserMode, eraserSize, nodeShape, nodeFilled, connectorRoute, connectorArrows, stickyColor, fingerDraws }) => ({
         tool,
         shape,
         textSize,
@@ -88,6 +92,7 @@ export const useNoteEditor = create<NoteEditorState>()(
         nodeFilled,
         connectorRoute,
         connectorArrows,
+        stickyColor,
         fingerDraws,
       }),
     },
