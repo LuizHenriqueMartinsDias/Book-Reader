@@ -1,8 +1,9 @@
-import { Copy, StickyNote, Trash2 } from 'lucide-react';
+import { Copy, NotebookPen, StickyNote, Trash2 } from 'lucide-react';
 import { db, type Highlight } from '../../db/schema';
 import { newId, putNote } from '../../db/repo';
 import { useHistory } from '../../store/history';
 import { HIGHLIGHT_COLORS, useUi } from '../../store/ui';
+import { sendQuoteToNotebook } from '../notes/SendQuoteDialog';
 import { useReader } from './readerStore';
 
 export type MenuTarget =
@@ -63,7 +64,22 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
     onClose();
   }
 
-  const left = Math.min(Math.max(8, x - 130), window.innerWidth - 268);
+  /** Highlights the passage (if it isn't yet) and sends it to a notebook with a link back here. */
+  async function sendToNotebook() {
+    let h = target.kind === 'highlight' ? target.highlight : null;
+    if (target.kind === 'selection') {
+      const created = target.createHighlights(HIGHLIGHT_COLORS[0]);
+      if (created.length) await useHistory.getState().commit({ added: { highlights: created }, removed: {} });
+      h = created[0] ?? null;
+    }
+    const text = target.kind === 'selection' ? target.text : target.highlight.text;
+    const { bookId, currentPage } = useReader.getState();
+    const book = await db.books.get(bookId);
+    onClose();
+    sendQuoteToNotebook({ text, source: { bookId, title: book?.title ?? 'Livro', page: h?.page ?? currentPage, cfi: h?.cfi } });
+  }
+
+  const left = Math.min(Math.max(8, x - 150), window.innerWidth - 308);
   const top = Math.min(y + 8, window.innerHeight - 56);
 
   return (
@@ -86,6 +102,9 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
       <div className="mx-1 h-6 w-px bg-[var(--border)]" />
       <button title="Adicionar nota" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={() => highlight(current ?? HIGHLIGHT_COLORS[0], true)}>
         <StickyNote className="size-5" />
+      </button>
+      <button title="Enviar para caderno" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={sendToNotebook}>
+        <NotebookPen className="size-5" />
       </button>
       {target.kind === 'selection' ? (
         <button

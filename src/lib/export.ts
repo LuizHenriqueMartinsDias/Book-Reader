@@ -74,7 +74,7 @@ export async function exportAnnotatedPdf(source: ArrayBuffer, { strokes, highlig
 }
 
 /** pdf.js displays the crop box clipped to the media box; mirror that. */
-function viewBoxOf(page: ReturnType<PDFDocument['getPages']>[number]): ViewBox {
+export function viewBoxOf(page: ReturnType<PDFDocument['getPages']>[number]): ViewBox {
   const m = page.getMediaBox();
   const c = page.getCropBox();
   const x1 = Math.max(m.x, c.x);

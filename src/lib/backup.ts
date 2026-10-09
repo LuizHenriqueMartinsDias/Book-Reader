@@ -1,31 +1,69 @@
-import { db, type Highlight, type Note, type Stroke } from '../db/schema';
+import { db, type Folder, type Highlight, type Note, type Notebook, type NoteItem, type NotePage, type Stroke } from '../db/schema';
 
 interface Backup {
   app: 'book-reader';
-  version: 1;
+  /** 1: book annotations only; 2: also notebooks. */
+  version: 1 | 2;
   exportedAt: string;
   books: { id: string; title: string; lastPage: number }[];
   strokes: Stroke[];
   highlights: Highlight[];
   notes: Note[];
+  folders?: Folder[];
+  notebooks?: Notebook[];
+  notePages?: NotePage[];
+  noteItems?: NoteItem[];
+  /** Images and imported PDFs of notebooks, as data URLs. */
+  noteAssets?: { id: string; notebookId: string; width: number; height: number; data: string }[];
+  notebookFiles?: { notebookId: string; data: string }[];
 }
 
-/** Annotations only (no PDF files); books are matched by content hash on restore. */
+async function toDataUrl(blob: Blob) {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:${blob.type || 'application/octet-stream'};base64,${btoa(binary)}`;
+}
+
+function fromDataUrl(url: string) {
+  const [head, data] = url.split(',', 2);
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: head.match(/^data:([^;]+)/)?.[1] });
+}
+
+/**
+ * Book annotations (not the book files; books are matched by content hash on restore) and
+ * notebooks in full, including their pictures and imported PDFs.
+ */
 export async function createBackup(): Promise<Blob> {
-  const [books, strokes, highlights, notes] = await Promise.all([
+  const [books, strokes, highlights, notes, folders, notebooks, notePages, noteItems, assets] = await Promise.all([
     db.books.toArray(),
     db.strokes.toArray(),
     db.highlights.toArray(),
     db.notes.toArray(),
+    db.folders.toArray(),
+    db.notebooks.toArray(),
+    db.notePages.toArray(),
+    db.noteItems.toArray(),
+    db.noteAssets.toArray(),
   ]);
+  const pdfs = await db.files.bulkGet(notebooks.filter((n) => n.hasPdf).map((n) => n.id));
   const backup: Backup = {
     app: 'book-reader',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     books: books.map(({ id, title, lastPage }) => ({ id, title, lastPage })),
     strokes,
     highlights,
     notes,
+    folders,
+    notebooks,
+    notePages,
+    noteItems,
+    noteAssets: await Promise.all(assets.map(async ({ blob, ...a }) => ({ ...a, data: await toDataUrl(blob) }))),
+    notebookFiles: await Promise.all(pdfs.filter((f) => !!f).map(async (f) => ({ notebookId: f!.bookId, data: await toDataUrl(f!.data) }))),
   };
   return new Blob([JSON.stringify(backup)], { type: 'application/json' });
 }
@@ -34,7 +72,15 @@ export async function createBackup(): Promise<Blob> {
 export async function restoreBackup(file: Blob) {
   const backup = JSON.parse(await file.text()) as Backup;
   if (backup.app !== 'book-reader') throw new Error('Arquivo de backup inválido');
-  await db.transaction('rw', [db.books, db.strokes, db.highlights, db.notes], async () => {
+  const assets = (backup.noteAssets ?? []).map(({ data, ...a }) => ({ ...a, blob: fromDataUrl(data) }));
+  const files = (backup.notebookFiles ?? []).map((f) => ({ bookId: f.notebookId, data: fromDataUrl(f.data) }));
+  await db.transaction('rw', [db.books, db.strokes, db.highlights, db.notes, db.folders, db.notebooks, db.notePages, db.noteItems, db.noteAssets, db.files], async () => {
+    await db.folders.bulkPut(backup.folders ?? []);
+    await db.notebooks.bulkPut(backup.notebooks ?? []);
+    await db.notePages.bulkPut(backup.notePages ?? []);
+    await db.noteItems.bulkPut(backup.noteItems ?? []);
+    await db.noteAssets.bulkPut(assets);
+    await db.files.bulkPut(files);
     await db.strokes.bulkPut(backup.strokes ?? []);
     await db.highlights.bulkPut(backup.highlights ?? []);
     await db.notes.bulkPut(backup.notes ?? []);
@@ -46,6 +92,7 @@ export async function restoreBackup(file: Blob) {
   const present = await db.books.bulkGet((backup.books ?? []).map((b) => b.id));
   return {
     annotations: (backup.strokes?.length ?? 0) + (backup.highlights?.length ?? 0) + (backup.notes?.length ?? 0),
+    notebooks: backup.notebooks?.length ?? 0,
     /** Books in the backup whose PDF isn't in this library yet; their notes appear once it's imported. */
     missingBooks: (backup.books ?? []).filter((_, i) => !present[i]).map((b) => b.title),
   };

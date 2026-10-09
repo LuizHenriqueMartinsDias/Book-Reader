@@ -8,6 +8,8 @@ Leitor pessoal de livros em PDF e EPUB com anotações — roda no navegador, in
 - **Escrita à mão**: caneta e marca-texto com pressão de stylus, borracha (inclusive a ponta-borracha da caneta), desfazer/refazer. Com stylus detectado, o dedo rola a página (rejeição de palma).
 - **Destaques e notas**: selecione texto → escolha a cor ou crie uma nota; notas por página no painel lateral.
 - **Buscar livros grátis**: pesquisa no Internet Archive (PDF/EPUB, domínio público ou licença aberta) e no Project Gutenberg (EPUB) e baixa direto para a estante.
+- **Cadernos** (aba "Cadernos"): pastas por matéria; cadernos com páginas A4 (liso, pautado, quadriculado, pontilhado) ou tela infinita; caneta, marca-texto, borracha, laço (mover, redimensionar, mudar cor, duplicar, copiar/colar), texto, imagens (arquivo, colar, arrastar), formas (linha, seta, retângulo, elipse) e "desenhar e segurar" para endireitar; S Pen escreve e o dedo navega; importar PDF como caderno para escrever por cima; exportar caderno em PDF.
+- **Estudo com livros**: envie um trecho destacado para um caderno (com link de volta à página) e abra livro e caderno lado a lado, com divisória ajustável.
 - **Exportar**: gera um PDF com destaques e traços gravados e as notas como comentários; backup/restauração das anotações em JSON.
 
 Tudo fica salvo localmente no navegador (IndexedDB). Livros são identificados pelo hash do arquivo, então um backup restaurado em outro dispositivo reconecta as anotações quando o mesmo PDF for importado.
@@ -35,6 +37,8 @@ gh variable set PROXY_URL --body https://book-proxy.<conta>.workers.dev   # usad
 
 Sem `VITE_PROXY_URL`, a busca continua funcionando e o botão abre a página do livro no Internet Archive.
 
-Atalhos: `V` selecionar, `P` caneta, `H` marca-texto, `E` borracha, `Ctrl+Z` / `Ctrl+Shift+Z` desfazer/refazer, `Ctrl +/−/0` zoom, `Ctrl+F` buscar, `←/→` página.
+Atalhos no leitor: `V` selecionar, `P` caneta, `H` marca-texto, `E` borracha, `Ctrl+Z` / `Ctrl+Shift+Z` desfazer/refazer, `Ctrl +/−/0` zoom, `Ctrl+F` buscar, `←/→` página.
 
 > Para instalar como PWA no tablet a página precisa ser servida via HTTPS (ou `localhost`).
+
+Atalhos no caderno: `P` caneta, `H` marca-texto, `E` borracha, `L` laço, `T` texto, `S` formas, `Ctrl+C/V/D` copiar/colar/duplicar, `Delete` apagar seleção, espaço + arrastar (ou roda) para mover a tela infinita, `Ctrl` + roda para zoom.

@@ -4,6 +4,7 @@ import { updateBook } from '../../db/repo';
 import { CSS_UNITS, type PageSize, type PDFDocumentProxy } from '../../lib/pdf';
 import { useHistory } from '../../store/history';
 import { useUi, type Tool } from '../../store/ui';
+import { useSplit } from '../split/splitStore';
 import { useReader } from './readerStore';
 import SelectionMenu from './SelectionMenu';
 import Sidebar from './Sidebar';
@@ -16,16 +17,22 @@ import PagedView from './views/PagedView';
 import ScrollView from './views/ScrollView';
 import { MAX_ZOOM, MIN_ZOOM, type ZoomChange, type ZoomMode } from './views/types';
 
-export default function ReaderPage({ bookId }: { bookId: string }) {
+/** Where to open a book instead of the last-read spot (links from notebook quotes). */
+export interface StartAt {
+  page?: number;
+  cfi?: string;
+}
+
+export default function ReaderPage({ bookId, startAt = {} }: { bookId: string; startAt?: StartAt }) {
   const [format, setFormat] = useState<BookFormat | null | 'missing'>(null);
   useEffect(() => {
     db.books.get(bookId).then((b) => setFormat(b ? (b.format ?? 'pdf') : 'missing'));
   }, [bookId]);
   if (format === null) return <div className="p-8 text-[var(--muted)]">Abrindo livro…</div>;
-  return format === 'epub' ? <EpubReader bookId={bookId} /> : <PdfReader bookId={bookId} />;
+  return format === 'epub' ? <EpubReader bookId={bookId} startCfi={startAt.cfi} /> : <PdfReader bookId={bookId} startPage={startAt.page} />;
 }
 
-function PdfReader({ bookId }: { bookId: string }) {
+function PdfReader({ bookId, startPage }: { bookId: string; startPage?: number }) {
   const state = useDocument(bookId);
 
   if (state.status === 'loading') return <div className="p-8 text-[var(--muted)]">Abrindo livro…</div>;
@@ -38,16 +45,17 @@ function PdfReader({ bookId }: { bookId: string }) {
         </a>
       </div>
     );
-  return <Reader book={state.book} doc={state.doc} sizes={state.sizes} />;
+  return <Reader book={state.book} doc={state.doc} sizes={state.sizes} startPage={startPage} />;
 }
 
 const TOOL_KEYS: Record<string, Tool> = { v: 'select', p: 'pen', h: 'marker', e: 'eraser' };
 
 /** Shared chrome around the active view: toolbar, sidebar, zoom, keyboard and persistence. */
-function Reader({ book, doc, sizes }: { book: Book; doc: PDFDocumentProxy; sizes: PageSize[] }) {
+function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentProxy; sizes: PageSize[]; startPage?: number }) {
   // Seed the per-book store before any child renders, so views open on the last-read page.
   useState(() => {
-    useReader.setState({ bookId: book.id, format: 'pdf', doc, epub: null, currentPage: book.lastPage, currentCfi: null, focusNoteId: null });
+    const page = startPage && startPage <= sizes.length ? startPage : book.lastPage;
+    useReader.setState({ bookId: book.id, format: 'pdf', doc, epub: null, currentPage: page, currentCfi: null, focusNoteId: null });
     useHistory.getState().reset();
   });
 
@@ -87,6 +95,7 @@ function Reader({ book, doc, sizes }: { book: Book; doc: PDFDocumentProxy; sizes
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest('input, textarea, [contenteditable]')) return;
+      if (useSplit.getState().active === 'notes') return;
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
       const reader = useReader.getState();

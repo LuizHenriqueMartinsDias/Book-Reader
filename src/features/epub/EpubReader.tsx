@@ -11,12 +11,13 @@ import { useReader } from '../reader/readerStore';
 import FullscreenChrome from '../reader/FullscreenChrome';
 import Sidebar from '../reader/Sidebar';
 import { useFullscreen } from '../reader/useFullscreen';
+import { useSplit } from '../split/splitStore';
 import EpubToolbar from './EpubToolbar';
 import { EPUB_FONTS, EPUB_THEMES, FONT_SIZES } from './epubTheme';
 
 type State = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; book: Book; epub: EpubBook };
 
-export default function EpubReader({ bookId }: { bookId: string }) {
+export default function EpubReader({ bookId, startCfi }: { bookId: string; startCfi?: string }) {
   const [state, setState] = useState<State>({ status: 'loading' });
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export default function EpubReader({ bookId }: { bookId: string }) {
         </a>
       </div>
     );
-  return <EpubView book={state.book} epub={state.epub} />;
+  return <EpubView book={state.book} epub={state.epub} startCfi={startCfi} />;
 }
 
 export interface EpubLocation {
@@ -61,10 +62,10 @@ export interface EpubLocation {
 
 type Menu = { x: number; y: number; target: MenuTarget; clear?: () => void };
 
-function EpubView({ book, epub }: { book: Book; epub: EpubBook }) {
+function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startCfi?: string }) {
   // Seed the per-book store before children render.
   useState(() => {
-    useReader.setState({ bookId: book.id, format: 'epub', doc: null, epub, currentPage: 1, currentCfi: book.lastLocation ?? null, focusNoteId: null });
+    useReader.setState({ bookId: book.id, format: 'epub', doc: null, epub, currentPage: 1, currentCfi: startCfi ?? book.lastLocation ?? null, focusNoteId: null });
     useHistory.getState().reset();
   });
 
@@ -307,6 +308,7 @@ function EpubView({ book, epub }: { book: Book; epub: EpubBook }) {
   const handleKey = (e: KeyboardEvent) => {
     const target = e.target as HTMLElement | null;
     if (target?.closest?.('input, textarea, select, [contenteditable]')) return;
+    if (useSplit.getState().active === 'notes') return;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
     const reader = useReader.getState();

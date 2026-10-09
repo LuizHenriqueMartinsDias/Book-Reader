@@ -1,10 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { BookOpen, Download, FilePlus2, Globe, Moon, Sun, SunDim, Upload } from 'lucide-react';
+import { Download, FilePlus2, Globe, Moon, Sun, SunDim, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { navigate } from '../../App';
 import { db } from '../../db/schema';
 import { createBackup, download, restoreBackup } from '../../lib/backup';
 import { useUi, type Theme } from '../../store/ui';
+import HomeTabs from '../HomeTabs';
 import BookCard from './BookCard';
 import { ACCEPTED_FILES, importBook, isBookFile } from './importBook';
 
@@ -47,9 +48,9 @@ export default function LibraryPage() {
 
   async function handleRestore(file: File) {
     try {
-      const { annotations, missingBooks } = await restoreBackup(file);
+      const { annotations, notebooks, missingBooks } = await restoreBackup(file);
       setMessage(
-        `${annotations} anotações restauradas.` +
+        `${annotations} anotações e ${notebooks} caderno(s) restaurados.` +
           (missingBooks.length ? ` Importe os PDFs para ver o resto: ${missingBooks.join(', ')}` : ''),
       );
     } catch (e) {
@@ -72,8 +73,7 @@ export default function LibraryPage() {
       }}
     >
       <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)]/90 px-4 py-3 backdrop-blur sm:px-6">
-        <BookOpen className="size-6" />
-        <h1 className="mr-auto text-lg font-semibold">Minha estante</h1>
+        <HomeTabs active="books" />
         <div className="flex rounded-lg border border-[var(--border)] p-0.5">
           {THEMES.map(({ id, icon: Icon, label }) => (
             <button

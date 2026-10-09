@@ -2,7 +2,8 @@ import { MoreVertical } from 'lucide-react';
 import { useState } from 'react';
 import { navigate } from '../../App';
 import type { Book } from '../../db/schema';
-import { deleteBook, updateBook } from '../../db/repo';
+import { deleteBook, getBookFile, updateBook } from '../../db/repo';
+import { notebookFromPdf } from '../notes/importPdf';
 
 export default function BookCard({ book }: { book: Book }) {
   const [menu, setMenu] = useState(false);
@@ -44,7 +45,7 @@ export default function BookCard({ book }: { book: Book }) {
       {menu && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
-          <div className="absolute top-8 right-1 z-20 w-36 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] text-sm shadow-lg">
+          <div className="absolute top-8 right-1 z-20 w-48 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--panel)] text-sm shadow-lg">
             <button
               className="block w-full px-3 py-2 text-left hover:bg-[var(--app-bg)]"
               onClick={() => {
@@ -55,6 +56,20 @@ export default function BookCard({ book }: { book: Book }) {
             >
               Renomear
             </button>
+            {!epub && (
+              <button
+                className="block w-full px-3 py-2 text-left hover:bg-[var(--app-bg)]"
+                onClick={async () => {
+                  setMenu(false);
+                  const file = await getBookFile(book.id);
+                  if (!file) return;
+                  const nb = await notebookFromPdf(file, book.title, { sourceBookId: book.id });
+                  navigate(`#/caderno/${nb.id}`);
+                }}
+              >
+                Criar caderno deste PDF
+              </button>
+            )}
             <button
               className="block w-full px-3 py-2 text-left text-red-600 hover:bg-[var(--app-bg)]"
               onClick={() => {

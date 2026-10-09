@@ -26,6 +26,7 @@ import { useHistory } from '../../store/history';
 import { MARKER_COLORS, PEN_COLORS, useUi, type Theme, type Tool } from '../../store/ui';
 import { useReader } from './readerStore';
 import FullscreenButton from './FullscreenButton';
+import NotebookSideButton from './NotebookSideButton';
 import ViewMenu from './ViewMenu';
 
 const TOOLS: { id: Tool; icon: typeof PenLine; label: string }[] = [
@@ -206,6 +207,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
           </button>
         )}
         {divider}
+        <NotebookSideButton className={btn} />
         <ViewMenu className={btn} />
         <FullscreenButton className={btn} supported={fullscreen.supported} onClick={fullscreen.toggle} />
         <button className={btn} title="Tema" onClick={() => ui.set({ theme: NEXT_THEME[ui.theme] })}>

@@ -1,9 +1,8 @@
-import { memo, useEffect, useRef, useState } from 'react';
-import type { PDFPageProxy } from 'pdfjs-dist';
+import { memo, useEffect, useRef } from 'react';
 import { pdfjs, type PageSize, type PDFDocumentProxy } from '../../lib/pdf';
-import { sizeCanvas } from './canvasSize';
 import HighlightLayer from './HighlightLayer';
 import InkLayer from './InkLayer';
+import { usePdfCanvas, usePdfPage, useSettledScale } from './PdfPageCanvas';
 
 interface Props {
   doc: PDFDocumentProxy;
@@ -16,9 +15,6 @@ interface Props {
   interactive?: boolean;
   shadow?: boolean;
 }
-
-/** Re-rendering on every zoom step is costly; let the old bitmap stretch until zooming settles. */
-const RERENDER_DELAY = 180;
 
 export default memo(function PageView({ doc, pageNumber, size, scale, active, interactive = true, shadow = true }: Props) {
   const width = size.width * scale;
@@ -41,54 +37,11 @@ export default memo(function PageView({ doc, pageNumber, size, scale, active, in
 });
 
 function PageContent({ doc, pageNumber, size, scale }: Pick<Props, 'doc' | 'pageNumber' | 'size' | 'scale'>) {
-  const [page, setPage] = useState<PDFPageProxy | null>(null);
-  const [renderScale, setRenderScale] = useState(scale);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    let loaded: PDFPageProxy | null = null;
-    doc.getPage(pageNumber).then((p) => {
-      if (cancelled) return;
-      loaded = p;
-      setPage(p);
-    });
-    return () => {
-      cancelled = true;
-      loaded?.cleanup();
-    };
-  }, [doc, pageNumber]);
-
-  useEffect(() => {
-    if (scale === renderScale) return;
-    const t = setTimeout(() => setRenderScale(scale), RERENDER_DELAY);
-    return () => clearTimeout(t);
-  }, [scale, renderScale]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!page || !canvas) return;
-    const viewport = page.getViewport({ scale: renderScale });
-    // Render offscreen and swap in, so the previous bitmap stays visible meanwhile.
-    const offscreen = document.createElement('canvas');
-    const ratio = sizeCanvas(offscreen, viewport.width, viewport.height);
-    const task = page.render({
-      canvasContext: offscreen.getContext('2d')!,
-      viewport,
-      transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined,
-    });
-    task.promise
-      .then(() => {
-        canvas.width = offscreen.width;
-        canvas.height = offscreen.height;
-        canvas.getContext('2d')!.drawImage(offscreen, 0, 0);
-      })
-      .catch((e) => {
-        if (e?.name !== 'RenderingCancelledException') console.error(e);
-      });
-    return () => task.cancel();
-  }, [page, renderScale]);
+  const page = usePdfPage(doc, pageNumber);
+  const renderScale = useSettledScale(scale);
+  usePdfCanvas(canvasRef, page, renderScale);
 
   useEffect(() => {
     const container = textRef.current;

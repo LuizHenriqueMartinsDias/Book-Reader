@@ -5,6 +5,7 @@ import { useHistory } from '../../store/history';
 import { useUi, type EpubFont, type Theme } from '../../store/ui';
 import { useReader } from '../reader/readerStore';
 import FullscreenButton from '../reader/FullscreenButton';
+import NotebookSideButton from '../reader/NotebookSideButton';
 import ViewMenu from '../reader/ViewMenu';
 import type { EpubLocation } from './EpubReader';
 import { EPUB_FONTS, FONT_SIZES } from './epubTheme';
@@ -96,6 +97,7 @@ export default function EpubToolbar({ book, location, fullscreen }: Props) {
             </>
           )}
         </div>
+        <NotebookSideButton className={btn} />
         <ViewMenu className={btn} />
         <FullscreenButton className={btn} supported={fullscreen.supported} onClick={fullscreen.toggle} />
         <button className={btn} title="Tema" onClick={() => ui.set({ theme: NEXT_THEME[ui.theme] })}>
