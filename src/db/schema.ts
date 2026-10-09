@@ -21,7 +21,9 @@ export interface Book {
   addedAt: number;
   lastOpenedAt: number;
   lastPage: number;
+  /** Scroll mode zoom (0 = fit width) and page-by-page zoom (0/absent = fit page). */
   zoom: number;
+  pagedZoom?: number;
   fileSize: number;
   /** EPUB reading position (CFI) and fraction read. */
   lastLocation?: string;

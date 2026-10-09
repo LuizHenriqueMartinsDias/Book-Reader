@@ -59,9 +59,16 @@ function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentP
     useHistory.getState().reset();
   });
 
-  const [zoom, setZoom] = useState<ZoomMode>(book.zoom > 0 ? book.zoom : null);
+  // Each way of reading keeps its own zoom: "fit" means the page width when scrolling but the
+  // whole page when turning pages, so one zoom can't serve both.
+  const [zooms, setZooms] = useState<{ scroll: ZoomMode; paged: ZoomMode }>({
+    scroll: book.zoom > 0 ? book.zoom : null,
+    paged: (book.pagedZoom ?? 0) > 0 ? book.pagedZoom! : null,
+  });
   const sidebarOpen = useUi((s) => s.sidebarOpen);
   const viewMode = useUi((s) => s.viewMode);
+  const modeKey = viewMode === 'scroll' ? 'scroll' : 'paged';
+  const zoom = zooms[modeKey];
   const currentPage = useReader((s) => s.currentPage);
   const scale = useReader((s) => s.scale);
   const fullscreen = useFullscreen();
@@ -83,13 +90,15 @@ function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentP
 
   const changeZoom = useCallback((next: ZoomChange) => {
     const value = typeof next === 'function' ? next(useReader.getState().scale / CSS_UNITS) : next;
-    setZoom(value === null ? null : Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 100) / 100)));
+    const clamped = value === null ? null : Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 100) / 100));
+    const key = useUi.getState().viewMode === 'scroll' ? 'scroll' : 'paged';
+    setZooms((z) => ({ ...z, [key]: clamped }));
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => updateBook(book.id, { zoom: zoom ?? 0 }), 500);
+    const t = setTimeout(() => updateBook(book.id, { zoom: zooms.scroll ?? 0, pagedZoom: zooms.paged ?? 0 }), 500);
     return () => clearTimeout(t);
-  }, [book.id, zoom]);
+  }, [book.id, zooms]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

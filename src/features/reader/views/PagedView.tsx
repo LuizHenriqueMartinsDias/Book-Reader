@@ -13,6 +13,8 @@ import { useZoomGestures } from './useZoomGestures';
 const PADDING = 20;
 const WHEEL_THRESHOLD = 60;
 const WHEEL_LOCK_MS = 450;
+/** Above this many times the fit size, pages turn without animation. */
+const ANIMATE_MAX_ZOOM = 1.6;
 
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
@@ -51,8 +53,9 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
   const zoomed = scale > fitScale * 1.01;
   const geo = useMemo(() => ({ double, slotW: ref.width * scale, slotH: ref.height * scale, scale }), [double, ref, scale]);
 
-  // Zoomed in, only part of a huge page shows: curling it is slow and hard to follow, so turn instantly.
-  const animate = viewMode !== 'instant' && !prefersReducedMotion() && !zoomed;
+  // Zoomed far in, only part of a huge page shows: curling it is slow and hard to follow, so
+  // turn instantly. Moderate zoom keeps the animation.
+  const animate = viewMode !== 'instant' && !prefersReducedMotion() && scale <= fitScale * ANIMATE_MAX_ZOOM;
   // Dragging pages around would fight with panning a zoomed-in page.
   const dragEnabled = !zoomed && (tool === 'select' || penDetected);
 
