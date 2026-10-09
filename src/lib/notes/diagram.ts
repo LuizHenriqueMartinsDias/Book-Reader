@@ -1,4 +1,5 @@
 import type { NodeItem, NodeShape, NoteItem } from '../../db/schema';
+import { attachedTo } from './connectors';
 import { nodeOutline, pointInPolygon, type Box, type Vec } from './geometry';
 
 /**
@@ -67,4 +68,10 @@ export function withChildren(ids: string[], items: NoteItem[]) {
   const set = new Set(ids);
   for (const i of items) if (i.parentId && set.has(i.parentId)) set.add(i.id);
   return [...set];
+}
+
+/** What goes when these are deleted: also the writing in the boxes and the arrows on them. */
+export function withDependents(ids: string[], items: NoteItem[]) {
+  const all = withChildren(ids, items);
+  return [...new Set([...all, ...attachedTo(items, new Set(all)).map((c) => c.id)])];
 }

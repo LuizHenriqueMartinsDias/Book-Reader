@@ -225,7 +225,34 @@ export interface NodeItem extends NoteItemBase {
   fontSize: number;
 }
 
-export type NoteItem = StrokeItem | ShapeItem | TextItem | ImageItem | NodeItem;
+export type ConnectorRoute = 'straight' | 'elbow' | 'curve';
+export type ConnectorArrows = 'end' | 'both' | 'none';
+
+/**
+ * One end of a diagram arrow: on a box (`node`; the arrow meets its edge, wherever the box goes)
+ * or loose at (x, y). For an end on a box, (x, y) is where it last was, for its bounding box.
+ */
+export interface ConnectorEnd {
+  node?: string;
+  x: number;
+  y: number;
+}
+
+/** An arrow between diagram boxes; its path is worked out from where the boxes are. */
+export interface ConnectorItem extends NoteItemBase {
+  type: 'connector';
+  from: ConnectorEnd;
+  to: ConnectorEnd;
+  route: ConnectorRoute;
+  arrows: ConnectorArrows;
+  color: string;
+  width: number;
+  /** Text on the arrow ("sim", "não"…). */
+  label: string;
+  fontSize: number;
+}
+
+export type NoteItem = StrokeItem | ShapeItem | TextItem | ImageItem | NodeItem | ConnectorItem;
 
 export interface NoteAsset {
   id: string;

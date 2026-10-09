@@ -1,6 +1,7 @@
-import type { NodeItem, NoteItem, Paper, ShapeItem, StrokeItem } from '../../db/schema';
+import type { ConnectorItem, NodeItem, NoteItem, Paper, ShapeItem, StrokeItem } from '../../db/schema';
 import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, strokeOutline } from '../ink';
-import { nodeRadius } from './geometry';
+import { barbs, connectorPoints, heads, midpoint, nodesById } from './connectors';
+import { nodeRadius, type Vec } from './geometry';
 
 /** How strong a filled box's tint of its outline color is. */
 export const NODE_FILL_OPACITY = 0.14;
@@ -160,13 +161,55 @@ export function drawNodeText(ctx: CanvasRenderingContext2D, n: NodeItem) {
   ctx.restore();
 }
 
-/** Draws the ink of a page in stacking order, diagram boxes first (under the writing in them); text and images are DOM. */
+/** A diagram arrow along `points` (see connectors.ts), with its heads; its text is DOM in the editor. */
+export function drawConnector(ctx: CanvasRenderingContext2D, c: Pick<ConnectorItem, 'arrows' | 'color' | 'width'>, points: Vec[]) {
+  ctx.save();
+  ctx.strokeStyle = c.color;
+  ctx.lineWidth = c.width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.stroke();
+  for (const [tip, from] of heads(c, points)) {
+    const [a, b] = barbs(tip, from, c.width);
+    ctx.beginPath();
+    ctx.moveTo(a[0], a[1]);
+    ctx.lineTo(tip[0], tip[1]);
+    ctx.lineTo(b[0], b[1]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** An arrow's text on a canvas (thumbnails), on a patch of paper so the line doesn't cross it. */
+export function drawConnectorLabel(ctx: CanvasRenderingContext2D, c: ConnectorItem, points: Vec[], paperColor: string) {
+  if (!c.label) return;
+  const [x, y] = midpoint(points);
+  ctx.save();
+  ctx.font = `${c.fontSize}px system-ui, sans-serif`;
+  const w = ctx.measureText(c.label).width + 8;
+  ctx.fillStyle = paperColor;
+  ctx.fillRect(x - w / 2, y - c.fontSize * 0.7, w, c.fontSize * 1.4);
+  ctx.fillStyle = c.color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(c.label, x, y);
+  ctx.restore();
+}
+
+/** Stacking layers on a page's canvas: diagram boxes, then their arrows, then ink. */
+const canvasLayer = (i: NoteItem) => (i.type === 'node' ? 0 : i.type === 'connector' ? 1 : 2);
+
+/** Draws the ink of a page in stacking order, diagram boxes and arrows first (under the writing); text and images are DOM. */
 export function drawItems(ctx: CanvasRenderingContext2D, items: NoteItem[], hidden?: Set<string>) {
-  const sorted = [...items].sort((a, b) => Number(b.type === 'node') - Number(a.type === 'node') || a.z - b.z);
+  const sorted = [...items].sort((a, b) => canvasLayer(a) - canvasLayer(b) || a.z - b.z);
+  let nodes: ReturnType<typeof nodesById> | null = null;
   for (const item of sorted) {
     if (hidden?.has(item.id)) continue;
     if (item.type === 'stroke') drawStrokeItem(ctx, item);
     else if (item.type === 'shape') drawShape(ctx, item);
     else if (item.type === 'node') drawNode(ctx, item);
+    else if (item.type === 'connector') drawConnector(ctx, item, connectorPoints(item, (nodes ??= nodesById(items.filter((i) => !hidden?.has(i.id))))));
   }
 }

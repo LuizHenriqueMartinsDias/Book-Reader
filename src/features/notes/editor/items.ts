@@ -1,4 +1,4 @@
-import { db, type Margins, type NoteItem, type NotePage } from '../../../db/schema';
+import { db, type ConnectorEnd, type Margins, type NoteItem, type NotePage } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { touchNotebook } from '../../../db/notes';
 import { transformItems } from '../../../lib/notes/geometry';
@@ -22,6 +22,8 @@ export async function cloneItems(items: NoteItem[], pageId: string, offset: numb
         return { ...i, points: i.points.map(([x, y, p]) => [x + offset, y + offset, p]) };
       case 'shape':
         return { ...i, x1: i.x1 + offset, y1: i.y1 + offset, x2: i.x2 + offset, y2: i.y2 + offset };
+      case 'connector':
+        return { ...i, from: { ...i.from, x: i.from.x + offset, y: i.from.y + offset }, to: { ...i.to, x: i.to.x + offset, y: i.to.y + offset } };
       default:
         return { ...i, x: (i as { x: number }).x + offset, y: (i as { y: number }).y + offset };
     }
@@ -31,6 +33,11 @@ export async function cloneItems(items: NoteItem[], pageId: string, offset: numb
   return items.map((item, k) => {
     const copy = { ...shift(item), id: ids.get(item.id)!, pageId, z: z + 1 + k, createdAt: Date.now() };
     if (item.parentId && ids.has(item.parentId)) copy.parentId = ids.get(item.parentId);
+    // Arrows copied with their boxes connect the copies; an end on a box left behind stays loose.
+    if (copy.type === 'connector') {
+      const end = (e: ConnectorEnd): ConnectorEnd => (e.node ? (ids.has(e.node) ? { ...e, node: ids.get(e.node) } : { x: e.x, y: e.y }) : e);
+      return { ...copy, from: end(copy.from), to: end(copy.to) };
+    }
     return copy;
   });
 }

@@ -38,11 +38,13 @@ describe('exportNotebookPdf', () => {
     expect(out.getTitle()).toBe('Teste');
   });
 
-  it('draws diagram boxes with their text, under the ink', async () => {
+  it('draws diagram boxes with their text and arrows, under the ink', async () => {
     const nb = await withItems('paged', (notebookId, pageId) => [
       { ...base, id: 'n', notebookId, pageId, type: 'node', shape: 'diamond', x: 100, y: 100, w: 160, h: 100, color: '#2563eb', filled: true, width: 2, text: 'Decisão?\nsim ou não', fontSize: 14 },
       { ...base, id: 'r', notebookId, pageId, type: 'node', shape: 'round', x: 100, y: 300, w: 160, h: 60, color: '#000000', filled: false, width: 2, text: '', fontSize: 14 },
       { ...base, z: 2, id: 's', notebookId, pageId, parentId: 'r', type: 'stroke', tool: 'pen', color: '#000000', width: 2, points: [[120, 320, 0.5], [200, 340, 0.5]] },
+      { ...base, z: 3, id: 'c', notebookId, pageId, type: 'connector', from: { node: 'n', x: 0, y: 0 }, to: { node: 'r', x: 0, y: 0 }, route: 'elbow', arrows: 'both', color: '#2563eb', width: 2, label: 'sim', fontSize: 12 },
+      { ...base, z: 4, id: 'd', notebookId, pageId, type: 'connector', from: { node: 'n', x: 0, y: 0 }, to: { x: 400, y: 150 }, route: 'curve', arrows: 'end', color: '#000000', width: 2, label: '', fontSize: 12 },
     ]);
     const out = await PDFDocument.load(await exportNotebookPdf(nb.id));
     expect(out.getPageCount()).toBe(1);

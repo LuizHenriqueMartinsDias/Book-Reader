@@ -1,10 +1,11 @@
 import { BlendMode, LineCapStyle, PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib';
 import { getPages } from '../../db/notes';
-import { db, type NoteItem, type Paper } from '../../db/schema';
+import { db, type NodeItem, type NoteItem, type Paper } from '../../db/schema';
 import { getBookFile } from '../../db/repo';
 import { userToDisplayMatrix, viewToUserSpace } from '../coords';
 import { viewBoxOf } from '../export';
 import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, strokeOutline } from '../ink';
+import { barbs, connectorPoints, heads, midpoint, nodesById } from './connectors';
 import { nodeTextBox } from './diagram';
 import { bboxOf, nodeOutline, shapePoints, unionBox } from './geometry';
 import { hasMargins, marginsOf, pdfBox } from './margins';
@@ -67,14 +68,15 @@ export async function exportNotebookPdf(notebookId: string, loadImage: (blob: Bl
       drawPaper(out, notebook.paper, page.width, page.height);
     }
 
-    for (const item of items) await drawItem(doc, out, font, item, toUser, loadImage);
+    const nodes = nodesById(items);
+    for (const item of items) await drawItem(doc, out, font, item, toUser, loadImage, nodes, notebook.paper);
   }
   return doc.save();
 }
 
-/** Same stacking as on screen: images, diagram boxes, then ink and shapes, then text; by `z` within each. */
+/** Same stacking as on screen: images, diagram boxes and arrows, then ink and shapes, then text; by `z` within each. */
 export function layered(items: NoteItem[]) {
-  const layer = (i: NoteItem) => (i.type === 'image' ? 0 : i.type === 'node' ? 0.5 : i.type === 'text' ? 2 : 1);
+  const layer = (i: NoteItem) => (i.type === 'image' ? 0 : i.type === 'node' ? 0.5 : i.type === 'connector' ? 0.75 : i.type === 'text' ? 2 : 1);
   return [...items].sort((a, b) => layer(a) - layer(b) || a.z - b.z);
 }
 
@@ -94,7 +96,16 @@ function drawPaper(page: PDFPage, paper: Paper, w: number, h: number) {
   }
 }
 
-async function drawItem(doc: PDFDocument, page: PDFPage, font: PDFFont, item: NoteItem, toUser: ToUser, loadImage: (b: Blob) => Promise<Uint8Array>) {
+async function drawItem(
+  doc: PDFDocument,
+  page: PDFPage,
+  font: PDFFont,
+  item: NoteItem,
+  toUser: ToUser,
+  loadImage: (b: Blob) => Promise<Uint8Array>,
+  nodes: Map<string, NodeItem>,
+  paper: Paper,
+) {
   // drawSvgPath flips y around the origin we give it, so pre-negate y to stay in user space.
   const map = (x: number, y: number) => {
     const [ux, uy] = toUser(x, y);
@@ -147,6 +158,26 @@ async function drawItem(doc: PDFDocument, page: PDFPage, font: PDFFont, item: No
         const [ux, uy] = toUser(item.x + item.w / 2 - font.widthOfTextAtSize(line, size) / 2, y);
         page.drawText(line, { x: ux, y: uy, size, font, color: color(item.color) });
         y += lh;
+      }
+      return;
+    }
+    case 'connector': {
+      const pts = connectorPoints(item, nodes);
+      const style = { x: 0, y: 0, borderColor: color(item.color), borderWidth: item.width, borderLineCap: LineCapStyle.Round };
+      page.drawSvgPath(path(pts), style);
+      for (const [tip, from] of heads(item, pts)) {
+        const [a, b] = barbs(tip, from, item.width);
+        page.drawSvgPath(path([a, tip, b]), style);
+      }
+      if (item.label) {
+        // On a patch of paper, so the line doesn't run through the text.
+        const size = item.fontSize;
+        const [mx, my] = midpoint(pts);
+        const w = font.widthOfTextAtSize(item.label, size) + 8;
+        const [rx, ry] = toUser(mx - w / 2, my + size * 0.7);
+        page.drawRectangle({ x: rx, y: ry, width: w, height: size * 1.4, color: color(paper.color) });
+        const [tx, ty] = toUser(mx - w / 2 + 4, my + size * 0.35);
+        page.drawText(encodable(font, item.label), { x: tx, y: ty, size, font, color: color(item.color) });
       }
       return;
     }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { NodeItem, StrokeItem } from '../../db/schema';
-import { attach, nodeAt, nodeTextBox, parentFor, withChildren } from './diagram';
+import type { ConnectorItem, NodeItem, StrokeItem } from '../../db/schema';
+import { attach, nodeAt, nodeTextBox, parentFor, withChildren, withDependents } from './diagram';
 import { bboxOf, eraserHits, transformItems } from './geometry';
 
 const base = { notebookId: 'n', pageId: 'p', createdAt: 0 };
@@ -68,5 +68,12 @@ describe('diagram boxes', () => {
     const t = nodeTextBox(box('d', 'diamond', 0, 0));
     expect(t.x).toBeGreaterThan(40);
     expect(t.w).toBeLessThan(120);
+  });
+
+  it('deletes a box with its writing and the arrows on it, but not other boxes', () => {
+    const arrow: ConnectorItem = { ...base, id: 'c', z: 3, type: 'connector', from: { node: 'a', x: 0, y: 0 }, to: { node: 'b', x: 0, y: 0 }, route: 'straight', arrows: 'end', color: '#000', width: 2, label: '', fontSize: 14 };
+    const items = [box('a', 'rect', 0, 0), box('b', 'rect', 300, 0), { ...stroke('s', [[10, 10]]), parentId: 'a' }, arrow];
+    expect(withDependents(['a'], items).sort()).toEqual(['a', 'c', 's']);
+    expect(withChildren(['a'], items).sort()).toEqual(['a', 's']); // moving a box leaves the arrow to follow
   });
 });

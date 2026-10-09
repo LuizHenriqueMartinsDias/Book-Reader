@@ -5,6 +5,7 @@ import { getPages } from '../../../db/notes';
 import { db, type ImageItem, type Notebook, type NoteItem } from '../../../db/schema';
 import { getBookFile, newId } from '../../../db/repo';
 import { download } from '../../../lib/backup';
+import { withDependents } from '../../../lib/notes/diagram';
 import { prepareImage } from '../../../lib/notes/images';
 import { renderThumbnail } from '../../../lib/notes/thumbnail';
 import { CSS_UNITS, openPdf, type PDFDocumentProxy } from '../../../lib/pdf';
@@ -196,7 +197,10 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selected.length) {
         e.preventDefault();
         editor.set({ selection: null });
-        commitItems([], selected);
+        // Boxes go with their writing and arrows.
+        const pageItems = await db.noteItems.where('pageId').equals(editor.selection!.pageId).toArray();
+        const gone = new Set(withDependents(selected.map((i) => i.id), pageItems));
+        commitItems([], pageItems.filter((i) => gone.has(i.id)));
       } else if (e.key === 'Escape') {
         editor.set({ selection: null });
       } else if (mod && (key === '=' || key === '+')) {

@@ -1,18 +1,21 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { ArrowLeftRight, ArrowRight, Minus, Plus, Spline, Type, Waypoints } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { db, type ImageItem, type NodeItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
+import { db, type ConnectorEnd, type ConnectorItem, type ImageItem, type NodeItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { drawStroke } from '../../../lib/ink';
-import { attach, isNode, MIN_NODE, NODE_SIZE, nodeAt, withChildren } from '../../../lib/notes/diagram';
+import { attachedTo, connectorHit, connectorPoints, isConnector, midpoint, nodesById, settle, SIDES, sideDir, sidePoint, type Side } from '../../../lib/notes/connectors';
+import { attach, isNode, MIN_NODE, NODE_SIZE, nodeAt, withChildren, withDependents } from '../../../lib/notes/diagram';
 import { eraseItem } from '../../../lib/notes/erase';
 import { bboxOf, eraserHits, itemsInLasso, screenToLocal, transformItems, type Transform, type Vec } from '../../../lib/notes/geometry';
-import { defaultInk, drawItems, drawNode, drawShape } from '../../../lib/notes/render';
+import { defaultInk, drawConnector, drawItems, drawNode, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
 import { useUi } from '../../../store/ui';
 import { sizeCanvas } from '../../reader/canvasSize';
 import { useNoteEditor } from './editorStore';
 import ImageItemView from './ImageItemView';
+import ConnectorLabelView from './ConnectorLabelView';
 import { cloneItems, commitItems } from './items';
 import NodeItemView from './NodeItemView';
 import SelectionOverlay from './SelectionOverlay';
@@ -52,8 +55,26 @@ type Gesture =
   | { kind: 'lasso'; id: number; points: Vec[] }
   | { kind: 'shape'; id: number; from: Vec; to: Vec }
   | { kind: 'text'; id: number; at: Vec }
-  /** Diagram tool: dragging a box (`hit`) moves it; elsewhere it makes a box from `from` to `to`. */
-  | { kind: 'diagram'; id: number; from: Vec; to: Vec; hit: NodeItem | null };
+  /**
+   * Diagram tool: dragging a box (`hit`) moves it; on an arrow (`picked`) it just selects it;
+   * elsewhere it makes a box from `from` to `to`.
+   */
+  | { kind: 'diagram'; id: number; from: Vec; to: Vec; hit: NodeItem | null; picked: boolean };
+
+/** Dragging out of a box's "+" handle: an arrow to another box, or to where a new box goes. */
+interface Linking {
+  id: number;
+  node: NodeItem;
+  side: Side;
+  to: Vec;
+  /** Where the press started on screen, to tell a tap from a drag. */
+  start: Vec;
+}
+
+/** Room between a box and the next one made with its "+" handle, in points. */
+const NEXT_GAP = 60;
+/** How close to an arrow (screen px) a tap must be to pick it. */
+const PICK_PX = 10;
 
 /** The stylus' eraser end (32) or side button (2) is down: it erases while held. */
 const penErases = (e: { pointerType: string; buttons: number }) => e.pointerType === 'pen' && (e.buttons & 34) !== 0;
@@ -74,6 +95,23 @@ function newNode(from: Vec, to: Vec, zoom: number, notebook: Notebook): Omit<Nod
       ? { x: Math.min(from[0], to[0]), y: Math.min(from[1], to[1]), w, h }
       : { x: from[0] - NODE_SIZE[nodeShape].w / 2, y: from[1] - NODE_SIZE[nodeShape].h / 2, ...NODE_SIZE[nodeShape] };
   return { type: 'node', shape: nodeShape, ...box, color: inkColor(notebook), filled: nodeFilled, width: 2, text: '', fontSize: textSize };
+}
+
+/** A new arrow from a box to `to`, styled like the last ones. */
+function newConnector(from: NodeItem, to: ConnectorEnd): Omit<ConnectorItem, 'id' | 'notebookId' | 'pageId' | 'z' | 'createdAt'> {
+  const { connectorRoute, connectorArrows, textSize } = useNoteEditor.getState();
+  return {
+    type: 'connector',
+    from: { node: from.id, x: from.x + from.w / 2, y: from.y + from.h / 2 },
+    to,
+    route: connectorRoute,
+    arrows: connectorArrows,
+    // The color of the box it comes out of.
+    color: from.color,
+    width: 2,
+    label: '',
+    fontSize: Math.round(textSize * 0.85),
+  };
 }
 
 function inkStyle(tool: 'pen' | 'marker') {
@@ -108,12 +146,15 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   /** An erase was just saved: keep showing its result until the database query catches up. */
   const settling = useRef(false);
   const [preview, setPreview] = useState<Transform | null>(null);
+  const linking = useRef<Linking | null>(null);
   const editOriginal = useRef<TextItem | null>(null);
 
   const selected = useMemo(() => (selection ? items.filter((i) => selection.ids.includes(i.id)) : []), [items, selection]);
   // While dragging a selection, show the moved copies in place of the originals.
   const moved = useMemo(() => (preview ? new Map(transformItems(selected, preview).map((i) => [i.id, i])) : null), [preview, selected]);
   const shown = useMemo(() => (moved ? items.map((i) => moved.get(i.id) ?? i) : items), [items, moved]);
+  // Boxes as they're shown (also mid-drag), for the arrows to follow.
+  const nodeMap = useMemo(() => nodesById(shown), [shown]);
 
   // Committed ink.
   useEffect(() => {
@@ -181,6 +222,14 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       const ratio = canvas.width / Math.max(1, width);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const link = linking.current;
+      if (link) {
+        ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
+        const target = nodeAt(items.filter((i) => i.id !== link.node.id), link.to);
+        const c = newConnector(link.node, { node: target?.id, x: link.to[0], y: link.to[1] });
+        drawConnector(ctx, c, connectorPoints(c, nodeMap));
+        return;
+      }
       const g = gesture.current ?? (hoverEraser.current && { kind: 'erase' as const, id: -1, at: hoverEraser.current, stylus: true });
       if (!g) return;
       ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
@@ -218,10 +267,11 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     const radius = eraserSize / view.zoom;
     const live = items.filter((i) => !erasingRef.current.has(i.id));
     if (eraserMode === 'stroke') {
-      const hits = eraserHits(live, x, y, radius);
+      const nodes = nodesById(live);
+      const hits = [...eraserHits(live, x, y, radius), ...live.filter(isConnector).filter((c) => connectorHit(c, nodes, x, y, radius))];
       if (!hits.length) return;
-      // Erasing a box erases what's written in it.
-      erasingRef.current = new Set([...erasingRef.current, ...withChildren(hits.map((i) => i.id), items)]);
+      // Erasing a box erases what's written in it and the arrows on it.
+      erasingRef.current = new Set([...erasingRef.current, ...withDependents(hits.map((i) => i.id), items)]);
       setErasing(erasingRef.current);
       return;
     }
@@ -295,8 +345,10 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       if (editor.editingTextId) return;
       // On a box: select it (with its writing) and drag to move; elsewhere: make a box.
       const hit = nodeAt(items, p) ?? null;
+      const arrow = hit ? undefined : [...items].sort((a, b) => b.z - a.z).find((i) => isConnector(i) && connectorHit(i, nodeMap, p[0], p[1], PICK_PX / view.zoom));
       if (hit) editor.set({ selection: { pageId: page.id, ids: withChildren([hit.id], items) } });
-      gesture.current = { kind: 'diagram', id, from: p, to: p, hit };
+      else if (arrow) editor.set({ selection: { pageId: page.id, ids: [arrow.id] } });
+      gesture.current = { kind: 'diagram', id, from: p, to: p, hit, picked: !!arrow };
     }
     renderLive();
   };
@@ -414,6 +466,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     const base = { notebookId: notebook.id, pageId: page.id, z: nextZ(), createdAt: Date.now(), id: newId() };
 
     if (g.kind === 'erase') return saveErase();
+    if (g.kind === 'diagram' && g.picked) return;
     if (g.kind === 'diagram' && g.hit) {
       const t = dragOf(g);
       if (!cancelled && Math.hypot(t.dx, t.dy) * view.zoom > 3) actions.onCommit(t);
@@ -467,6 +520,63 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     }
   };
 
+  /** Saves boxes and arrows as one undoable step, settling the arrows' ends. */
+  const addDiagram = async (nodes: NodeItem[], arrows: Omit<ConnectorItem, 'id' | 'notebookId' | 'pageId' | 'z' | 'createdAt'>[]) => {
+    const base = () => ({ notebookId: notebook.id, pageId: page.id, createdAt: Date.now(), id: newId() });
+    const z = nextZ();
+    const map = nodesById([...items, ...nodes]);
+    const made = arrows.map((a, i) => settle({ ...a, ...base(), z: z + nodes.length + i } as ConnectorItem, map));
+    await commitItems([...nodes, ...made]);
+  };
+
+  /** A box like `from` (shape, size, look; no text) with its top-left at (x, y). */
+  const sibling = (from: NodeItem, x: number, y: number): NodeItem => ({ ...from, id: newId(), x, y, text: '', z: nextZ(), createdAt: Date.now() });
+
+  /** The "+" of a box: the next box on that side (below the ones already there), connected and ready to type in. */
+  const addNext = async (from: NodeItem, side: Side) => {
+    const [dx, dy] = sideDir(side);
+    let x = from.x + dx * (from.w + NEXT_GAP);
+    let y = from.y + dy * (from.h + NEXT_GAP);
+    const taken = (bx: number, by: number) => items.some((i) => isNode(i) && bx < i.x + i.w && bx + from.w > i.x && by < i.y + i.h && by + from.h > i.y);
+    for (let tries = 0; taken(x, y) && tries < 20; tries++) {
+      if (dx) y += from.h + NEXT_GAP / 2;
+      else x += from.w + NEXT_GAP / 2;
+    }
+    const next = sibling(from, x, y);
+    await addDiagram([next], [newConnector(from, { node: next.id, x, y })]);
+    useNoteEditor.getState().set({ selection: null, editingTextId: next.id });
+  };
+
+  const linkStart = (node: NodeItem, side: Side) => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    linking.current = { id: e.pointerId, node, side, to: toWorld(e), start: [e.clientX, e.clientY] };
+  };
+  const linkMove = (e: React.PointerEvent) => {
+    const link = linking.current;
+    if (link?.id !== e.pointerId) return;
+    link.to = toWorld(e);
+    renderLive();
+  };
+  const linkEnd = async (e: React.PointerEvent) => {
+    const link = linking.current;
+    if (link?.id !== e.pointerId) return;
+    linking.current = null;
+    renderLive();
+    if (e.type === 'pointercancel') return;
+    // A tap on the handle: the next box on that side.
+    if (Math.hypot(e.clientX - link.start[0], e.clientY - link.start[1]) < 8) return addNext(link.node, link.side);
+    const target = nodeAt(items.filter((i) => i.id !== link.node.id), link.to);
+    if (target) {
+      await addDiagram([], [newConnector(link.node, { node: target.id, x: link.to[0], y: link.to[1] })]);
+      return;
+    }
+    // Let go on empty paper: a new box there, connected.
+    const next = sibling(link.node, link.to[0] - link.node.w / 2, link.to[1] - link.node.h / 2);
+    await addDiagram([next], [newConnector(link.node, { node: next.id, x: link.to[0], y: link.to[1] })]);
+    useNoteEditor.getState().set({ selection: null, editingTextId: next.id });
+  };
+
   // Stylus strokes must not scroll the page (Chrome on Android also sends touch events for pens).
   useEffect(() => {
     const canvas = liveRef.current;
@@ -491,15 +601,26 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       const ids = new Set(selected.map((i) => i.id));
       const next = transformItems(selected, t);
       const all = [...items.filter((i) => !ids.has(i.id)), ...next];
-      replaceSelected(next.map((i) => ((i.type === 'stroke' || i.type === 'shape') && !(i.parentId && ids.has(i.parentId)) ? attach(i, all) : i)));
+      const placed = next.map((i) => ((i.type === 'stroke' || i.type === 'shape') && !(i.parentId && ids.has(i.parentId)) ? attach(i, all) : i));
+      // Arrows on moved boxes record where their ends are now.
+      const map = nodesById(all);
+      const arrows = attachedTo(all, new Set(next.filter(isNode).map((n) => n.id)));
+      const settled = arrows.map((c) => settle(c, map));
+      const changed = arrows.filter((c, i) => settled[i] !== c && !ids.has(c.id));
+      const changedIds = new Set(changed.map((c) => c.id));
+      commitItems([...placed.map((i) => (changedIds.has(i.id) ? settle(i as ConnectorItem, map) : i)), ...settled.filter((c) => changedIds.has(c.id))], [
+        ...selected,
+        ...items.filter((i) => changedIds.has(i.id)),
+      ]);
     },
     onRecolor: (color: string) =>
       replaceSelected(selected.map((i) => (i.type === 'image' ? i : { ...i, color }))),
     onTap: () => {
-      // Tapping a selected box again types in it.
+      // Tapping a selected box (or arrow) again types in it.
       const boxes = selected.filter(isNode);
-      if (boxes.length !== 1) return;
-      useNoteEditor.getState().set({ selection: null, editingTextId: boxes[0].id });
+      const arrows = selected.filter(isConnector);
+      const target = boxes.length === 1 ? boxes[0] : !boxes.length && arrows.length === 1 ? arrows[0] : null;
+      if (target) useNoteEditor.getState().set({ selection: null, editingTextId: target.id });
     },
     onDuplicate: async () => {
       const copies = await cloneItems(selected, page.id, 20);
@@ -509,9 +630,79 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     onCopy: () => useNoteEditor.getState().set({ clipboard: selected }),
     onDelete: () => {
       useNoteEditor.getState().set({ selection: null });
-      commitItems([], selected);
+      const gone = new Set(withDependents(selected.map((i) => i.id), items));
+      commitItems([], items.filter((i) => gone.has(i.id)));
     },
   };
+
+  // What's selected, for diagram controls: one box (with its writing) or one arrow.
+  const selectedBoxes = selected.filter(isNode);
+  const selectedArrows = selected.filter(isConnector);
+  const soleBox = selectedBoxes.length === 1 && !selectedArrows.length ? selectedBoxes[0] : null;
+  const soleArrow = !selectedBoxes.length && selectedArrows.length === 1 && selected.length === 1 ? selectedArrows[0] : null;
+  const restyle = (patch: Partial<NodeItem> & Partial<ConnectorItem>) => {
+    const target = soleBox ?? soleArrow;
+    if (target) commitItems([{ ...target, ...patch } as NoteItem], [target]);
+  };
+  const pill = (active: boolean) => `rounded-md p-1.5 ${active ? 'bg-[var(--app-bg)] text-amber-600' : 'hover:bg-[var(--app-bg)]'}`;
+  const extra = soleBox ? (
+    <>
+      {(['round', 'rect', 'ellipse', 'diamond'] as const).map((shape) => (
+        <button key={shape} title="Forma da caixa" className={pill(soleBox.shape === shape)} onClick={() => restyle({ shape })}>
+          <span
+            className={`block size-4 border-2 border-current ${shape === 'round' ? 'rounded-[5px]' : shape === 'ellipse' ? 'rounded-full' : shape === 'diamond' ? 'scale-75 rotate-45' : ''}`}
+          />
+        </button>
+      ))}
+    </>
+  ) : soleArrow ? (
+    <>
+      {(
+        [
+          ['straight', Minus, 'Reta'],
+          ['elbow', Waypoints, 'Em cotovelo'],
+          ['curve', Spline, 'Curva'],
+        ] as const
+      ).map(([route, Icon, label]) => (
+        <button
+          key={route}
+          title={label}
+          className={pill(soleArrow.route === route)}
+          onClick={() => {
+            useNoteEditor.getState().set({ connectorRoute: route });
+            restyle({ route });
+          }}
+        >
+          <Icon className="size-4" />
+        </button>
+      ))}
+      <div className="mx-1 h-5 w-px bg-[var(--border)]" />
+      {(
+        [
+          ['end', ArrowRight, 'Ponta no fim'],
+          ['both', ArrowLeftRight, 'Pontas nos dois lados'],
+          ['none', null, 'Sem ponta'],
+        ] as const
+      ).map(([arrows, Icon, label]) => (
+        <button
+          key={arrows}
+          title={label}
+          className={pill(soleArrow.arrows === arrows)}
+          onClick={() => {
+            useNoteEditor.getState().set({ connectorArrows: arrows });
+            restyle({ arrows });
+          }}
+        >
+          {Icon ? <Icon className="size-4" /> : <span className="block w-4 text-center text-xs leading-4">—</span>}
+        </button>
+      ))}
+      <button title="Texto na seta" className={pill(false)} onClick={() => useNoteEditor.getState().set({ selection: null, editingTextId: soleArrow.id })}>
+        <Type className="size-4" />
+      </button>
+    </>
+  ) : null;
+  // The "+" handles around a box selected with the diagram tool.
+  const handles = tool === 'diagram' && soleBox && !preview && !editingTextId ? soleBox : null;
 
   const images = shown.filter((i): i is ImageItem => i.type === 'image').sort((a, b) => a.z - b.z);
   const texts = shown.filter((i): i is TextItem => i.type === 'text').sort((a, b) => a.z - b.z);
@@ -553,13 +744,35 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         {nodes.map((i) => (
           <NodeItemView key={i.id} item={i} editing={editingTextId === i.id} />
         ))}
+        {shown.filter(isConnector).map((c) => (
+          <ConnectorLabelView key={c.id} item={c} at={midpoint(connectorPoints(c, nodeMap))} editing={editingTextId === c.id} paper={notebook.paper.color} />
+        ))}
         {texts.map((i) => (
           <TextItemView key={i.id} item={i} editing={editingTextId === i.id} original={editingTextId === i.id ? editOriginal.current : null} />
         ))}
       </div>
       {selected.length > 0 && (
-        <SelectionOverlay items={selected} view={view} rotation={rotation} preview={preview} onPreview={setPreview} {...actions} />
+        <SelectionOverlay items={selected} view={view} rotation={rotation} preview={preview} onPreview={setPreview} extra={extra} clearance={handles ? 30 : 0} {...actions} />
       )}
+      {handles &&
+        SIDES.map((side) => {
+          const [px, py] = sidePoint(handles, side);
+          const [dx, dy] = sideDir(side);
+          return (
+            <div
+              key={side}
+              title="Toque: nova caixa ligada deste lado · Arraste: ligar a outra caixa"
+              className="absolute z-30 flex size-7 -translate-x-1/2 -translate-y-1/2 cursor-crosshair touch-none items-center justify-center rounded-full border-2 border-white bg-sky-500 text-white shadow"
+              style={{ left: (px - view.x) * view.zoom + dx * 26, top: (py - view.y) * view.zoom + dy * 26 }}
+              onPointerDown={linkStart(handles, side)}
+              onPointerMove={linkMove}
+              onPointerUp={linkEnd}
+              onPointerCancel={linkEnd}
+            >
+              <Plus className="size-4" />
+            </div>
+          );
+        })}
     </div>
   );
 }

@@ -40,6 +40,12 @@ export function bboxOf(item: NoteItem): Box {
       const pad = item.width / 2;
       return { x: item.x - pad, y: item.y - pad, w: item.w + 2 * pad, h: item.h + 2 * pad };
     }
+    case 'connector': {
+      // From where its ends last were (the path itself depends on the boxes; see connectors.ts).
+      const x = Math.min(item.from.x, item.to.x);
+      const y = Math.min(item.from.y, item.to.y);
+      return { x, y, w: Math.abs(item.to.x - item.from.x), h: Math.abs(item.to.y - item.from.y) };
+    }
   }
 }
 
@@ -99,6 +105,14 @@ export function transformItems(items: NoteItem[], { dx, dy, scale, origin }: Tra
         return { ...item, x: tx(item.x), y: ty(item.y), w: item.w * scale, h: item.h * scale };
       case 'node':
         return { ...item, x: tx(item.x), y: ty(item.y), w: item.w * scale, h: item.h * scale, width: item.width * scale, fontSize: item.fontSize * scale };
+      case 'connector':
+        return {
+          ...item,
+          from: { ...item.from, x: tx(item.from.x), y: ty(item.from.y) },
+          to: { ...item.to, x: tx(item.to.x), y: ty(item.to.y) },
+          width: item.width * scale,
+          fontSize: item.fontSize * scale,
+        };
     }
   });
 }

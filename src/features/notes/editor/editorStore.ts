@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { NodeShape, NoteItem, ShapeKind } from '../../../db/schema';
+import type { ConnectorArrows, ConnectorRoute, NodeShape, NoteItem, ShapeKind } from '../../../db/schema';
 import type { Ruler } from '../../../lib/notes/ruler';
 
 export type NoteTool = 'pen' | 'marker' | 'eraser' | 'lasso' | 'text' | 'shape' | 'diagram';
@@ -20,6 +20,9 @@ interface NoteEditorState {
   /** Diagram tool: the box shape it makes and whether boxes get a tint. */
   nodeShape: NodeShape;
   nodeFilled: boolean;
+  /** How new diagram arrows look (the last ones picked). */
+  connectorRoute: ConnectorRoute;
+  connectorArrows: ConnectorArrows;
   /** Eraser radius in screen px. */
   eraserSize: number;
   /** Lasso selection (on one page at a time). */
@@ -56,6 +59,8 @@ export const useNoteEditor = create<NoteEditorState>()(
       eraserMode: 'stroke',
       nodeShape: 'round',
       nodeFilled: true,
+      connectorRoute: 'straight',
+      connectorArrows: 'end',
       eraserSize: 10,
       selection: null,
       clipboard: null,
@@ -73,7 +78,7 @@ export const useNoteEditor = create<NoteEditorState>()(
     }),
     {
       name: 'book-reader-notes',
-      partialize: ({ tool, shape, textSize, eraserMode, eraserSize, nodeShape, nodeFilled, fingerDraws }) => ({
+      partialize: ({ tool, shape, textSize, eraserMode, eraserSize, nodeShape, nodeFilled, connectorRoute, connectorArrows, fingerDraws }) => ({
         tool,
         shape,
         textSize,
@@ -81,6 +86,8 @@ export const useNoteEditor = create<NoteEditorState>()(
         eraserSize,
         nodeShape,
         nodeFilled,
+        connectorRoute,
+        connectorArrows,
         fingerDraws,
       }),
     },

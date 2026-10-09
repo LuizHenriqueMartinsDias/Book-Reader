@@ -1,5 +1,5 @@
 import { ClipboardCopy, CopyPlus, Trash2 } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import type { NoteItem } from '../../../db/schema';
 import { bboxOf, rotateVec, unionBox, type Transform } from '../../../lib/notes/geometry';
 import { PEN_COLORS } from '../../../store/ui';
@@ -19,12 +19,16 @@ interface Props {
   onDelete: () => void;
   /** A tap on the selection without moving it (a selected diagram box: edit its text). */
   onTap?: () => void;
+  /** More buttons for what's selected (a diagram box's shape, an arrow's style…), before the colors. */
+  extra?: ReactNode;
+  /** Extra room (px) between the box and the action bar, for handles around the selection. */
+  clearance?: number;
 }
 
 const HANDLE = 22;
 
 /** Dashed box around the lasso selection: drag to move, corner to resize, plus quick actions. */
-export default function SelectionOverlay({ items, view, rotation, preview, onPreview, onCommit, onRecolor, onDuplicate, onCopy, onDelete, onTap }: Props) {
+export default function SelectionOverlay({ items, view, rotation, preview, onPreview, onCommit, onRecolor, onDuplicate, onCopy, onDelete, onTap, extra, clearance = 0 }: Props) {
   const drag = useRef<{ mode: 'move' | 'resize'; start: [number, number]; id: number } | null>(null);
   const box = unionBox(items.map(bboxOf));
   if (!box) return null;
@@ -70,7 +74,7 @@ export default function SelectionOverlay({ items, view, rotation, preview, onPre
     }
   };
 
-  const actionsAbove = top > 56;
+  const actionsAbove = top > 56 + clearance;
   return (
     <>
       <div
@@ -93,9 +97,15 @@ export default function SelectionOverlay({ items, view, rotation, preview, onPre
       {!preview && (
         <div
           className="absolute z-30 flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 text-[var(--app-fg)] shadow-lg"
-          style={{ left: Math.max(4, left), top: actionsAbove ? top - 50 : top + height + 12 }}
+          style={{ left: Math.max(4, left), top: actionsAbove ? top - 50 - clearance : top + height + 12 + clearance }}
           onPointerDown={(e) => e.stopPropagation()}
         >
+          {extra && (
+            <>
+              {extra}
+              <div className="mx-1 h-5 w-px bg-[var(--border)]" />
+            </>
+          )}
           {PEN_COLORS.map((c) => (
             <button key={c} title="Mudar cor" onClick={() => onRecolor(c)} className="size-6 rounded-full ring-1 ring-black/10" style={{ background: c }} />
           ))}
