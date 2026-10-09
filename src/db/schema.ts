@@ -89,8 +89,11 @@ export interface Note {
    * like strokes); with its paper color and whether it's folded down to an icon.
    */
   pin?: { x: number; y: number; w: number; h: number };
+  /** Paper color: a note with one is a post-it (on a PDF page by `pin`, in an EPUB by `cfi`). */
   color?: string;
   collapsed?: boolean;
+  /** Handwriting on the post-it, in points from its top-left corner (it moves with it). */
+  ink?: Pick<Stroke, 'tool' | 'brush' | 'color' | 'width' | 'points'>[];
   body: string;
   createdAt: number;
   updatedAt: number;

@@ -65,7 +65,7 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
     onClose();
   }
 
-  /** PDF: the passage's note (made if needed) stuck beside it as a post-it, ready to write in. */
+  /** The passage's note (made if needed) as a post-it beside it, ready to write in. */
   async function stickBeside() {
     let h = target.kind === 'highlight' ? target.highlight : null;
     if (target.kind === 'selection') {
@@ -74,16 +74,21 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
       h = created[0] ?? null;
     }
     onClose();
-    if (!h?.rects.length) return;
+    if (!h) return;
     const existing = await db.notes.where('highlightId').equals(h.id).first();
-    const [x, y, w] = h.rects[0];
-    const note = pinNote(existing ?? newNote(h), x + w + 8, Math.max(4, y - 4));
+    let note;
+    if (h.cfi) {
+      // EPUB: it hangs on the passage, as an icon in the margin.
+      note = { ...(existing ?? newNote(h)), color: existing?.color ?? useUi.getState().stickyColor, updatedAt: Date.now() };
+    } else {
+      if (!h.rects.length) return;
+      const [x, y, w] = h.rects[0];
+      note = pinNote(existing ?? newNote(h), x + w + 8, Math.max(4, y - 4));
+    }
     await useHistory.getState().commit({ added: { notes: [note] }, removed: existing ? { notes: [existing] } : {} });
     useReader.setState({ freshStickyId: note.id });
   }
 
-  // Post-its stick on PDF pages (an EPUB's text reflows, so it has no fixed spots yet).
-  const canStick = useReader.getState().format !== 'epub';
 
   /** Highlights the passage (if it isn't yet) and sends it to a notebook with a link back here. */
   async function sendToNotebook() {
@@ -124,11 +129,9 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
       <button title="Adicionar nota (no painel)" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={() => highlight(current ?? HIGHLIGHT_COLORS[0], true)}>
         <MessageSquarePlus className="size-5" />
       </button>
-      {canStick && (
-        <button title="Colar um post-it ao lado" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={stickBeside}>
-          <StickyNote className="size-5" />
-        </button>
-      )}
+      <button title="Colar um post-it ao lado" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={stickBeside}>
+        <StickyNote className="size-5" />
+      </button>
       <button title="Enviar para caderno" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={sendToNotebook}>
         <NotebookPen className="size-5" />
       </button>

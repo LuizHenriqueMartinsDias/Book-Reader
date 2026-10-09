@@ -12,6 +12,7 @@ import FullscreenChrome from '../reader/FullscreenChrome';
 import Sidebar from '../reader/Sidebar';
 import { useFullscreen } from '../reader/useFullscreen';
 import { useSplit } from '../split/splitStore';
+import EpubStickies from './EpubStickies';
 import EpubToolbar from './EpubToolbar';
 import { EPUB_FONTS, EPUB_THEMES, FONT_SIZES } from './epubTheme';
 
@@ -396,10 +397,11 @@ function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startC
         toolbar={<EpubToolbar book={book} location={location} fullscreen={fullscreen} />}
       />
       <div className="relative flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col" style={{ background: colors.background }}>
+        <div className="relative flex min-w-0 flex-1 flex-col" style={{ background: colors.background }}>
           <div className={`min-h-0 flex-1 ${flow === 'paginated' ? 'px-4 py-6 sm:px-10' : ''}`}>
             <div ref={viewerRef} data-reader-pages className="mx-auto size-full max-w-[1400px]" />
           </div>
+          {rendition && <EpubStickies rendition={rendition} bookId={book.id} />}
           {flow === 'paginated' && <ProgressBar epub={epub} location={location} rendition={rendition} />}
         </div>
         {sidebarOpen && <Sidebar pageCount={0} />}

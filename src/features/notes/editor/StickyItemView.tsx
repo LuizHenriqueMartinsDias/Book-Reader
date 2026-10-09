@@ -1,5 +1,5 @@
 import { Minus, X } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { STICKY_COLORS, STICKY_HEADER, STICKY_ICON, STICKY_INK } from '../../../lib/notes/sticky';
 
 const PAD = 6;
@@ -35,13 +35,17 @@ interface Props {
   onGrow: (h: number) => void;
   onDelete: () => void;
   onEditEnd?: () => void;
+  /** Laid over the text, below the strip (a book post-it's handwriting). */
+  overlay?: ReactNode;
+  /** Can't be moved or resized (an EPUB post-it's card, which opens by its passage). */
+  fixed?: boolean;
 }
 
 /**
  * A post-it card: the strip to drag it by with color / fold / delete, its typed text, the corner
  * to resize it. Folded, a small icon. Used by notebooks and by books.
  */
-export default function StickyItemView({ item, editing = false, live = false, paper = false, onDrag, onChange, onText, onGrow, onDelete, onEditEnd }: Props) {
+export default function StickyItemView({ item, editing = false, live = false, paper = false, onDrag, onChange, onText, onGrow, onDelete, onEditEnd, overlay, fixed = false }: Props) {
   const [text, setText] = useState(item.text);
   const [palette, setPalette] = useState(false);
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -126,13 +130,14 @@ export default function StickyItemView({ item, editing = false, live = false, pa
   const icon = Math.max(10, Math.min(14, STICKY_HEADER - 8));
   return (
     <div
+      data-sticky-card
       className={`absolute ${paper ? 'pointer-events-auto shadow-md ring-1 ring-black/5' : ''}`}
       style={{ left: item.x, top: item.y, width: item.w, height: item.h, color: STICKY_INK, background: paper ? item.color : undefined }}
     >
       <div
-        className="pointer-events-auto flex cursor-move touch-none items-center justify-end gap-1 px-1"
+        className={`pointer-events-auto flex touch-none items-center justify-end gap-1 px-1 ${fixed ? '' : 'cursor-move'}`}
         style={{ height: STICKY_HEADER, background: paper ? 'rgb(0 0 0 / 0.06)' : undefined }}
-        {...grab('move')}
+        {...(fixed ? {} : grab('move'))}
       >
         {palette ? (
           STICKY_COLORS.map((c) => (
@@ -160,7 +165,12 @@ export default function StickyItemView({ item, editing = false, live = false, pa
           </>
         )}
       </div>
-      <div ref={bodyRef} style={{ padding: PAD, paddingTop: PAD / 2, fontSize: item.fontSize, lineHeight }}>
+      <div
+        ref={bodyRef}
+        style={{ padding: PAD, paddingTop: PAD / 2, fontSize: item.fontSize, lineHeight }}
+        // A tap anywhere on a book post-it types in it, not just on the lines of text.
+        onClick={() => live && areaRef.current?.focus()}
+      >
         {typing ? (
           <textarea
             ref={areaRef}
@@ -181,12 +191,19 @@ export default function StickyItemView({ item, editing = false, live = false, pa
           <div className="break-words whitespace-pre-wrap">{item.text}</div>
         )}
       </div>
-      <div
-        title="Redimensionar"
-        className="pointer-events-auto absolute right-0 bottom-0 cursor-nwse-resize touch-none"
-        style={{ width: 16, height: 16, background: 'linear-gradient(135deg, transparent 55%, rgb(0 0 0 / 0.18) 55%)' }}
-        {...grab('resize')}
-      />
+      {overlay && (
+        <div className="absolute inset-x-0 bottom-0" style={{ top: STICKY_HEADER }}>
+          {overlay}
+        </div>
+      )}
+      {!fixed && (
+        <div
+          title="Redimensionar"
+          className="pointer-events-auto absolute right-0 bottom-0 cursor-nwse-resize touch-none"
+          style={{ width: 16, height: 16, background: 'linear-gradient(135deg, transparent 55%, rgb(0 0 0 / 0.18) 55%)' }}
+          {...grab('resize')}
+        />
+      )}
     </div>
   );
 }

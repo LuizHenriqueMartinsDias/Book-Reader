@@ -9,6 +9,8 @@ export const STICKY_SIZE = 150;
 export const STICKY_HEADER = 22;
 /** Size of a collapsed post-it's icon, in points. */
 export const STICKY_ICON = 26;
+/** A post-it stuck on a book page, in page points. */
+export const BOOK_STICKY = { w: 140, h: 120, fontSize: 12 };
 /** Ink on post-its is always dark: the papers are all light. */
 export const STICKY_INK = '#1f2937';
 

@@ -154,7 +154,8 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
     if (!canvas || !page || !stylusInks) return;
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== 'pen' || current.current) return;
-      if ((e.target as Element).closest('button, a, [data-selection-menu]')) return;
+      // Post-its take the pen themselves (their own handwriting).
+      if ((e.target as Element).closest('button, a, [data-selection-menu], [data-sticky-card]')) return;
       e.preventDefault();
       e.stopPropagation();
       penActive.current = true;

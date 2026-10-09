@@ -2,15 +2,14 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useState } from 'react';
 import { db, type Note } from '../../db/schema';
 import { newId, putNote } from '../../db/repo';
-import { STICKY_HEADER } from '../../lib/notes/sticky';
+import { BOOK_STICKY, STICKY_HEADER } from '../../lib/notes/sticky';
 import type { PageSize } from '../../lib/pdf';
 import { useHistory } from '../../store/history';
 import { useUi } from '../../store/ui';
 import StickyItemView, { type StickyDrag, type StickyLook } from '../notes/editor/StickyItemView';
 import { useReader } from './readerStore';
+import StickyInk from './StickyInk';
 
-/** A post-it stuck on a book page, in page points. */
-export const BOOK_STICKY = { w: 140, h: 120, fontSize: 12 };
 const MIN = { w: 80, h: STICKY_HEADER + 30 };
 
 /** Width of a PDF page in points, from the page on screen (A4's if it isn't there). */
@@ -87,6 +86,7 @@ export default function StickyLayer({ pageNumber, scale, size }: { pageNumber: n
               onText={(body) => putNote({ ...n, body, updatedAt: Date.now() })}
               onGrow={onGrow(n)}
               onDelete={() => useHistory.getState().commit({ added: {}, removed: { notes: [n] } })}
+              overlay={<StickyInk ink={n.ink ?? []} w={w} h={h} scale={scale} onInk={(ink) => change(n, { ...n, ink, updatedAt: Date.now() })} />}
             />
           );
         })}

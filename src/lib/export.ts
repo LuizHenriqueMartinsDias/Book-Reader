@@ -1,4 +1,6 @@
-import { BlendMode, PDFDocument, PDFHexString, PDFName, PDFString, rgb } from 'pdf-lib';
+import { BlendMode, degrees, PDFDocument, PDFHexString, PDFName, PDFString, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib';
+import { BOOK_STICKY, STICKY_COLORS, STICKY_HEADER, STICKY_INK } from './notes/sticky';
+import { wrapText } from './pdfText';
 import type { Highlight, Note, Stroke } from '../db/schema';
 import { viewToUserSpace, type ViewBox } from './coords';
 import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, PENCIL_OPACITY, strokeOutline } from './ink';
@@ -18,6 +20,7 @@ export interface Annotations {
 export async function exportAnnotatedPdf(source: ArrayBuffer, { strokes, highlights, notes }: Annotations) {
   const doc = await PDFDocument.load(source, { ignoreEncryption: true });
   const pages = doc.getPages();
+  const font = notes.some((n) => n.pin && !n.collapsed) ? await doc.embedFont(StandardFonts.Helvetica) : null;
 
   pages.forEach((page, i) => {
     const n = i + 1;
@@ -49,8 +52,12 @@ export async function exportAnnotatedPdf(source: ArrayBuffer, { strokes, highlig
       });
     }
 
+    // Open post-its are drawn on the page as they look (paper, text, handwriting).
+    for (const note of notes.filter((note) => note.page === n && note.pin && !note.collapsed)) drawPostit(page, note, toUser, map, font!, page.getRotation().angle);
+
+    // Other notes (and folded post-its) become standard PDF notes.
     notes
-      .filter((note) => note.page === n && note.body.trim())
+      .filter((note) => note.page === n && note.body.trim() && !(note.pin && !note.collapsed))
       .forEach((note, k) => {
         // A post-it goes where it's stuck, in its color; other notes beside their highlight or at the top.
         const anchor = highlights.find((h) => h.id === note.highlightId)?.rects[0];
@@ -85,4 +92,27 @@ export function viewBoxOf(page: ReturnType<PDFDocument['getPages']>[number]): Vi
   const x2 = Math.min(m.x + m.width, c.x + c.width);
   const y2 = Math.min(m.y + m.height, c.y + c.height);
   return x2 > x1 && y2 > y1 ? [x1, y1, x2, y2] : [m.x, m.y, m.x + m.width, m.y + m.height];
+}
+
+/** An open post-it drawn on a page: its paper and strip, its text, its handwriting. */
+function drawPostit(page: PDFPage, note: Note, toUser: (x: number, y: number) => [number, number], map: (x: number, y: number) => number[], font: PDFFont, rotation: number) {
+  const { x, y, w, h } = note.pin!;
+  const box = (bx: number, by: number, bw: number, bh: number, style: Parameters<PDFPage['drawRectangle']>[0]) => {
+    const [ax, ay] = toUser(bx, by);
+    const [cx, cy] = toUser(bx + bw, by + bh);
+    page.drawRectangle({ x: Math.min(ax, cx), y: Math.min(ay, cy), width: Math.abs(cx - ax), height: Math.abs(cy - ay), ...style });
+  };
+  box(x, y, w, h, { color: rgb(...hexToRgb(note.color ?? STICKY_COLORS[0])), borderColor: rgb(0, 0, 0), borderOpacity: 0.15, borderWidth: 0.5 });
+  box(x, y, w, Math.min(STICKY_HEADER, h), { color: rgb(0, 0, 0), opacity: 0.06 });
+  const size = BOOK_STICKY.fontSize;
+  let ty = y + STICKY_HEADER + 3 + size;
+  for (const line of note.body.trim() ? wrapText(note.body, font, size, w - 12) : []) {
+    const [ux, uy] = toUser(x + 6, ty);
+    page.drawText(line, { x: ux, y: uy, size, font, color: rgb(...hexToRgb(STICKY_INK)), rotate: degrees(rotation) });
+    ty += size * 1.35;
+  }
+  for (const s of note.ink ?? []) {
+    const d = outlineToSvgPath(strokeOutline({ ...s, points: s.points.map(([px, py, p]) => [x + px, y + py, p]) }), map);
+    if (d) page.drawSvgPath(d, { x: 0, y: 0, color: rgb(...hexToRgb(s.color)), ...(s.tool === 'marker' ? { opacity: MARKER_OPACITY, blendMode: BlendMode.Multiply } : s.brush === 'pencil' ? { opacity: PENCIL_OPACITY } : {}) });
+  }
 }

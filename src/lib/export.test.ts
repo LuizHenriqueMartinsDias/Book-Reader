@@ -62,13 +62,22 @@ describe('exportAnnotatedPdf', () => {
     expect(pageContent(await PDFDocument.load(bytes), 0)).toContain('700 -50');
   });
 
-  it('puts a post-it where it is stuck, in its color, open unless folded', async () => {
-    const postit: Note = { ...note, id: 'p', highlightId: undefined, pin: { x: 300, y: 200, w: 140, h: 120 }, color: '#bfdbfe', collapsed: false };
-    const out = await PDFDocument.load(await exportAnnotatedPdf(await samplePdf(), { strokes: [], highlights: [], notes: [postit] }));
-    const annot = out.context.lookup(out.getPage(0).node.Annots()!.get(0), PDFDict);
+  it('draws an open post-it on the page (paper, text, handwriting) and makes a folded one a PDF note', async () => {
+    const pin = { x: 300, y: 200, w: 140, h: 120 };
+    const open: Note = { ...note, id: 'p', highlightId: undefined, pin, color: '#bfdbfe', body: 'Revisar', ink: [{ tool: 'pen', color: '#16a34a', width: 2, points: [[10, 40, 0.5], [80, 60, 0.5]] }] };
+    const folded: Note = { ...open, id: 'q', collapsed: true, color: '#fbcfe8' };
+    const out = await PDFDocument.load(await exportAnnotatedPdf(await samplePdf(), { strokes: [], highlights: [], notes: [open, folded] }));
+
+    const content = pageContent(out, 0);
+    expect(content).toMatch(/0\.74\d* 0\.85\d* 0\.99\d* rg/); // the open one's paper, #bfdbfe
+    expect(content).toMatch(/0\.08\d* 0\.63\d* 0\.29\d* rg/); // its handwriting, #16a34a
+
+    const annots = out.getPage(0).node.Annots()!;
+    expect(annots.size()).toBe(1); // only the folded one
+    const annot = out.context.lookup(annots.get(0), PDFDict);
     const rect = annot.lookup(PDFName.of('Rect'), PDFArray).asArray().map((n) => (n as PDFNumber).asNumber());
-    expect(rect.slice(0, 2)).toEqual([300, 800 - 200 - 20]); // its top-left corner, in user space
-    expect(annot.lookup(PDFName.of('C'), PDFArray).asArray().map((n) => (n as PDFNumber).asNumber())[2]).toBeCloseTo(0xfe / 255, 3);
-    expect(annot.get(PDFName.of('Open'))).toBe(PDFBool.True);
+    expect(rect.slice(0, 2)).toEqual([300, 800 - 200 - 20]); // where it's stuck
+    expect(annot.lookup(PDFName.of('C'), PDFArray).asArray().map((n) => (n as PDFNumber).asNumber())[0]).toBeCloseTo(0xfb / 255, 3);
+    expect(annot.get(PDFName.of('Open'))).toBe(PDFBool.False);
   });
 });
