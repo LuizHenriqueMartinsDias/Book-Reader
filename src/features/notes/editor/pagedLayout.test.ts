@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { anchorAt, buildLayout, scrollFor } from './pagedLayout';
+import { anchorAt, buildLayout, scrollFor, turnedSize } from './pagedLayout';
 
 const pages = [
   { width: 595, height: 842 },
@@ -27,5 +27,14 @@ describe('paged layout anchors', () => {
     const a = anchorAt(l, 0, l.offsets[0] + 10, 16 + (842 - 595) / 2, 0);
     expect(a.index).toBe(0);
     expect(a.fx).toBeCloseTo(0, 9);
+  });
+});
+
+describe('turnedSize', () => {
+  it('swaps width and height on a quarter turn and grows on a slant', () => {
+    expect(turnedSize({ width: 595, height: 842 }, 90)).toEqual({ width: 842, height: 595 });
+    expect(turnedSize({ width: 595, height: 842 }, 180)).toEqual({ width: 595, height: 842 });
+    const slant = turnedSize({ width: 100, height: 100 }, 45);
+    expect(slant.width).toBeCloseTo(141.421, 2);
   });
 });

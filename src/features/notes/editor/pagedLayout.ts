@@ -4,6 +4,16 @@ export const GAP = 12;
 export const FOOTER = 34;
 export const PADDING = 16;
 
+/** Size of the box a page takes on screen when turned by `deg` (its bounding box), in points. */
+export function turnedSize(p: { width: number; height: number }, deg: number) {
+  const a = (deg * Math.PI) / 180;
+  const c = Math.abs(Math.cos(a));
+  const s = Math.abs(Math.sin(a));
+  // Rounded so quarter turns give the exact swapped size.
+  const r = (v: number) => Math.round(v * 1000) / 1000;
+  return { width: r(p.width * c + p.height * s), height: r(p.width * s + p.height * c) };
+}
+
 export interface PagedLayout {
   /** Top of each page (px), plus the end of the content. */
   offsets: number[];

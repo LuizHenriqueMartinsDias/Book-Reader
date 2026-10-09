@@ -11,7 +11,7 @@ import PdfPageCanvas from '../../reader/PdfPageCanvas';
 import type { ZoomChange, ZoomMode } from '../../reader/views/types';
 import { useNoteEditor } from './editorStore';
 import NoteSurface from './NoteSurface';
-import { anchorAt, buildLayout, FOOTER, GAP, PADDING, pageIndexAt, scrollFor, type Anchor, type PagedLayout } from './pagedLayout';
+import { anchorAt, buildLayout, FOOTER, GAP, PADDING, pageIndexAt, scrollFor, turnedSize, type Anchor, type PagedLayout } from './pagedLayout';
 
 const MAX_FIT = 2.2;
 /** Zoom limits relative to 100%, as in the editor. */
@@ -38,7 +38,16 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
   const maxWidth = useMemo(() => Math.max(...pages.map((p) => p.width), 1), [pages]);
   const fit = Math.min(MAX_FIT, Math.max(0.2, (viewport.width - 2 * PADDING) / maxWidth));
   const scale = zoom === null ? fit : zoom * CSS_UNITS;
-  const layout = useMemo(() => buildLayout(pages, scale), [pages, scale]);
+  // A turned page takes the room of its turned outline, so all of it can be scrolled to. The
+  // layout follows once the twist ends; meanwhile the page just overflows its slot.
+  const pageRotation = useNoteEditor((s) => s.pageRotation);
+  const rotating = useNoteEditor((s) => s.rotationHint !== null);
+  const [layoutRotation, setLayoutRotation] = useState(pageRotation);
+  useEffect(() => {
+    if (!rotating) setLayoutRotation(pageRotation);
+  }, [rotating, pageRotation]);
+  const boxes = useMemo(() => pages.map((p) => turnedSize(p, layoutRotation[p.id] ?? 0)), [pages, layoutRotation]);
+  const layout = useMemo(() => buildLayout(boxes, scale), [boxes, scale]);
   const offsets = layout.offsets;
 
   useEffect(() => onScale(scale), [scale, onScale]);
@@ -94,7 +103,8 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
     const el = scrollRef.current;
     const before = layoutRef.current;
     layoutRef.current = layout;
-    if (!el || before.scale === layout.scale) return;
+    // Zooming, turning, stretching or adding pages: keep the same spot in view.
+    if (!el || before === layout) return;
     const a = pendingAnchor.current ?? anchorAt(before, el.scrollLeft, el.scrollTop, el.clientWidth / 2, el.clientHeight / 2);
     pendingAnchor.current = null;
     const { left, top } = scrollFor(layout, a);
@@ -105,7 +115,6 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
 
   useTwoFingerGestures(scrollRef, contentRef, layoutRef, zoomAround);
   useCtrlWheelZoom(scrollRef, anchorAtClient, zoomAround);
-  const pageRotation = useNoteEditor((s) => s.pageRotation);
 
   const first = pageIndexAt(layout, viewport.top - viewport.height);
   const last = pageIndexAt(layout, viewport.top + viewport.height * 2);
@@ -119,32 +128,35 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
 
   return (
     <div ref={scrollRef} onScroll={measure} className="min-h-0 flex-1 overflow-auto overscroll-contain" style={{ touchAction: 'pan-x pan-y' }}>
-      <div ref={contentRef} className="mx-auto origin-top-left" style={{ width: maxWidth * scale + 2 * PADDING, padding: PADDING }}>
+      <div ref={contentRef} className="mx-auto origin-top-left" style={{ width: layout.maxWidth * scale + 2 * PADDING, padding: PADDING }}>
         {pages.map((page, i) => {
           const w = page.width * scale;
           const h = page.height * scale;
           const active = i >= first && i <= last;
           const rotation = pageRotation[page.id] ?? 0;
+          const slot = { width: boxes[i].width * scale, height: boxes[i].height * scale };
           return (
             <div key={page.id} style={{ marginBottom: GAP }}>
-              <div
-                data-page-box={page.id}
-                className="relative mx-auto shadow-md"
-                style={{ width: w, height: h, ...paperCss(notebook.paper, scale), transform: rotation ? `rotate(${rotation}deg)` : undefined }}
-              >
-                {active && (
-                  <NoteSurface
-                    notebook={notebook}
-                    page={page}
-                    width={w}
-                    height={h}
-                    view={{ x: 0, y: 0, zoom: scale }}
-                    rotation={rotation}
-                    background={page.background && pdf ? <PdfBackground page={page} pdf={pdf} pdfPage={page.background.pdfPage} scale={scale} /> : undefined}
-                  />
-                )}
+              <div className="mx-auto flex items-center justify-center" style={slot}>
+                <div
+                  data-page-box={page.id}
+                  className="relative shrink-0 shadow-md"
+                  style={{ width: w, height: h, ...paperCss(notebook.paper, scale), transform: rotation ? `rotate(${rotation}deg)` : undefined }}
+                >
+                  {active && (
+                    <NoteSurface
+                      notebook={notebook}
+                      page={page}
+                      width={w}
+                      height={h}
+                      view={{ x: 0, y: 0, zoom: scale }}
+                      rotation={rotation}
+                      background={page.background && pdf ? <PdfBackground page={page} pdf={pdf} pdfPage={page.background.pdfPage} scale={scale} /> : undefined}
+                    />
+                  )}
+                </div>
               </div>
-              <div className="mx-auto flex items-center justify-between px-1 text-xs text-[var(--muted)]" style={{ width: w, height: FOOTER }}>
+              <div className="mx-auto flex items-center justify-between px-1 text-xs text-[var(--muted)]" style={{ width: slot.width, height: FOOTER }}>
                 <span>
                   Página {i + 1} de {pages.length}
                 </span>
