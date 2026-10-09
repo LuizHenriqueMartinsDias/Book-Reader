@@ -179,13 +179,9 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
   );
 }
 
-/** Pixels the fingers must travel together (without spreading or turning) to scroll. */
-const PAN_START = 8;
-
 type TwoFinger = {
-  /** Zoom and/or rotation (see twoFinger.ts); `pan` when the fingers just moved together. */
+  /** Zoom and/or rotation (see twoFinger.ts). Scrolling by the midpoint happens throughout. */
   tf: TwoFingerState;
-  pan: boolean;
   dist: number;
   angle: number;
   mid: Vec;
@@ -230,7 +226,6 @@ function useTwoFingerGestures(
       const pageId = box?.dataset.pageBox ?? null;
       g = {
         tf: initialTwoFinger(),
-        pan: false,
         ...t,
         lastMid: t.mid,
         scroll: [el.scrollLeft, el.scrollTop],
@@ -248,17 +243,22 @@ function useTwoFingerGestures(
       const t = info(e.touches);
       const ratio = t.dist / g.dist;
       const turn = ((t.angle - g.angle + 540) % 360) - 180;
-      const moved = Math.hypot(t.mid[0] - g.mid[0], t.mid[1] - g.mid[1]);
-      if (!g.pan) {
-        g.tf = classify(g.tf, ratio, turn, !!g.pageId);
-        if (g.tf.mode === 'pending' && moved > PAN_START) g.pan = true;
-      }
+      // Real hands drift while they twist or pinch, so moving together never locks the gesture
+      // into scrolling: it scrolls along while zoom and rotation can still start.
+      const wasZooming = zooms(g.tf);
+      g.tf = classify(g.tf, ratio, turn, !!g.pageId);
       g.lastMid = t.mid;
+      if (zooms(g.tf) && !wasZooming) {
+        // Zoom starts now: measure the preview from where scrolling has brought things.
+        const cr = contentRef.current!.getBoundingClientRect();
+        g.scroll = [el.scrollLeft, el.scrollTop];
+        g.origin = [cr.left, cr.top];
+        g.mid = t.mid;
+      }
 
-      if (g.pan) {
+      if (!zooms(g.tf)) {
         el.scrollLeft = g.scroll[0] - (t.mid[0] - g.mid[0]);
         el.scrollTop = g.scroll[1] - (t.mid[1] - g.mid[1]);
-        return;
       }
       if (zooms(g.tf)) {
         const target = Math.min(MAX_ZOOM * CSS_UNITS, Math.max(MIN_ZOOM * CSS_UNITS, g.scale * ratio));
