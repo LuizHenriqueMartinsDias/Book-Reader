@@ -47,7 +47,10 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
     if (!rotating) setLayoutRotation(pageRotation);
   }, [rotating, pageRotation]);
   const boxes = useMemo(() => pages.map((p) => turnedSize(p, layoutRotation[p.id] ?? 0)), [pages, layoutRotation]);
-  const layout = useMemo(() => buildLayout(boxes, scale), [boxes, scale]);
+  // Empty room beside the pages, so the view moves sideways freely; it grows (on both sides)
+  // whenever the view gets near its end, so there's always more.
+  const [side, setSide] = useState(() => window.innerWidth);
+  const layout = useMemo(() => buildLayout(boxes, scale, side), [boxes, scale, side]);
   const offsets = layout.offsets;
 
   useEffect(() => onScale(scale), [scale, onScale]);
@@ -56,6 +59,25 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
     const el = scrollRef.current;
     if (!el) return;
     setViewport({ top: el.scrollTop, height: el.clientHeight, width: el.clientWidth });
+  }, []);
+
+  const growing = useRef(false);
+  const onScroll = () => {
+    measure();
+    const el = scrollRef.current;
+    if (!el || growing.current) return;
+    const room = el.clientWidth;
+    if (el.scrollLeft < room / 2 || el.scrollWidth - el.clientWidth - el.scrollLeft < room / 2) {
+      // Keeping the same spot in view is the layout effect's job (the pages move right).
+      growing.current = true;
+      setSide((s) => s + room);
+    }
+  };
+
+  // Open with the pages in the middle.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
   }, []);
 
   useLayoutEffect(() => {
@@ -110,6 +132,7 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
     const { left, top } = scrollFor(layout, a);
     el.scrollLeft = left;
     el.scrollTop = top;
+    growing.current = false;
     measure();
   }, [layout, measure]);
 
@@ -127,8 +150,8 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
   }
 
   return (
-    <div ref={scrollRef} onScroll={measure} className="min-h-0 flex-1 overflow-auto overscroll-contain" style={{ touchAction: 'pan-x pan-y' }}>
-      <div ref={contentRef} className="mx-auto origin-top-left" style={{ width: layout.maxWidth * scale + 2 * PADDING, padding: PADDING }}>
+    <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto overscroll-contain" style={{ touchAction: 'pan-x pan-y' }}>
+      <div ref={contentRef} className="origin-top-left" style={{ width: layout.maxWidth * scale + 2 * (PADDING + side), padding: PADDING, paddingInline: PADDING + side }}>
         {pages.map((page, i) => {
           const w = page.width * scale;
           const h = page.height * scale;

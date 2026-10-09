@@ -38,3 +38,13 @@ describe('turnedSize', () => {
     expect(slant.width).toBeCloseTo(141.421, 2);
   });
 });
+
+describe('room beside the pages', () => {
+  it('keeps a spot out in the empty side room in place when the room grows', () => {
+    const before = buildLayout(pages, 1, 800);
+    const a = anchorAt(before, 100, 50, 400, 300); // far left of the pages, in the empty room
+    expect(a.fx).toBeLessThan(0);
+    const after = buildLayout(pages, 1, 1600);
+    expect(scrollFor(after, a).left).toBeCloseTo(100 + 800, 6); // the pages moved right by the new room
+  });
+});
