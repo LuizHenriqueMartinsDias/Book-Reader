@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { NoteItem, ShapeKind } from '../../../db/schema';
+import type { Ruler } from '../../../lib/notes/ruler';
 
 export type NoteTool = 'pen' | 'marker' | 'eraser' | 'lasso' | 'text' | 'shape';
 
@@ -25,6 +26,16 @@ interface NoteEditorState {
   insertTarget: (() => { pageId: string; x: number; y: number; viewWidth: number }) | null;
   /** Without a stylus, fingers draw instead of scrolling. */
   fingerDraws: boolean;
+  /** On-screen ruler (in px of `rulerHost`), or null when hidden. */
+  ruler: Ruler | null;
+  rulerHost: HTMLElement | null;
+  /** Pages turned with two fingers (degrees, by page id); for this session only. */
+  pageRotation: Record<string, number>;
+  /** Angle shown while a page or the canvas is being turned. */
+  rotationHint: number | null;
+  /** Infinite canvas turn (mirrored here for the toolbar) and how to undo it. */
+  canvasRotation: number;
+  straightenCanvas: (() => void) | null;
   set: (patch: Partial<Omit<NoteEditorState, 'set'>>) => void;
 }
 
@@ -40,6 +51,12 @@ export const useNoteEditor = create<NoteEditorState>()(
       currentPageId: null,
       insertTarget: null,
       fingerDraws: false,
+      ruler: null,
+      rulerHost: null,
+      pageRotation: {},
+      rotationHint: null,
+      canvasRotation: 0,
+      straightenCanvas: null,
       set: (patch) => set(patch.tool ? { selection: null, editingTextId: null, ...patch } : patch),
     }),
     { name: 'book-reader-notes', partialize: ({ tool, shape, textSize, fingerDraws }) => ({ tool, shape, textSize, fingerDraws }) },

@@ -42,3 +42,23 @@ describe('bbox and eraser', () => {
     expect(eraserHits(items, 250, 220, 5)).toEqual([]);
   });
 });
+
+describe('rotated views', () => {
+  it('maps screen points into a rotated element', async () => {
+    const { screenToLocal, rotateVec, snapQuarter } = await import('./geometry');
+    // 200×100 box rotated 90° clockwise around its center at (500, 500): its top-left corner
+    // is now at the top-right of the rotated box on screen.
+    const local = screenToLocal([550, 400], [500, 500], 90, 200, 100);
+    expect(local[0]).toBeCloseTo(0, 9);
+    expect(local[1]).toBeCloseTo(0, 9);
+    const center = screenToLocal([500, 500], [500, 500], 33, 200, 100);
+    expect(center).toEqual([100, 50]);
+    const v = rotateVec([1, 0], 90);
+    expect(v[0]).toBeCloseTo(0, 9);
+    expect(v[1]).toBeCloseTo(1, 9);
+    expect(snapQuarter(87)).toBe(90);
+    expect(snapQuarter(-3)).toBe(0);
+    expect(snapQuarter(30)).toBe(30);
+    expect(snapQuarter(270)).toBe(-90);
+  });
+});

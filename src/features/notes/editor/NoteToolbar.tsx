@@ -13,8 +13,10 @@ import {
   Loader2,
   Minus,
   PenLine,
+  Ruler,
   Plus,
   Redo2,
+  RotateCcw,
   Shapes,
   Square,
   StickyNote,
@@ -66,12 +68,14 @@ interface Props {
   onPaste: () => void;
   onExport: () => Promise<void>;
   onOpenBook: () => void;
+  rulerOn: boolean;
+  onToggleRuler: () => void;
   fullscreen: { supported: boolean; toggle: () => void };
   /** Side by side with a book: close the notebook pane instead of going back. */
   onClose?: () => void;
 }
 
-export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertImage, onPaste, onExport, onOpenBook, fullscreen, onClose }: Props) {
+export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertImage, onPaste, onExport, onOpenBook, rulerOn, onToggleRuler, fullscreen, onClose }: Props) {
   const ui = useUi();
   const editor = useNoteEditor();
   const { undoStack, redoStack, undo, redo } = useNoteHistory();
@@ -79,6 +83,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
   const [exporting, setExporting] = useState(false);
   const imageInput = useRef<HTMLInputElement>(null);
 
+  const rotated = Object.values(editor.pageRotation).some((r) => r !== 0) || editor.canvasRotation !== 0;
   const usesMarker = editor.tool === 'marker';
   const showsInk = ['pen', 'marker', 'shape', 'text'].includes(editor.tool);
   const colors = usesMarker ? MARKER_COLORS : PEN_COLORS;
@@ -169,6 +174,9 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
       )}
 
       {divider}
+      <button className={`${btn} ${rulerOn ? 'bg-amber-500/15 text-amber-600' : ''}`} title={rulerOn ? 'Guardar régua (R)' : 'Régua (R)'} onClick={onToggleRuler}>
+        <Ruler className="size-5" />
+      </button>
       <button className={btn} title="Inserir imagem" onClick={() => imageInput.current?.click()}>
         <ImagePlus className="size-5" />
       </button>
@@ -196,6 +204,18 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
       </button>
 
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        {rotated && (
+          <button
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-500 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400"
+            title="Desfazer o giro da folha"
+            onClick={() => {
+              editor.set({ pageRotation: {} });
+              editor.straightenCanvas?.();
+            }}
+          >
+            <RotateCcw className="size-4" /> Endireitar
+          </button>
+        )}
         <button
           className={`${btn} ${editor.fingerDraws ? 'text-amber-600' : ''}`}
           title={editor.fingerDraws ? 'O dedo desenha (toque para o dedo navegar)' : 'O dedo navega (toque para desenhar com o dedo)'}

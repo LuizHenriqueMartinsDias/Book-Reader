@@ -1,13 +1,15 @@
 import { ClipboardCopy, CopyPlus, Trash2 } from 'lucide-react';
 import { useRef } from 'react';
 import type { NoteItem } from '../../../db/schema';
-import { bboxOf, unionBox, type Transform } from '../../../lib/notes/geometry';
+import { bboxOf, rotateVec, unionBox, type Transform } from '../../../lib/notes/geometry';
 import { PEN_COLORS } from '../../../store/ui';
 
 interface Props {
   items: NoteItem[];
   /** World point at the surface's top-left and px per point. */
   view: { x: number; y: number; zoom: number };
+  /** The surface's on-screen rotation: pointer movement is turned back into page directions. */
+  rotation: number;
   preview: Transform | null;
   onPreview: (t: Transform | null) => void;
   onCommit: (t: Transform) => void;
@@ -20,7 +22,7 @@ interface Props {
 const HANDLE = 22;
 
 /** Dashed box around the lasso selection: drag to move, corner to resize, plus quick actions. */
-export default function SelectionOverlay({ items, view, preview, onPreview, onCommit, onRecolor, onDuplicate, onCopy, onDelete }: Props) {
+export default function SelectionOverlay({ items, view, rotation, preview, onPreview, onCommit, onRecolor, onDuplicate, onCopy, onDelete }: Props) {
   const drag = useRef<{ mode: 'move' | 'resize'; start: [number, number]; id: number } | null>(null);
   const box = unionBox(items.map(bboxOf));
   if (!box) return null;
@@ -39,8 +41,9 @@ export default function SelectionOverlay({ items, view, preview, onPreview, onCo
 
   const transformFor = (e: React.PointerEvent): Transform => {
     const d = drag.current!;
-    const dx = (e.clientX - d.start[0]) / view.zoom;
-    const dy = (e.clientY - d.start[1]) / view.zoom;
+    const [sx, sy] = rotateVec([e.clientX - d.start[0], e.clientY - d.start[1]], -rotation);
+    const dx = sx / view.zoom;
+    const dy = sy / view.zoom;
     if (d.mode === 'move') return { dx, dy, scale: 1, origin: [box.x, box.y] };
     const scale = Math.max(0.1, Math.max((box.w + dx) / box.w, (box.h + dy) / box.h));
     return { dx: 0, dy: 0, scale, origin: [box.x, box.y] };

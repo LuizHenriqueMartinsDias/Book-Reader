@@ -104,8 +104,11 @@ export interface Notebook {
   coverColor: string;
   /** Small image of the first page, refreshed when leaving the editor. */
   thumb?: string;
-  /** Infinite canvas: where the view was left (world point at the top-left, and zoom). */
-  camera?: { x: number; y: number; zoom: number };
+  /**
+   * Infinite canvas: where the view was left. With `centered`, (x, y) is the world point at the
+   * center of the screen; older saves have the top-left point and no rotation.
+   */
+  camera?: { x: number; y: number; zoom: number; rotation?: number; centered?: boolean };
   /** Imported from a PDF: the file lives in `files` under the notebook id. */
   hasPdf?: boolean;
   sourceBookId?: string;

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { addPage, deletePage, movePage } from '../../../db/notes';
 import { db, type Notebook, type NotePage } from '../../../db/schema';
 import { CSS_UNITS, type PDFDocumentProxy } from '../../../lib/pdf';
+import { snapQuarter } from '../../../lib/notes/geometry';
 import { paperCss } from '../../../lib/notes/render';
 import PdfPageCanvas from '../../reader/PdfPageCanvas';
 import { useZoomGestures } from '../../reader/views/useZoomGestures';
@@ -98,6 +99,8 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
   };
 
   useZoomGestures(scrollRef, onZoom, () => scale / CSS_UNITS);
+  usePageTwist(scrollRef);
+  const pageRotation = useNoteEditor((s) => s.pageRotation);
 
   const first = pageAt(viewport.top - viewport.height);
   const last = pageAt(viewport.top + viewport.height * 2);
@@ -116,9 +119,14 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
           const w = page.width * scale;
           const h = page.height * scale;
           const active = i >= first && i <= last;
+          const rotation = pageRotation[page.id] ?? 0;
           return (
             <div key={page.id} style={{ marginBottom: GAP }}>
-              <div className="relative mx-auto shadow-md" style={{ width: w, height: h, ...paperCss(notebook.paper, scale) }}>
+              <div
+                data-page-box={page.id}
+                className="relative mx-auto shadow-md"
+                style={{ width: w, height: h, ...paperCss(notebook.paper, scale), transform: rotation ? `rotate(${rotation}deg)` : undefined }}
+              >
                 {active && (
                   <NoteSurface
                     notebook={notebook}
@@ -126,6 +134,7 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
                     width={w}
                     height={h}
                     view={{ x: 0, y: 0, zoom: scale }}
+                    rotation={rotation}
                     background={page.background && pdf ? <PdfPageCanvas doc={pdf} pageNumber={page.background.pdfPage} scale={scale} /> : undefined}
                   />
                 )}
@@ -166,4 +175,52 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
       </div>
     </div>
   );
+}
+
+/** Degrees past which a two-finger gesture turns the page (below, it's just a pinch or a scroll). */
+const TWIST_START = 6;
+
+/** Two fingers turning on a page rotate that page, like turning paper on a desk. */
+function usePageTwist(ref: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let twist: { pageId: string; start: number; base: number; turning: boolean } | null = null;
+    const angle = (t: TouchList) => (Math.atan2(t[1].clientY - t[0].clientY, t[1].clientX - t[0].clientX) * 180) / Math.PI;
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const box = document.elementFromPoint(mx, my)?.closest<HTMLElement>('[data-page-box]');
+      if (!box) return;
+      const pageId = box.dataset.pageBox!;
+      twist = { pageId, start: angle(e.touches), base: useNoteEditor.getState().pageRotation[pageId] ?? 0, turning: false };
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!twist || e.touches.length !== 2) return;
+      let delta = angle(e.touches) - twist.start;
+      delta = ((delta + 540) % 360) - 180;
+      if (!twist.turning && Math.abs(delta) < TWIST_START) return;
+      twist.turning = true;
+      const rotation = snapQuarter(twist.base + delta);
+      const editor = useNoteEditor.getState();
+      editor.set({ pageRotation: { ...editor.pageRotation, [twist.pageId]: rotation }, rotationHint: rotation });
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length >= 2 || !twist) return;
+      twist = null;
+      useNoteEditor.getState().set({ rotationHint: null });
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: true });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+    };
+  }, [ref]);
 }

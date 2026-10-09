@@ -3,8 +3,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { db, type ImageItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { drawStroke } from '../../../lib/ink';
-import { bboxOf, eraserHits, itemsInLasso, transformItems, type Transform, type Vec } from '../../../lib/notes/geometry';
+import { bboxOf, eraserHits, itemsInLasso, screenToLocal, transformItems, type Transform, type Vec } from '../../../lib/notes/geometry';
 import { defaultInk, drawItems, drawShape } from '../../../lib/notes/render';
+import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
 import { useUi } from '../../../store/ui';
 import { sizeCanvas } from '../../reader/canvasSize';
@@ -33,13 +34,17 @@ interface Props {
   background?: ReactNode;
   /** Infinite canvas: the parent pans with fingers, so never let the browser scroll. */
   infinite?: boolean;
+  /** Degrees the parent has CSS-rotated this surface by (around its center), to map input back. */
+  rotation?: number;
 }
 
 const ERASER_RADIUS_PX = 10;
+/** How close to a ruler edge (screen px) a stroke must start to follow it. */
+const RULER_REACH = 28;
 const HOLD_MS = 550;
 
 type Gesture =
-  | { kind: 'ink'; id: number; tool: 'pen' | 'marker'; points: Point[]; shape: RecognizedShape | null }
+  | { kind: 'ink'; id: number; tool: 'pen' | 'marker'; points: Point[]; shape: RecognizedShape | null; edge: Edge | null }
   | { kind: 'erase'; id: number }
   | { kind: 'lasso'; id: number; points: Vec[] }
   | { kind: 'shape'; id: number; from: Vec; to: Vec }
@@ -54,7 +59,7 @@ function inkStyle(tool: 'pen' | 'marker') {
  * One drawable page (or the whole infinite canvas): paper → images → text → ink → live input
  * → lasso selection. Coordinates are page points; `view` maps them to the screen.
  */
-export default function NoteSurface({ notebook, page, width, height, view, background, infinite }: Props) {
+export default function NoteSurface({ notebook, page, width, height, view, background, infinite, rotation = 0 }: Props) {
   const items = useLiveQuery(() => db.noteItems.where('pageId').equals(page.id).toArray(), [page.id]) ?? [];
   const tool = useNoteEditor((s) => s.tool);
   const selection = useNoteEditor((s) => (s.selection?.pageId === page.id ? s.selection : null));
@@ -100,8 +105,27 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   }, [items, selection]);
 
   const toWorld = (e: { clientX: number; clientY: number }): Vec => {
+    // The bounding box of a rotated element still has the element's center at its center.
     const rect = liveRef.current!.getBoundingClientRect();
-    return [(e.clientX - rect.left) / view.zoom + view.x, (e.clientY - rect.top) / view.zoom + view.y];
+    const [lx, ly] = screenToLocal([e.clientX, e.clientY], [rect.left + rect.width / 2, rect.top + rect.height / 2], rotation, width, height);
+    return [lx / view.zoom + view.x, ly / view.zoom + view.y];
+  };
+
+  /** The ruler edge a stroke starting here follows, if the ruler is out and the point is next to it. */
+  const rulerEdgeAt = (e: { clientX: number; clientY: number }): Edge | null => {
+    const { ruler, rulerHost } = useNoteEditor.getState();
+    if (!ruler || !rulerHost) return null;
+    const h = rulerHost.getBoundingClientRect();
+    return edgeNear(ruler, [e.clientX - h.left, e.clientY - h.top], RULER_REACH);
+  };
+
+  /** Where a stroke point lands: on the ruler edge when following one. */
+  const strokePoint = (e: { clientX: number; clientY: number }, edge: Edge | null): Vec => {
+    const { ruler, rulerHost } = useNoteEditor.getState();
+    if (edge === null || !ruler || !rulerHost) return toWorld(e);
+    const h = rulerHost.getBoundingClientRect();
+    const [x, y] = projectOnEdge(ruler, [e.clientX - h.left, e.clientY - h.top], edge);
+    return toWorld({ clientX: x + h.left, clientY: y + h.top });
   };
 
   const renderLive = () => {
@@ -175,8 +199,11 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       gesture.current = { kind: 'erase', id };
       eraseAt(p);
     } else if (tool === 'pen' || tool === 'marker') {
-      gesture.current = { kind: 'ink', id, tool, points: [[p[0], p[1], e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5]], shape: null };
-      armHold();
+      const edge = rulerEdgeAt(e);
+      const start = strokePoint(e, edge);
+      gesture.current = { kind: 'ink', id, tool, points: [[start[0], start[1], e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5]], shape: null, edge };
+      // Along the ruler the line is already straight; no need for "draw and hold".
+      if (edge === null) armHold();
     } else if (tool === 'lasso') {
       gesture.current = { kind: 'lasso', id, points: [p] };
     } else if (tool === 'shape') {
@@ -208,7 +235,10 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     for (const ev of events.length ? events : [e.nativeEvent]) {
       const p = toWorld(ev);
       if (g.kind === 'erase') eraseAt(p);
-      else if (g.kind === 'ink') {
+      else if (g.kind === 'ink' && g.edge !== null) {
+        const q = strokePoint(ev, g.edge);
+        g.points.push([q[0], q[1], ev.pointerType === 'pen' ? ev.pressure || 0.5 : 0.5]);
+      } else if (g.kind === 'ink') {
         const last = g.points[g.points.length - 1];
         if (g.shape?.shape === 'line') {
           // After snapping to a line, the end keeps following the pen.
@@ -353,7 +383,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         ))}
       </div>
       {selected.length > 0 && (
-        <SelectionOverlay items={selected} view={view} preview={preview} onPreview={setPreview} {...actions} />
+        <SelectionOverlay items={selected} view={view} rotation={rotation} preview={preview} onPreview={setPreview} {...actions} />
       )}
     </div>
   );

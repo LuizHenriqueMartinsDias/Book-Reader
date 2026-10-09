@@ -8,7 +8,7 @@ Leitor pessoal de livros em PDF e EPUB com anotações — roda no navegador, in
 - **Escrita à mão**: caneta e marca-texto com pressão de stylus, borracha (inclusive a ponta-borracha da caneta), desfazer/refazer. Com stylus detectado, o dedo rola a página (rejeição de palma).
 - **Destaques e notas**: selecione texto → escolha a cor ou crie uma nota; notas por página no painel lateral.
 - **Buscar livros grátis**: pesquisa no Internet Archive (PDF/EPUB, domínio público ou licença aberta) e no Project Gutenberg (EPUB) e baixa direto para a estante.
-- **Cadernos** (aba "Cadernos"): pastas por matéria; cadernos com páginas A4 (liso, pautado, quadriculado, pontilhado) ou tela infinita; caneta, marca-texto, borracha, laço (mover, redimensionar, mudar cor, duplicar, copiar/colar), texto, imagens (arquivo, colar, arrastar), formas (linha, seta, retângulo, elipse) e "desenhar e segurar" para endireitar; S Pen escreve e o dedo navega; importar PDF como caderno para escrever por cima; exportar caderno em PDF.
+- **Cadernos** (aba "Cadernos"): pastas por matéria; cadernos com páginas A4 (liso, pautado, quadriculado, pontilhado) ou tela infinita; caneta, marca-texto, borracha, laço (mover, redimensionar, mudar cor, duplicar, copiar/colar), texto, imagens (arquivo, colar, arrastar), formas (linha, seta, retângulo, elipse) e "desenhar e segurar" para endireitar; régua (arrastar, girar com dois dedos, traços retos ao longo da borda, marcações em cm); girar a folha com dois dedos (a página sob os dedos, ou a tela infinita inteira), com "Endireitar"; S Pen escreve e o dedo navega; importar PDF como caderno para escrever por cima; exportar caderno em PDF.
 - **Estudo com livros**: envie um trecho destacado para um caderno (com link de volta à página) e abra livro e caderno lado a lado, com divisória ajustável.
 - **Exportar**: gera um PDF com destaques e traços gravados e as notas como comentários; backup/restauração das anotações em JSON.
 
@@ -41,4 +41,4 @@ Atalhos no leitor: `V` selecionar, `P` caneta, `H` marca-texto, `E` borracha, `C
 
 > Para instalar como PWA no tablet a página precisa ser servida via HTTPS (ou `localhost`).
 
-Atalhos no caderno: `P` caneta, `H` marca-texto, `E` borracha, `L` laço, `T` texto, `S` formas, `Ctrl+C/V/D` copiar/colar/duplicar, `Delete` apagar seleção, espaço + arrastar (ou roda) para mover a tela infinita, `Ctrl` + roda para zoom.
+Atalhos no caderno: `P` caneta, `H` marca-texto, `E` borracha, `L` laço, `T` texto, `S` formas, `R` régua, `Ctrl+C/V/D` copiar/colar/duplicar, `Delete` apagar seleção, espaço + arrastar (ou roda) para mover a tela infinita, `Ctrl` + roda para zoom.

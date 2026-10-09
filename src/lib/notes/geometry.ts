@@ -120,3 +120,26 @@ export function eraserHits(items: NoteItem[], x: number, y: number, radius: numb
     return false;
   });
 }
+
+/** Rotates a vector by `deg` degrees (clockwise on screen, where y points down). */
+export function rotateVec([x, y]: Vec, deg: number): Vec {
+  const a = (deg * Math.PI) / 180;
+  return [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
+}
+
+/**
+ * A point on screen to px within an element of size w×h that is CSS-rotated by `deg` around its
+ * center (`center` is where that center is on screen; rotation keeps it in place).
+ */
+export function screenToLocal(client: Vec, center: Vec, deg: number, w: number, h: number): Vec {
+  const [dx, dy] = rotateVec([client[0] - center[0], client[1] - center[1]], -deg);
+  return [dx + w / 2, dy + h / 2];
+}
+
+/** Snaps an angle (degrees) to the nearest quarter turn when within `tolerance`, normalized to (-180, 180]. */
+export function snapQuarter(deg: number, tolerance = 4) {
+  const quarter = Math.round(deg / 90) * 90;
+  const snapped = Math.abs(deg - quarter) <= tolerance ? quarter : deg;
+  const n = ((snapped % 360) + 360) % 360;
+  return n > 180 ? n - 360 : n;
+}

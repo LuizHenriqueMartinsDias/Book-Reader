@@ -19,6 +19,7 @@ import InfiniteCanvas from './InfiniteCanvas';
 import { cloneItems, commitItems } from './items';
 import NoteToolbar from './NoteToolbar';
 import PagedNotebook from './PagedNotebook';
+import RulerOverlay from './RulerOverlay';
 
 const TOOL_KEYS: Record<string, NoteTool> = { p: 'pen', h: 'marker', e: 'eraser', l: 'lasso', t: 'text', s: 'shape' };
 
@@ -71,6 +72,24 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
   const fullscreen = useFullscreen();
   const notebookRef = useRef(notebook);
   notebookRef.current = notebook;
+  const hostRef = useRef<HTMLDivElement>(null);
+  const ruler = useNoteEditor((s) => s.ruler);
+  const rotationHint = useNoteEditor((s) => s.rotationHint);
+
+  // The ruler lives in the view area's coordinates.
+  useEffect(() => {
+    useNoteEditor.getState().set({ rulerHost: hostRef.current });
+    return () => useNoteEditor.getState().set({ ruler: null, rulerHost: null, pageRotation: {}, rotationHint: null });
+  }, []);
+
+  const toggleRuler = useCallback(() => {
+    const editor = useNoteEditor.getState();
+    const host = hostRef.current;
+    if (editor.ruler || !host) return editor.set({ ruler: null });
+    editor.set({
+      ruler: { x: host.clientWidth / 2, y: host.clientHeight * 0.45, angle: 0, length: Math.min(1000, host.clientWidth * 0.85), width: 76 },
+    });
+  }, []);
 
   useState(() => {
     useNoteHistory.getState().reset();
@@ -186,6 +205,8 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
       } else if (mod && key === '0') {
         e.preventDefault();
         changeZoom(null);
+      } else if (!mod && !e.altKey && key === 'r') {
+        toggleRuler();
       } else if (!mod && !e.altKey && TOOL_KEYS[key]) {
         editor.set({ tool: TOOL_KEYS[key] });
       }
@@ -205,7 +226,7 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('paste', onPaste);
     };
-  }, [changeZoom, insertImage, paste]);
+  }, [changeZoom, insertImage, paste, toggleRuler]);
 
   const registerZoom = useCallback((fn: (z: ZoomChange) => void) => {
     canvasZoom.current = fn;
@@ -234,16 +255,26 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
             onPaste={paste}
             onExport={exportPdf}
             onOpenBook={() => setPickingBook(true)}
+            rulerOn={!!ruler}
+            onToggleRuler={toggleRuler}
             fullscreen={fullscreen}
             onClose={onClose}
           />
         }
       />
-      {notebook.kind === 'canvas' ? (
-        <InfiniteCanvas notebook={notebook} page={pages[0]} registerZoom={registerZoom} onScale={setScale} />
-      ) : (
-        <PagedNotebook notebook={notebook} pages={pages} pdf={pdf} zoom={zoom} onZoom={changeZoom} onScale={setScale} />
-      )}
+      <div ref={hostRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        {notebook.kind === 'canvas' ? (
+          <InfiniteCanvas notebook={notebook} page={pages[0]} registerZoom={registerZoom} onScale={setScale} />
+        ) : (
+          <PagedNotebook notebook={notebook} pages={pages} pdf={pdf} zoom={zoom} onZoom={changeZoom} onScale={setScale} />
+        )}
+        {ruler && <RulerOverlay ruler={ruler} scale={scale} />}
+        {rotationHint !== null && (
+          <div className="pointer-events-none absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-stone-900/80 px-3 py-1 text-sm font-semibold text-white tabular-nums">
+            {Math.round(rotationHint)}°
+          </div>
+        )}
+      </div>
       {pickingBook && (
         <BookPicker
           onClose={() => setPickingBook(false)}
