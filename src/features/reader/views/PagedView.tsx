@@ -5,6 +5,7 @@ import CurlBook, { type BookHandle } from '../paged/CurlBook';
 import SlideStrip from '../paged/SlideStrip';
 import { buildSpreads, firstPageOf, resolveDouble, spreadIndexOf } from '../paged/spreads';
 import type { TurnDir } from '../paged/useTurnGesture';
+import { zoomedTurn } from '../paged/zoomedTurns';
 import { useReader } from '../readerStore';
 import { MAX_ZOOM, type ViewProps } from './types';
 import { useZoomGestures } from './useZoomGestures';
@@ -50,7 +51,8 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
   const zoomed = scale > fitScale * 1.01;
   const geo = useMemo(() => ({ double, slotW: ref.width * scale, slotH: ref.height * scale, scale }), [double, ref, scale]);
 
-  const animate = viewMode !== 'instant' && !prefersReducedMotion();
+  // Zoomed in, only part of a huge page shows: curling it is slow and hard to follow, so turn instantly.
+  const animate = viewMode !== 'instant' && !prefersReducedMotion() && !zoomed;
   // Dragging pages around would fight with panning a zoomed-in page.
   const dragEnabled = !zoomed && (tool === 'select' || penDetected);
 
@@ -79,10 +81,86 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
 
   useZoomGestures(stageRef, onZoom);
 
-  // A wheel or two-finger trackpad swipe turns the page when nothing needs scrolling.
+  // Zoomed in, fingers pan the page; reaching an edge and swiping on, or tapping the screen's
+  // edges, turns it. The new page opens at its top.
+  /** Where the page that's coming should open, once the turn (maybe animated) lands. */
+  const openAt = useRef<'top' | 'bottom' | null>(null);
   useEffect(() => {
     const el = stageRef.current;
-    if (!el || zoomed) return;
+    if (!el || !zoomed) return;
+    let start: { x: number; y: number; t: number; atLeft: boolean; atRight: boolean } | null = null;
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) {
+        start = null; // pinching
+        return;
+      }
+      const max = el.scrollWidth - el.clientWidth;
+      start = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp, atLeft: el.scrollLeft <= 2, atRight: el.scrollLeft >= max - 2 };
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!start || e.touches.length) return;
+      const t = e.changedTouches[0];
+      const r = el.getBoundingClientRect();
+      const dir = zoomedTurn({
+        dx: t.clientX - start.x,
+        dy: t.clientY - start.y,
+        ms: e.timeStamp - start.t,
+        startFraction: (start.x - r.left) / r.width,
+        atLeft: start.atLeft,
+        atRight: start.atRight,
+      });
+      start = null;
+      const { tool, penDetected } = useUi.getState();
+      // Fingers navigate under the select tool, or whenever a stylus does the writing.
+      if (!dir || (tool !== 'select' && !penDetected) || !getSelection()?.isCollapsed) return;
+      openAt.current = 'top';
+      bookRef.current?.turn(dir);
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [zoomed]);
+
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!openAt.current || !el) return;
+    el.scrollTo({ left: 0, top: openAt.current === 'top' ? 0 : el.scrollHeight });
+    openAt.current = null;
+  }, [index]);
+
+  // A wheel or two-finger trackpad swipe turns the page when nothing needs scrolling; zoomed in,
+  // it scrolls, and keeps going onto the next/previous page past the bottom/top.
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    if (zoomed) {
+      let acc = 0;
+      let lockedUntil = 0;
+      const onWheel = (e: WheelEvent) => {
+        if (e.ctrlKey || e.metaKey) return;
+        // Right after a turn, the rest of the wheel flick mustn't scroll the new page away from its top.
+        if (e.timeStamp < lockedUntil) {
+          e.preventDefault();
+          return;
+        }
+        const atBottom = el.scrollTop >= el.scrollHeight - el.clientHeight - 1;
+        const atTop = el.scrollTop <= 0;
+        if ((e.deltaY > 0 && atBottom) || (e.deltaY < 0 && atTop)) acc += e.deltaY;
+        else acc = 0;
+        if (Math.abs(acc) < WHEEL_THRESHOLD * 3) return;
+        const dir = acc > 0 ? 'next' : 'prev';
+        acc = 0;
+        lockedUntil = e.timeStamp + WHEEL_LOCK_MS;
+        // Continue where reading continues: the top of the next page, the bottom of the previous.
+        openAt.current = dir === 'next' ? 'top' : 'bottom';
+        bookRef.current?.turn(dir);
+      };
+      el.addEventListener('wheel', onWheel, { passive: false });
+      return () => el.removeEventListener('wheel', onWheel);
+    }
     let acc = 0;
     let lockedUntil = 0;
     const onWheel = (e: WheelEvent) => {
