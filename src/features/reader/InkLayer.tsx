@@ -11,6 +11,9 @@ import { useReader } from './readerStore';
 
 const ERASER_RADIUS_PX = 10;
 
+/** The stylus' eraser end (32) or side button (2) is down: it erases while held. */
+const penErases = (e: { pointerType: string; buttons: number }) => e.pointerType === 'pen' && (e.buttons & 34) !== 0;
+
 /** Current color and width settings of an ink tool. */
 function inkStyle(tool: InkTool) {
   const ui = useUi.getState();
@@ -39,8 +42,9 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
   /**
    * `erase` also covers the stylus' eraser end and side button, whatever tool is selected.
    * `captured`: a stylus stroke started under the select tool (see the page listener below).
+   * `stylus`: erasing because the pen's button is held, so letting go of it draws again.
    */
-  const current = useRef<{ pointerId: number; points: Point[]; mode: 'draw' | 'erase'; ink: InkTool; captured: boolean } | null>(null);
+  const current = useRef<{ pointerId: number; points: Point[]; mode: 'draw' | 'erase'; ink: InkTool; captured: boolean; stylus: boolean } | null>(null);
   const penActive = useRef(false);
   const [penHover, setPenHover] = useState(false);
   const frame = useRef(0);
@@ -116,11 +120,10 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
   const begin = (e: PointerEvent, canvas: HTMLCanvasElement, captured: boolean) => {
     canvas.setPointerCapture(e.pointerId);
     const p = toPoint(e, canvas.getBoundingClientRect());
-    // Eraser end (32) or side button (2) of the stylus erases.
-    const stylusErase = e.pointerType === 'pen' && (e.buttons & 32 || e.buttons & 2);
+    const stylusErase = penErases(e);
     const mode = tool === 'eraser' || stylusErase ? 'erase' : 'draw';
     const ink: InkTool = drawing ? (tool as InkTool) : useUi.getState().lastInkTool;
-    current.current = { pointerId: e.pointerId, points: [p], mode, ink, captured };
+    current.current = { pointerId: e.pointerId, points: [p], mode, ink, captured, stylus: stylusErase && tool !== 'eraser' };
     if (mode === 'erase') eraseAt(p[0], p[1]);
     renderLive();
   };
@@ -173,10 +176,40 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
     };
   });
 
+  const saveErase = () => {
+    const removed = (strokes ?? []).filter((s) => erasingRef.current.has(s.id));
+    const clear = () => {
+      erasingRef.current = new Set();
+      setErasing(erasingRef.current);
+    };
+    if (removed.length) useHistory.getState().commit({ added: {}, removed: { strokes: removed } }).then(clear);
+    else clear();
+  };
+
+  const saveStroke = (ink: InkTool, points: Point[]) => {
+    const s: Stroke = { id: newId(), bookId, page: pageNumber, ...inkStyle(ink), points, createdAt: Date.now() };
+    // Paint it onto the committed canvas right away to avoid a flicker before the DB query updates.
+    const committed = committedRef.current?.getContext('2d');
+    if (committed) drawStroke(committed, s);
+    useHistory.getState().commit({ added: { strokes: [s] }, removed: {} });
+  };
+
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const stroke = current.current;
     if (!stroke || stroke.pointerId !== e.pointerId) return;
     const rect = e.currentTarget.getBoundingClientRect();
+    // The pen's button works while held: pressing it mid-stroke keeps what was drawn and
+    // erases; letting go draws again, without lifting the pen.
+    if (e.pointerType === 'pen') {
+      const erases = penErases(e);
+      if (stroke.mode === 'draw' && erases) {
+        if (stroke.points.length > 1) saveStroke(stroke.ink, stroke.points);
+        Object.assign(stroke, { mode: 'erase', stylus: true, points: [] });
+      } else if (stroke.mode === 'erase' && stroke.stylus && !erases) {
+        saveErase();
+        Object.assign(stroke, { mode: 'draw', points: [] });
+      }
+    }
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent];
     for (const ev of events.length ? events : [e.nativeEvent]) {
       const p = toPoint(ev, rect);
@@ -193,24 +226,11 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
     current.current = null;
     if (stroke.captured) e.currentTarget.style.pointerEvents = interactive ? 'auto' : 'none';
 
-    if (stroke.mode === 'erase') {
-      const removed = (strokes ?? []).filter((s) => erasingRef.current.has(s.id));
-      const clear = () => {
-        erasingRef.current = new Set();
-        setErasing(erasingRef.current);
-      };
-      if (removed.length) useHistory.getState().commit({ added: {}, removed: { strokes: removed } }).then(clear);
-      else clear();
-      return;
-    }
-    if (cancelled) return renderLive();
+    if (stroke.mode === 'erase') return saveErase();
+    if (cancelled || !stroke.points.length) return renderLive();
 
-    const s: Stroke = { id: newId(), bookId, page: pageNumber, ...inkStyle(stroke.ink), points: stroke.points, createdAt: Date.now() };
-    // Paint it onto the committed canvas right away to avoid a flicker before the DB query updates.
-    const committed = committedRef.current?.getContext('2d');
-    if (committed) drawStroke(committed, s);
+    saveStroke(stroke.ink, stroke.points);
     renderLive();
-    useHistory.getState().commit({ added: { strokes: [s] }, removed: {} });
   };
 
   return (
@@ -233,6 +253,8 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
         onPointerMove={onPointerMove}
         onPointerUp={(e) => finish(e, false)}
         onPointerCancel={(e) => finish(e, true)}
+        // The pen's side button can open the browser's menu; here it's the eraser.
+        onContextMenu={(e) => e.preventDefault()}
       />
     </>
   );

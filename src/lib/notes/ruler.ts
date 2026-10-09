@@ -37,13 +37,15 @@ export function onRuler(r: Ruler, p: P) {
 export type Edge = -1 | 1;
 
 /**
- * The edge a stroke starting at `p` should follow: when `p` is outside the ruler but within
- * `reach` px of a long edge, along its length. Otherwise null (draw freely).
+ * The edge a stroke starting at `p` should follow: when `p` is on the ruler (the pen tip landing
+ * a bit over it is the usual way to draw along it), the nearest long edge; when it's within
+ * `reach` px outside one, along its length, that edge. Otherwise null (draw freely).
  */
 export function edgeNear(r: Ruler, p: P, reach: number): Edge | null {
   const [u, v] = toRulerSpace(r, p);
   if (Math.abs(u) > r.length / 2 + reach) return null;
   const half = r.width / 2;
+  if (Math.abs(v) <= half) return v < 0 ? -1 : 1;
   if (v < -half && v > -half - reach) return -1;
   if (v > half && v < half + reach) return 1;
   return null;

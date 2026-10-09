@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { db, type ImageItem, type NoteItem, type NotePage, type Notebook, type Point, type ShapeItem, type StrokeItem, type TextItem } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { drawStroke } from '../../../lib/ink';
+import { eraseItem } from '../../../lib/notes/erase';
 import { bboxOf, eraserHits, itemsInLasso, screenToLocal, transformItems, type Transform, type Vec } from '../../../lib/notes/geometry';
 import { defaultInk, drawItems, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
@@ -38,17 +39,20 @@ interface Props {
   rotation?: number;
 }
 
-const ERASER_RADIUS_PX = 10;
 /** How close to a ruler edge (screen px) a stroke must start to follow it. */
 const RULER_REACH = 28;
 const HOLD_MS = 550;
 
 type Gesture =
   | { kind: 'ink'; id: number; tool: 'pen' | 'marker'; points: Point[]; shape: RecognizedShape | null; edge: Edge | null }
-  | { kind: 'erase'; id: number }
+  /** `stylus`: erasing because the pen's button is held, so letting go of it goes back to the pen. */
+  | { kind: 'erase'; id: number; at: Vec; stylus: boolean }
   | { kind: 'lasso'; id: number; points: Vec[] }
   | { kind: 'shape'; id: number; from: Vec; to: Vec }
   | { kind: 'text'; id: number; at: Vec };
+
+/** The stylus' eraser end (32) or side button (2) is down: it erases while held. */
+const penErases = (e: { pointerType: string; buttons: number }) => e.pointerType === 'pen' && (e.buttons & 34) !== 0;
 
 function inkStyle(tool: 'pen' | 'marker') {
   const ui = useUi.getState();
@@ -71,9 +75,16 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   const gesture = useRef<Gesture | null>(null);
   const penActive = useRef(false);
   const holdTimer = useRef(0);
+  /** Where a hovering pen with its button held is, to show the eraser before it touches. */
+  const hoverEraser = useRef<Vec | null>(null);
   const frame = useRef(0);
   const erasingRef = useRef<Set<string>>(new Set());
   const [erasing, setErasing] = useState<Set<string>>(new Set());
+  // Partial eraser: what's left of the items it cut so far (shown in their place until saved).
+  const piecesRef = useRef<StrokeItem[]>([]);
+  const [pieces, setPieces] = useState<StrokeItem[]>([]);
+  /** An erase was just saved: keep showing its result until the database query catches up. */
+  const settling = useRef(false);
   const [preview, setPreview] = useState<Transform | null>(null);
   const editOriginal = useRef<TextItem | null>(null);
 
@@ -91,8 +102,20 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
-    drawItems(ctx, shown, erasing);
-  }, [shown, erasing, width, height, view.x, view.y, view.zoom]);
+    drawItems(ctx, pieces.length ? [...shown, ...pieces] : shown, erasing);
+  }, [shown, erasing, pieces, width, height, view.x, view.y, view.zoom]);
+
+  const clearErase = () => {
+    erasingRef.current = new Set();
+    piecesRef.current = [];
+    setErasing(erasingRef.current);
+    setPieces([]);
+  };
+  useEffect(() => {
+    if (!settling.current) return;
+    settling.current = false;
+    clearErase();
+  }, [items]);
 
   useEffect(() => {
     if (liveRef.current) sizeCanvas(liveRef.current, width, height);
@@ -136,7 +159,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       const ratio = canvas.width / Math.max(1, width);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const g = gesture.current;
+      const g = gesture.current ?? (hoverEraser.current && { kind: 'erase' as const, id: -1, at: hoverEraser.current, stylus: true });
       if (!g) return;
       ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
       const ink = inkStyle(g.kind === 'ink' ? g.tool : 'pen');
@@ -145,6 +168,14 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         else drawStroke(ctx, { ...ink, points: g.points }, false);
       } else if (g.kind === 'shape') {
         drawShape(ctx, { shape: useNoteEditor.getState().shape, x1: g.from[0], y1: g.from[1], x2: g.to[0], y2: g.to[1], color: ink.color, width: ink.width });
+      } else if (g.kind === 'erase') {
+        ctx.save();
+        ctx.strokeStyle = 'rgb(120 113 108 / 0.9)';
+        ctx.lineWidth = 1.5 / view.zoom;
+        ctx.beginPath();
+        ctx.arc(g.at[0], g.at[1], useNoteEditor.getState().eraserSize / view.zoom, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       } else if (g.kind === 'lasso' && g.points.length > 1) {
         ctx.save();
         ctx.strokeStyle = '#0ea5e9';
@@ -159,10 +190,37 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   };
 
   const eraseAt = ([x, y]: Vec) => {
-    const hits = eraserHits(items.filter((i) => !erasingRef.current.has(i.id)), x, y, ERASER_RADIUS_PX / view.zoom);
-    if (!hits.length) return;
-    erasingRef.current = new Set([...erasingRef.current, ...hits.map((i) => i.id)]);
-    setErasing(erasingRef.current);
+    const { eraserMode, eraserSize } = useNoteEditor.getState();
+    const radius = eraserSize / view.zoom;
+    const live = items.filter((i) => !erasingRef.current.has(i.id));
+    if (eraserMode === 'stroke') {
+      const hits = eraserHits(live, x, y, radius);
+      if (!hits.length) return;
+      erasingRef.current = new Set([...erasingRef.current, ...hits.map((i) => i.id)]);
+      setErasing(erasingRef.current);
+      return;
+    }
+    // Partial: cut the saved items it touches (hiding them) and the pieces already cut.
+    const hidden = new Set(erasingRef.current);
+    const next: StrokeItem[] = [];
+    let changed = false;
+    for (const item of live) {
+      const cut = eraseItem(item, x, y, radius, newId);
+      if (!cut) continue;
+      hidden.add(item.id);
+      next.push(...cut);
+      changed = true;
+    }
+    for (const piece of piecesRef.current) {
+      const cut = eraseItem(piece, x, y, radius, newId);
+      next.push(...(cut ?? [piece]));
+      if (cut) changed = true;
+    }
+    if (!changed) return;
+    erasingRef.current = hidden;
+    piecesRef.current = next;
+    setErasing(hidden);
+    setPieces(next);
   };
 
   const nextZ = () => items.reduce((m, i) => Math.max(m, i.z), 0) + 1;
@@ -188,11 +246,12 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     const p = toWorld(e);
     const editor = useNoteEditor.getState();
     if (editor.selection) editor.set({ selection: null });
-    const stylusErase = e.pointerType === 'pen' && (e.buttons & 32 || e.buttons & 2);
+    const stylusErase = penErases(e);
     const id = e.pointerId;
+    hoverEraser.current = null;
 
     if (tool === 'eraser' || stylusErase) {
-      gesture.current = { kind: 'erase', id };
+      gesture.current = { kind: 'erase', id, at: p, stylus: stylusErase && tool !== 'eraser' };
       eraseAt(p);
     } else if (tool === 'pen' || tool === 'marker') {
       const edge = rulerEdgeAt(e);
@@ -225,13 +284,25 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!gesture.current) {
+      // A pen hovering with its button held shows the eraser it's about to be.
+      const hover = penErases(e) ? toWorld(e) : null;
+      if (hover || hoverEraser.current) {
+        hoverEraser.current = hover;
+        renderLive();
+      }
+      return;
+    }
+    if (gesture.current.id !== e.pointerId) return;
+    switchByPenButton(e);
     const g = gesture.current;
-    if (!g || g.id !== e.pointerId) return;
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
     for (const ev of events.length ? events : [e.nativeEvent]) {
       const p = toWorld(ev);
-      if (g.kind === 'erase') eraseAt(p);
-      else if (g.kind === 'ink' && g.edge !== null) {
+      if (g.kind === 'erase') {
+        g.at = p;
+        eraseAt(p);
+      } else if (g.kind === 'ink' && g.edge !== null) {
         const q = strokePoint(ev, g.edge);
         g.points.push([q[0], q[1], ev.pointerType === 'pen' ? ev.pressure || 0.5 : 0.5]);
       } else if (g.kind === 'ink') {
@@ -249,6 +320,45 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     renderLive();
   };
 
+  const saveErase = async () => {
+    const removed = items.filter((i) => erasingRef.current.has(i.id));
+    if (!removed.length) return clearErase();
+    settling.current = true;
+    await commitItems(piecesRef.current, removed);
+  };
+
+  const saveInk = async (g: Extract<Gesture, { kind: 'ink' }>) => {
+    const style = inkStyle(g.tool);
+    const base = { notebookId: notebook.id, pageId: page.id, z: nextZ(), createdAt: Date.now(), id: newId() };
+    const item: StrokeItem | ShapeItem = g.shape
+      ? { ...base, type: 'shape', ...g.shape, color: style.color, width: style.width }
+      : { ...base, type: 'stroke', ...style, points: g.points };
+    // Paint right away so nothing flickers before the database query catches up.
+    const ctx = inkRef.current?.getContext('2d');
+    if (ctx) drawItems(ctx, [item]);
+    await commitItems([item]);
+  };
+
+  /**
+   * The pen's button works while it's held: pressing it mid-stroke keeps what was drawn and
+   * starts erasing; letting go goes back to the pen or marker, without lifting the pen.
+   */
+  const switchByPenButton = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const g = gesture.current;
+    if (!g || e.pointerType !== 'pen') return;
+    const erases = penErases(e);
+    if (g.kind === 'ink' && erases) {
+      clearTimeout(holdTimer.current);
+      if (g.shape || g.points.length > 1) saveInk(g);
+      gesture.current = { kind: 'erase', id: g.id, at: toWorld(e), stylus: true };
+    } else if (g.kind === 'erase' && g.stylus && !erases && (tool === 'pen' || tool === 'marker')) {
+      saveErase();
+      const [x, y] = toWorld(e);
+      gesture.current = { kind: 'ink', id: g.id, tool, points: [[x, y, e.pressure || 0.5]], shape: null, edge: null };
+      armHold();
+    }
+  };
+
   const finish = async (e: React.PointerEvent<HTMLCanvasElement>, cancelled: boolean) => {
     if (e.pointerType === 'pen') penActive.current = false;
     const g = gesture.current;
@@ -258,24 +368,11 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     renderLive();
     const base = { notebookId: notebook.id, pageId: page.id, z: nextZ(), createdAt: Date.now(), id: newId() };
 
-    if (g.kind === 'erase') {
-      const removed = items.filter((i) => erasingRef.current.has(i.id));
-      await commitItems([], removed);
-      erasingRef.current = new Set();
-      setErasing(erasingRef.current);
-      return;
-    }
+    if (g.kind === 'erase') return saveErase();
     if (cancelled) return;
 
     if (g.kind === 'ink') {
-      const style = inkStyle(g.tool);
-      const item: StrokeItem | ShapeItem = g.shape
-        ? { ...base, type: 'shape', ...g.shape, color: style.color, width: style.width }
-        : { ...base, type: 'stroke', ...style, points: g.points };
-      // Paint right away so nothing flickers before the database query catches up.
-      const ctx = inkRef.current?.getContext('2d');
-      if (ctx) drawItems(ctx, [item]);
-      await commitItems([item]);
+      await saveInk(g);
     } else if (g.kind === 'shape') {
       if (Math.hypot(g.to[0] - g.from[0], g.to[1] - g.from[1]) * view.zoom < 4) return;
       const style = inkStyle('pen');
@@ -365,12 +462,21 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       <canvas ref={inkRef} className="pointer-events-none absolute inset-0 size-full" />
       <canvas
         ref={liveRef}
+        data-note-input
         className="absolute inset-0 size-full"
         style={{ touchAction, cursor }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={(e) => finish(e, false)}
         onPointerCancel={(e) => finish(e, true)}
+        onPointerLeave={() => {
+          if (hoverEraser.current && !gesture.current) {
+            hoverEraser.current = null;
+            renderLive();
+          }
+        }}
+        // The pen's side button can open the browser's menu; here it's the eraser.
+        onContextMenu={(e) => e.preventDefault()}
       />
       {/* Text is above the input canvas but lets pointers through, except the box being typed in. */}
       <div className="pointer-events-none absolute top-0 left-0 origin-top-left" style={{ transform: worldTransform }}>

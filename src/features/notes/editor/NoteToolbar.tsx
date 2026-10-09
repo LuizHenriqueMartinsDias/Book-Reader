@@ -32,7 +32,7 @@ import { PAPER_COLORS } from '../../../lib/notes/render';
 import { useNoteHistory } from '../../../store/history';
 import { MARKER_COLORS, PEN_COLORS, useUi } from '../../../store/ui';
 import FullscreenButton from '../../reader/FullscreenButton';
-import { useNoteEditor, type NoteTool } from './editorStore';
+import { useNoteEditor, type EraserMode, type NoteTool } from './editorStore';
 
 const TOOLS: { id: NoteTool; icon: typeof PenLine; label: string }[] = [
   { id: 'pen', icon: PenLine, label: 'Caneta (P)' },
@@ -54,6 +54,11 @@ const PAPERS: { id: PaperStyle; label: string }[] = [
   { id: 'grid', label: 'Quadriculado' },
   { id: 'dotted', label: 'Pontilhado' },
 ];
+const ERASER_MODES: { id: EraserMode; label: string; title: string }[] = [
+  { id: 'partial', label: 'Normal', title: 'Apaga só o que a borracha passa por cima' },
+  { id: 'stroke', label: 'Traço inteiro', title: 'Encostar num traço apaga ele inteiro' },
+];
+const ERASER_SIZES = [6, 10, 18];
 const PEN_WIDTHS = [1, 2, 4];
 const MARKER_WIDTHS = [8, 14, 22];
 const TEXT_SIZES = [12, 16, 22, 30];
@@ -138,6 +143,32 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
               className={`rounded-md p-1.5 ${editor.shape === id ? 'bg-[var(--app-bg)] text-amber-600' : ''}`}
             >
               <Icon className="size-4" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {editor.tool === 'eraser' && (
+        <div className="flex shrink-0 items-center gap-0.5 pl-1">
+          {ERASER_MODES.map(({ id, label, title }) => (
+            <button
+              key={id}
+              title={title}
+              onClick={() => editor.set({ eraserMode: id })}
+              className={`rounded-md px-2 py-1 text-xs whitespace-nowrap ${editor.eraserMode === id ? 'bg-[var(--app-bg)] font-medium text-amber-600' : 'opacity-70 hover:opacity-100'}`}
+            >
+              {label}
+            </button>
+          ))}
+          {divider}
+          {ERASER_SIZES.map((size, i) => (
+            <button
+              key={size}
+              title={['Borracha pequena', 'Borracha média', 'Borracha grande'][i]}
+              onClick={() => editor.set({ eraserSize: size })}
+              className={`flex size-7 items-center justify-center rounded-md ${editor.eraserSize === size ? 'bg-[var(--app-bg)]' : ''}`}
+            >
+              <span className="rounded-full border-[1.5px] border-current" style={{ width: 6 + i * 4, height: 6 + i * 4 }} />
             </button>
           ))}
         </div>

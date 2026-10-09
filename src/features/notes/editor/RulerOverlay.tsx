@@ -17,6 +17,35 @@ type Drag =
   | { kind: 'rotate'; id: number; offset: number }
   | { kind: 'pinch'; ids: [number, number]; startAngle: number; rulerAngle: number; mid: [number, number] };
 
+/** Re-sends a pen press on the ruler to the note page's input canvas under it. */
+function passToPage(e: React.PointerEvent) {
+  const input = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el instanceof HTMLCanvasElement && el.dataset.noteInput !== undefined);
+  if (!input) return;
+  e.stopPropagation();
+  const n = e.nativeEvent;
+  input.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      pointerId: n.pointerId,
+      pointerType: n.pointerType,
+      isPrimary: n.isPrimary,
+      clientX: n.clientX,
+      clientY: n.clientY,
+      screenX: n.screenX,
+      screenY: n.screenY,
+      pressure: n.pressure,
+      tiltX: n.tiltX,
+      tiltY: n.tiltY,
+      width: n.width,
+      height: n.height,
+      button: n.button,
+      buttons: n.buttons,
+    }),
+  );
+}
+
 /**
  * A see-through ruler over the page. Drag it with a finger or the mouse, turn it with two
  * fingers or the round handles; pen strokes next to its edges come out straight (NoteSurface).
@@ -37,8 +66,9 @@ export default function RulerOverlay({ ruler, scale }: Props) {
   const pairAngle = (a: [number, number], b: [number, number]) => (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
 
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // The pen keeps writing next to the ruler; pressing on the ruler itself does nothing.
-    if (e.pointerType === 'pen') return;
+    // The pen writes, not moves the ruler: hand it to the page underneath, where the stroke
+    // follows the nearest edge (see NoteSurface).
+    if (e.pointerType === 'pen') return passToPage(e);
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = local(e);
@@ -91,7 +121,7 @@ export default function RulerOverlay({ ruler, scale }: Props) {
   };
 
   const startRotate = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'pen') return;
+    if (e.pointerType === 'pen') return passToPage(e);
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     const p = local(e);

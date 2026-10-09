@@ -4,6 +4,8 @@ import type { NoteItem, ShapeKind } from '../../../db/schema';
 import type { Ruler } from '../../../lib/notes/ruler';
 
 export type NoteTool = 'pen' | 'marker' | 'eraser' | 'lasso' | 'text' | 'shape';
+/** `stroke`: touching ink deletes the whole stroke. `partial`: rubs out only what's under it. */
+export type EraserMode = 'stroke' | 'partial';
 
 export interface Selection {
   pageId: string;
@@ -14,6 +16,9 @@ interface NoteEditorState {
   tool: NoteTool;
   shape: ShapeKind;
   textSize: number;
+  eraserMode: EraserMode;
+  /** Eraser radius in screen px. */
+  eraserSize: number;
   /** Lasso selection (on one page at a time). */
   selection: Selection | null;
   /** Copied items, pasted with an offset. */
@@ -45,6 +50,8 @@ export const useNoteEditor = create<NoteEditorState>()(
       tool: 'pen',
       shape: 'line',
       textSize: 16,
+      eraserMode: 'stroke',
+      eraserSize: 10,
       selection: null,
       clipboard: null,
       editingTextId: null,
@@ -59,6 +66,6 @@ export const useNoteEditor = create<NoteEditorState>()(
       straightenCanvas: null,
       set: (patch) => set(patch.tool ? { selection: null, editingTextId: null, ...patch } : patch),
     }),
-    { name: 'book-reader-notes', partialize: ({ tool, shape, textSize, fingerDraws }) => ({ tool, shape, textSize, fingerDraws }) },
+    { name: 'book-reader-notes', partialize: ({ tool, shape, textSize, eraserMode, eraserSize, fingerDraws }) => ({ tool, shape, textSize, eraserMode, eraserSize, fingerDraws }) },
   ),
 );

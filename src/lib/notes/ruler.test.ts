@@ -17,7 +17,8 @@ describe('ruler geometry', () => {
     expect(onRuler(flat, [500, 445])).toBe(false);
     expect(edgeNear(flat, [300, 350], 24)).toBe(-1); // just above the top edge (y = 360)
     expect(edgeNear(flat, [300, 452], 24)).toBe(1); // just below the bottom edge (y = 440)
-    expect(edgeNear(flat, [300, 400], 24)).toBeNull(); // on the ruler itself
+    expect(edgeNear(flat, [300, 365], 24)).toBe(-1); // on the ruler: the nearest edge
+    expect(edgeNear(flat, [300, 430], 24)).toBe(1);
     expect(edgeNear(flat, [300, 300], 24)).toBeNull(); // too far
     expect(edgeNear(flat, [950, 350], 24)).toBeNull(); // past the end
   });
