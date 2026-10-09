@@ -1,8 +1,9 @@
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Expand, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { addPage, deletePage, movePage } from '../../../db/notes';
 import { db, type Notebook, type NotePage } from '../../../db/schema';
 import { snapQuarter, type Vec } from '../../../lib/notes/geometry';
+import { hasMargins, marginsOf, pdfBox } from '../../../lib/notes/margins';
 import { paperCss } from '../../../lib/notes/render';
 import { appliedTurn, classify, initialTwoFinger, rotates, zooms, type TwoFingerState } from '../../../lib/notes/twoFinger';
 import { CSS_UNITS, type PDFDocumentProxy } from '../../../lib/pdf';
@@ -24,10 +25,12 @@ interface Props {
   zoom: ZoomMode;
   onZoom: (z: ZoomChange) => void;
   onScale: (scale: number) => void;
+  /** Opens "stretch the sheet" for an imported PDF page. */
+  onStretch: (page: NotePage) => void;
 }
 
 /** A4-like pages one under the other, like a paper notebook; only pages near the screen render. */
-export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onScale }: Props) {
+export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onScale, onStretch }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ top: 0, height: 800, width: 800 });
@@ -137,7 +140,7 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
                     height={h}
                     view={{ x: 0, y: 0, zoom: scale }}
                     rotation={rotation}
-                    background={page.background && pdf ? <PdfPageCanvas doc={pdf} pageNumber={page.background.pdfPage} scale={scale} /> : undefined}
+                    background={page.background && pdf ? <PdfBackground page={page} pdf={pdf} pdfPage={page.background.pdfPage} scale={scale} /> : undefined}
                   />
                 )}
               </div>
@@ -146,6 +149,11 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
                   Página {i + 1} de {pages.length}
                 </span>
                 <span className="flex items-center gap-0.5">
+                  {page.background && (
+                    <button title="Esticar a folha (margens para anotar)" className="rounded p-1.5 hover:bg-[var(--panel)]" onClick={() => onStretch(page)}>
+                      <Expand className="size-3.5" />
+                    </button>
+                  )}
                   <button title="Nova página depois desta" className="rounded p-1.5 hover:bg-[var(--panel)]" onClick={() => addPage(notebook.id, page.order)}>
                     <Plus className="size-3.5" />
                   </button>
@@ -175,6 +183,19 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
           <Plus className="size-4" /> Nova página
         </button>
       </div>
+    </div>
+  );
+}
+
+/** The imported PDF page, inset by the sheet's margins; outlined when there are any. */
+function PdfBackground({ page, pdf, pdfPage, scale }: { page: NotePage; pdf: PDFDocumentProxy; pdfPage: number; scale: number }) {
+  const box = pdfBox(page);
+  return (
+    <div
+      className={`absolute ${hasMargins(marginsOf(page)) ? 'ring-1 ring-black/10' : ''}`}
+      style={{ left: box.x * scale, top: box.y * scale, width: box.w * scale, height: box.h * scale }}
+    >
+      <PdfPageCanvas doc={pdf} pageNumber={pdfPage} scale={scale} />
     </div>
   );
 }

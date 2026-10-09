@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clientRectsToPdf, mergeLineRects, viewToUserSpace } from './coords';
+import { clientRectsToPdf, mergeLineRects, userToDisplayMatrix, viewToUserSpace } from './coords';
 
 describe('viewToUserSpace', () => {
   const view: [number, number, number, number] = [10, 20, 610, 820]; // 600 x 800, offset origin
@@ -49,5 +49,18 @@ describe('clientRectsToPdf', () => {
       [10, 10, 50, 10],
       [175, 275, 25, 10],
     ]);
+  });
+});
+
+describe('userToDisplayMatrix', () => {
+  const view: [number, number, number, number] = [10, 20, 610, 820];
+
+  it.each([0, 90, 180, 270])('undoes viewToUserSpace at /Rotate %i, with y up', (rotation) => {
+    const height = rotation % 180 ? 600 : 800; // displayed height
+    const [a, b, c, d, e, f] = userToDisplayMatrix(view, rotation);
+    for (const [vx, vy] of [[0, 0], [100, 30], [250, 590]]) {
+      const [ux, uy] = viewToUserSpace(view, rotation)(vx, vy);
+      expect([a * ux + c * uy + e, b * ux + d * uy + f]).toEqual([vx, height - vy]);
+    }
   });
 });

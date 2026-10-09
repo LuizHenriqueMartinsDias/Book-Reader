@@ -1,6 +1,8 @@
-import { db, type NoteItem } from '../../../db/schema';
+import { db, type Margins, type NoteItem, type NotePage } from '../../../db/schema';
 import { newId } from '../../../db/repo';
 import { touchNotebook } from '../../../db/notes';
+import { transformItems } from '../../../lib/notes/geometry';
+import { withMargins } from '../../../lib/notes/margins';
 import { useNoteHistory } from '../../../store/history';
 
 /** Saves a change to notebook items through the undo history and marks the notebook edited. */
@@ -25,4 +27,26 @@ export async function cloneItems(items: NoteItem[], pageId: string, offset: numb
     }
   };
   return items.map((item, k) => ({ ...shift(item), id: newId(), pageId, z: z + 1 + k, createdAt: Date.now() }));
+}
+
+/** Stretches PDF pages to `margins` (undoable), moving their items along with the PDF. */
+export async function commitMargins(pages: NotePage[], margins: Margins) {
+  const before: NotePage[] = [];
+  const after: NotePage[] = [];
+  const oldItems: NoteItem[] = [];
+  const newItems: NoteItem[] = [];
+  for (const page of pages) {
+    const r = withMargins(page, margins);
+    if (!r || (r.page.width === page.width && r.page.height === page.height && !r.dx && !r.dy)) continue;
+    before.push(page);
+    after.push(r.page);
+    if (r.dx || r.dy) {
+      const items = await db.noteItems.where('pageId').equals(page.id).toArray();
+      oldItems.push(...items);
+      newItems.push(...transformItems(items, { dx: r.dx, dy: r.dy, scale: 1, origin: [0, 0] }));
+    }
+  }
+  if (!after.length) return;
+  await useNoteHistory.getState().commit({ added: { notePages: after, noteItems: newItems }, removed: { notePages: before, noteItems: oldItems } });
+  touchNotebook(pages[0].notebookId);
 }

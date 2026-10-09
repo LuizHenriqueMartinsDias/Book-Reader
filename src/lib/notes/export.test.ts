@@ -1,8 +1,15 @@
-import { PDFDocument } from 'pdf-lib';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { degrees, PDFDocument, PDFName } from 'pdf-lib';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNotebook, getPages } from '../../db/notes';
 import { db, type NoteItem } from '../../db/schema';
 import { exportNotebookPdf } from './export';
+
+// fake-indexeddb can't keep Blobs, so the imported PDF comes from here instead of the database.
+const sourcePdf = vi.hoisted(() => ({ bytes: new Uint8Array() as Uint8Array }));
+vi.mock('../../db/repo', async (original) => ({
+  ...(await original<typeof import('../../db/repo')>()),
+  getBookFile: async () => ({ arrayBuffer: async () => sourcePdf.bytes.slice().buffer }),
+}));
 
 const paper = { style: 'lined' as const, color: '#ffffff' };
 const base = { z: 1, createdAt: 0 };
@@ -38,5 +45,27 @@ describe('exportNotebookPdf', () => {
     const size = (await PDFDocument.load(await exportNotebookPdf(nb.id))).getPage(0).getSize();
     expect(size.width).toBeCloseTo(2002 + 80, 0);
     expect(size.height).toBeCloseTo(1102 + 80, 0);
+  });
+
+  it('draws a stretched PDF page upright inside the bigger sheet', async () => {
+    const src = await PDFDocument.create();
+    const srcPage = src.addPage([600, 400]);
+    srcPage.setRotation(degrees(90)); // shown as 400 × 600
+    srcPage.drawText('Capítulo 1', { x: 50, y: 300 });
+    src.addPage([600, 400]); // blank: nothing to embed
+    sourcePdf.bytes = await src.save();
+    const data = new Blob([], { type: 'application/pdf' });
+    const nb = await createNotebook({ title: 'PDF', kind: 'paged', paper, coverColor: '#000', pdf: { data, pageSizes: [{ width: 400, height: 600 }, { width: 600, height: 400 }] } });
+    const [page, blank] = await getPages(nb.id);
+    await db.notePages.update(page.id, { width: 400 + 300, height: 600 + 50, background: { pdfPage: 1, margins: { top: 50, right: 300, bottom: 0, left: 0 } } });
+    await db.notePages.update(blank.id, { width: 600 + 40, background: { pdfPage: 2, margins: { top: 0, right: 40, bottom: 0, left: 0 } } });
+
+    const exported = await PDFDocument.load(await exportNotebookPdf(nb.id));
+    expect(exported.getPage(1).getSize()).toEqual({ width: 640, height: 400 });
+    const out = exported.getPage(0);
+    expect(out.getSize()).toEqual({ width: 700, height: 650 });
+    expect(out.getRotation().angle).toBe(0);
+    const xobjects = out.node.Resources()!.lookup(PDFName.of('XObject'))!;
+    expect(xobjects.toString()).toContain('EmbeddedPdfPage');
   });
 });

@@ -28,6 +28,25 @@ export function viewToUserSpace(view: ViewBox, rotation: number) {
   }
 }
 
+/**
+ * PDF matrix mapping user space to the page as displayed, with y up and its bottom-left corner
+ * at the origin (`viewToUserSpace` reversed, y flipped). Lets a page be drawn as a picture,
+ * upright, inside another page.
+ */
+export function userToDisplayMatrix(view: ViewBox, rotation: number): [number, number, number, number, number, number] {
+  const [x1, y1, x2, y2] = view;
+  switch (((rotation % 360) + 360) % 360) {
+    case 90:
+      return [0, -1, 1, 0, -y1, x2];
+    case 180:
+      return [-1, 0, 0, -1, x2, y2];
+    case 270:
+      return [0, 1, -1, 0, y2, -x1];
+    default:
+      return [1, 0, 0, 1, -x1, -y1];
+  }
+}
+
 /** Converts client rects (e.g. from a DOM Range) into page-relative PDF rects. */
 export function clientRectsToPdf(rects: Iterable<DOMRectReadOnly>, pageBox: DOMRectReadOnly, scale: number): Rect[] {
   const out: Rect[] = [];

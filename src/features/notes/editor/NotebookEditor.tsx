@@ -19,6 +19,7 @@ import InfiniteCanvas from './InfiniteCanvas';
 import { cloneItems, commitItems } from './items';
 import NoteToolbar from './NoteToolbar';
 import PagedNotebook from './PagedNotebook';
+import PageMarginsDialog from './PageMarginsDialog';
 import RulerOverlay from './RulerOverlay';
 
 const TOOL_KEYS: Record<string, NoteTool> = { p: 'pen', h: 'marker', e: 'eraser', l: 'lasso', t: 'text', s: 'shape' };
@@ -68,6 +69,8 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
   const [zoom, setZoom] = useState<ZoomMode>(null);
   const [scale, setScale] = useState(CSS_UNITS);
   const [pickingBook, setPickingBook] = useState(false);
+  const [stretchingId, setStretchingId] = useState<string | null>(null);
+  const stretching = pages.find((p) => p.id === stretchingId);
   const canvasZoom = useRef<((z: ZoomChange) => void) | null>(null);
   const fullscreen = useFullscreen();
   const notebookRef = useRef(notebook);
@@ -228,6 +231,13 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
     };
   }, [changeZoom, insertImage, paste, toggleRuler]);
 
+  /** From the toolbar: the PDF page in view, else the first one. */
+  const stretchCurrent = useCallback(() => {
+    const current = pages.find((p) => p.id === useNoteEditor.getState().currentPageId);
+    setStretchingId((current?.background ? current : pages.find((p) => p.background))?.id ?? null);
+  }, [pages]);
+  const stretchPage = useCallback((page: { id: string }) => setStretchingId(page.id), []);
+
   const registerZoom = useCallback((fn: (z: ZoomChange) => void) => {
     canvasZoom.current = fn;
   }, []);
@@ -255,6 +265,7 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
             onPaste={paste}
             onExport={exportPdf}
             onOpenBook={() => setPickingBook(true)}
+            onStretchPage={notebook.hasPdf && notebook.kind === 'paged' ? stretchCurrent : undefined}
             rulerOn={!!ruler}
             onToggleRuler={toggleRuler}
             fullscreen={fullscreen}
@@ -266,7 +277,7 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
         {notebook.kind === 'canvas' ? (
           <InfiniteCanvas notebook={notebook} page={pages[0]} registerZoom={registerZoom} onScale={setScale} />
         ) : (
-          <PagedNotebook notebook={notebook} pages={pages} pdf={pdf} zoom={zoom} onZoom={changeZoom} onScale={setScale} />
+          <PagedNotebook notebook={notebook} pages={pages} pdf={pdf} zoom={zoom} onZoom={changeZoom} onScale={setScale} onStretch={stretchPage} />
         )}
         {ruler && <RulerOverlay ruler={ruler} scale={scale} />}
         {rotationHint !== null && (
@@ -275,6 +286,7 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
           </div>
         )}
       </div>
+      {stretching && <PageMarginsDialog notebook={notebook} pages={pages} page={stretching} pdf={pdf} onClose={() => setStretchingId(null)} />}
       {pickingBook && (
         <BookPicker
           onClose={() => setPickingBook(false)}

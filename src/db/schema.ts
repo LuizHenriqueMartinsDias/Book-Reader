@@ -122,15 +122,23 @@ export interface Notebook {
   lastOpenedAt: number;
 }
 
+/** Blank space added around an imported PDF page ("stretching" the sheet), in points. */
+export interface Margins {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface NotePage {
   id: string;
   notebookId: string;
   order: number;
-  /** In points; A4 is 595 × 842. Ignored for infinite canvases. */
+  /** In points; A4 is 595 × 842. Ignored for infinite canvases. Includes the margins. */
   width: number;
   height: number;
-  /** Page of the notebook's PDF drawn underneath (imported PDFs). */
-  background?: { pdfPage: number };
+  /** Page of the notebook's PDF drawn underneath (imported PDFs), inset by `margins` if any. */
+  background?: { pdfPage: number; margins?: Margins };
 }
 
 /** Where a quote sent from the reader came from, to jump back to it. */

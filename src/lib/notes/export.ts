@@ -2,10 +2,11 @@ import { BlendMode, LineCapStyle, PDFDocument, rgb, StandardFonts, type PDFFont,
 import { getPages } from '../../db/notes';
 import { db, type NoteItem, type Paper } from '../../db/schema';
 import { getBookFile } from '../../db/repo';
-import { viewToUserSpace } from '../coords';
+import { userToDisplayMatrix, viewToUserSpace } from '../coords';
 import { viewBoxOf } from '../export';
 import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, strokeOutline } from '../ink';
 import { bboxOf, shapePoints, unionBox } from './geometry';
+import { hasMargins, marginsOf, pdfBox } from './margins';
 import { toPngBytes } from './images';
 import { arrowHead, PAPER_SPACING } from './render';
 
@@ -40,6 +41,21 @@ export async function exportNotebookPdf(notebookId: string, loadImage: (blob: Bl
       out = doc.addPage([w, h]);
       toUser = (x, y) => [x - box.x + MARGIN, h - (y - box.y + MARGIN)];
       drawPaper(out, notebook.paper, w, h);
+    } else if (page.background && source && hasMargins(marginsOf(page))) {
+      // A stretched sheet: paper all over, the PDF page drawn upright inside it as a picture.
+      const sourcePage = source.getPage(page.background.pdfPage - 1);
+      const view = viewBoxOf(sourcePage);
+      const [x1, y1, x2, y2] = view;
+      out = doc.addPage([page.width, page.height]);
+      toUser = (x, y) => [x, page.height - y];
+      drawPaper(out, notebook.paper, page.width, page.height);
+      const box = pdfBox(page);
+      out.drawRectangle({ x: box.x, y: page.height - box.y - box.h, width: box.w, height: box.h, color: rgb(1, 1, 1) });
+      // A blank PDF page has no content to embed (pdf-lib refuses it); the white box is all of it.
+      if (sourcePage.node.Contents()) {
+        const embedded = await doc.embedPage(sourcePage, { left: x1, bottom: y1, right: x2, top: y2 }, userToDisplayMatrix(view, sourcePage.getRotation().angle));
+        out.drawPage(embedded, { x: box.x, y: page.height - box.y - box.h });
+      }
     } else if (page.background && source) {
       const [copied] = await doc.copyPages(source, [page.background.pdfPage - 1]);
       out = doc.addPage(copied);

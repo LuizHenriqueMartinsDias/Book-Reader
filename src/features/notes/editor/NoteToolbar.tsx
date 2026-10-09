@@ -5,6 +5,7 @@ import {
   Circle,
   ClipboardPaste,
   Eraser,
+  Expand,
   FileDown,
   Hand,
   Highlighter,
@@ -68,6 +69,8 @@ interface Props {
   onPaste: () => void;
   onExport: () => Promise<void>;
   onOpenBook: () => void;
+  /** Imported PDF: open "stretch the sheet" for the page in view. */
+  onStretchPage?: () => void;
   rulerOn: boolean;
   onToggleRuler: () => void;
   fullscreen: { supported: boolean; toggle: () => void };
@@ -75,7 +78,7 @@ interface Props {
   onClose?: () => void;
 }
 
-export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertImage, onPaste, onExport, onOpenBook, rulerOn, onToggleRuler, fullscreen, onClose }: Props) {
+export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertImage, onPaste, onExport, onOpenBook, onStretchPage, rulerOn, onToggleRuler, fullscreen, onClose }: Props) {
   const ui = useUi();
   const editor = useNoteEditor();
   const { undoStack, redoStack, undo, redo } = useNoteHistory();
@@ -272,6 +275,17 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
                     />
                   ))}
                 </div>
+                {onStretchPage && (
+                  <button
+                    className="mt-3 flex w-full items-center gap-2 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs hover:border-amber-500"
+                    onClick={() => {
+                      setPaperOpen(false);
+                      onStretchPage();
+                    }}
+                  >
+                    <Expand className="size-4" /> Esticar a folha (margens)…
+                  </button>
+                )}
               </div>
             </>
           )}

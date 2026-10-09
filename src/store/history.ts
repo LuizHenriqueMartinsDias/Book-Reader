@@ -1,10 +1,18 @@
 import { create } from 'zustand';
-import { db, type Highlight, type NoteItem, type Stroke } from '../db/schema';
+import { db, type Highlight, type NoteItem, type NotePage, type Stroke } from '../db/schema';
+
+interface Records {
+  strokes?: Stroke[];
+  highlights?: Highlight[];
+  noteItems?: NoteItem[];
+  /** Notebook pages whose size changed (stretched sheets), as whole records. */
+  notePages?: NotePage[];
+}
 
 /** An undoable change: records that were added and records that were removed. */
 export interface Change {
-  added: { strokes?: Stroke[]; highlights?: Highlight[]; noteItems?: NoteItem[] };
-  removed: { strokes?: Stroke[]; highlights?: Highlight[]; noteItems?: NoteItem[] };
+  added: Records;
+  removed: Records;
 }
 
 interface HistoryState {
@@ -20,14 +28,16 @@ interface HistoryState {
 const LIMIT = 200;
 
 async function apply({ added, removed }: Change) {
-  await db.transaction('rw', db.strokes, db.highlights, db.noteItems, async () => {
+  await db.transaction('rw', [db.strokes, db.highlights, db.noteItems, db.notePages], async () => {
     // Removals first: an edit is "remove old version, add new one" with the same id.
     if (removed.strokes?.length) await db.strokes.bulkDelete(removed.strokes.map((s) => s.id));
     if (removed.highlights?.length) await db.highlights.bulkDelete(removed.highlights.map((h) => h.id));
     if (removed.noteItems?.length) await db.noteItems.bulkDelete(removed.noteItems.map((i) => i.id));
+    if (removed.notePages?.length) await db.notePages.bulkDelete(removed.notePages.map((p) => p.id));
     if (added.strokes?.length) await db.strokes.bulkPut(added.strokes);
     if (added.highlights?.length) await db.highlights.bulkPut(added.highlights);
     if (added.noteItems?.length) await db.noteItems.bulkPut(added.noteItems);
+    if (added.notePages?.length) await db.notePages.bulkPut(added.notePages);
   });
 }
 
