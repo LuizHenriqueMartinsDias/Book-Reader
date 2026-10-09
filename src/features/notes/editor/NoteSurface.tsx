@@ -309,13 +309,16 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
    * With the diagram tool, a finger that navigates can still pick things: a quick tap (no drag,
    * which scrolls) selects the box or arrow under it, with its move and resize handles.
    */
-  const fingerTap = useRef<{ id: number; at: Vec; time: number } | null>(null);
-  const pickAt = (p: Vec) => {
+  const fingerTap = useRef<{ id: number; at: Vec; time: number; busy: boolean } | null>(null);
+  const pickAt = (p: Vec, wasBusy: boolean) => {
     const editor = useNoteEditor.getState();
     const box = nodeAt(items, p);
     const arrow = box ? undefined : [...items].sort((a, b) => b.z - a.z).find((i) => isConnector(i) && connectorHit(i, nodeMap, p[0], p[1], (PICK_PX * 1.6) / view.zoom));
     const ids = box ? withChildren([box.id], items) : arrow ? [arrow.id] : null;
-    editor.set({ selection: ids ? { pageId: page.id, ids } : null });
+    if (ids) return editor.set({ selection: { pageId: page.id, ids } });
+    editor.set({ selection: null });
+    // On empty paper, like the pen: a box, unless the tap was just to let go of a selection or of typing.
+    if (!wasBusy) createNode(tapBox(p));
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -323,6 +326,10 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       penActive.current = true;
       if (!useUi.getState().penDetected) useUi.getState().set({ penDetected: true });
     }
+    // Touching the page ends typing in a box. The browser won't always do it: a stylus's touch
+    // events are cancelled (so it doesn't scroll), and with them the mouse events that blur.
+    const wasTyping = !!useNoteEditor.getState().editingTextId;
+    if (wasTyping) (document.activeElement as HTMLElement | null)?.blur?.();
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (gesture.current) {
       // A second finger: it's a pinch or a pan, not a stroke.
@@ -333,7 +340,10 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     }
     if (!usesTool(e)) {
       // A second finger means pinching or scrolling, not a tap.
-      fingerTap.current = !fingerTap.current && tool === 'diagram' ? { id: e.pointerId, at: [e.clientX, e.clientY], time: Date.now() } : null;
+      fingerTap.current =
+        !fingerTap.current && tool === 'diagram'
+          ? { id: e.pointerId, at: [e.clientX, e.clientY], time: Date.now(), busy: wasTyping || !!useNoteEditor.getState().selection }
+          : null;
       return;
     }
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -360,8 +370,8 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     } else if (tool === 'text') {
       gesture.current = { kind: 'text', id, at: p };
     } else if (tool === 'diagram') {
-      // A tap while typing in a box just ends the typing (the text box loses focus).
-      if (editor.editingTextId) return;
+      // A tap while typing in a box just ends the typing.
+      if (wasTyping) return;
       // An arrow under the tap is picked right away; boxes and paper wait to see a tap or a drawing.
       const hit = nodeAt(items, p) ?? null;
       const arrow = hit ? undefined : [...items].sort((a, b) => b.z - a.z).find((i) => isConnector(i) && connectorHit(i, nodeMap, p[0], p[1], PICK_PX / view.zoom));
@@ -502,7 +512,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     if (tap?.id === e.pointerId) {
       fingerTap.current = null;
       // Scrolling cancels the pointer; a real tap ends where it began, quickly.
-      if (!cancelled && Math.hypot(e.clientX - tap.at[0], e.clientY - tap.at[1]) < 10 && Date.now() - tap.time < 600) pickAt(toWorld(e));
+      if (!cancelled && Math.hypot(e.clientX - tap.at[0], e.clientY - tap.at[1]) < 10 && Date.now() - tap.time < 600) pickAt(toWorld(e), tap.busy);
       return;
     }
     const g = gesture.current;
