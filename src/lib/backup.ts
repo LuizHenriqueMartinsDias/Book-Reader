@@ -1,9 +1,9 @@
-import { db, type Folder, type PageTemplate, type Highlight, type Note, type Notebook, type NoteItem, type NotePage, type Stroke } from '../db/schema';
+import { db, type Activity, type DayOff, type Folder, type Habit, type HabitLog, type PageTemplate, type Highlight, type Note, type Notebook, type NoteItem, type NotePage, type Stroke } from '../db/schema';
 
 interface Backup {
   app: 'book-reader';
-  /** 1: book annotations only; 2: also notebooks. */
-  version: 1 | 2;
+  /** 1: book annotations only; 2: also notebooks; 3: also the routine. */
+  version: 1 | 2 | 3;
   exportedAt: string;
   books: { id: string; title: string; lastPage: number; folderId?: string | null }[];
   bookFolders?: Folder[];
@@ -19,6 +19,11 @@ interface Backup {
   notebookFiles?: { notebookId: string; data: string }[];
   /** Page templates, their pictures as data URLs. */
   pageTemplates?: (Omit<PageTemplate, 'blob'> & { data: string })[];
+  /** The routine: habits, what was done each day, days off, measured reading and study time. */
+  habits?: Habit[];
+  habitLogs?: HabitLog[];
+  dayOffs?: DayOff[];
+  activity?: Activity[];
 }
 
 async function toDataUrl(blob: Blob) {
@@ -38,10 +43,10 @@ function fromDataUrl(url: string) {
 
 /**
  * Book annotations (not the book files; books are matched by content hash on restore) and
- * notebooks in full, including their pictures and imported PDFs.
+ * notebooks in full, including their pictures and imported PDFs, and the routine.
  */
 export async function createBackup(): Promise<Blob> {
-  const [books, bookFolders, strokes, highlights, notes, folders, notebooks, notePages, noteItems, assets, templates] = await Promise.all([
+  const [books, bookFolders, strokes, highlights, notes, folders, notebooks, notePages, noteItems, assets, templates, habits, habitLogs, dayOffs, activity] = await Promise.all([
     db.books.toArray(),
     db.bookFolders.toArray(),
     db.strokes.toArray(),
@@ -53,11 +58,15 @@ export async function createBackup(): Promise<Blob> {
     db.noteItems.toArray(),
     db.noteAssets.toArray(),
     db.pageTemplates.toArray(),
+    db.habits.toArray(),
+    db.habitLogs.toArray(),
+    db.dayOffs.toArray(),
+    db.activity.toArray(),
   ]);
   const pdfs = await db.files.bulkGet(notebooks.filter((n) => n.hasPdf).map((n) => n.id));
   const backup: Backup = {
     app: 'book-reader',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     books: books.map(({ id, title, lastPage, folderId }) => ({ id, title, lastPage, folderId })),
     bookFolders,
@@ -71,6 +80,10 @@ export async function createBackup(): Promise<Blob> {
     noteAssets: await Promise.all(assets.map(async ({ blob, ...a }) => ({ ...a, data: await toDataUrl(blob) }))),
     pageTemplates: await Promise.all(templates.map(async ({ blob, ...t }) => ({ ...t, data: await toDataUrl(blob) }))),
     notebookFiles: await Promise.all(pdfs.filter((f) => !!f).map(async (f) => ({ notebookId: f!.bookId, data: await toDataUrl(f!.data) }))),
+    habits,
+    habitLogs,
+    dayOffs,
+    activity,
   };
   return new Blob([JSON.stringify(backup)], { type: 'application/json' });
 }
@@ -82,7 +95,8 @@ export async function restoreBackup(file: Blob) {
   const assets = (backup.noteAssets ?? []).map(({ data, ...a }) => ({ ...a, blob: fromDataUrl(data) }));
   const files = (backup.notebookFiles ?? []).map((f) => ({ bookId: f.notebookId, data: fromDataUrl(f.data) }));
   const templates = (backup.pageTemplates ?? []).map(({ data, ...t }) => ({ ...t, blob: fromDataUrl(data) }));
-  await db.transaction('rw', [db.books, db.bookFolders, db.pageTemplates, db.strokes, db.highlights, db.notes, db.folders, db.notebooks, db.notePages, db.noteItems, db.noteAssets, db.files], async () => {
+  const tables = [db.books, db.bookFolders, db.pageTemplates, db.strokes, db.highlights, db.notes, db.folders, db.notebooks, db.notePages, db.noteItems, db.noteAssets, db.files, db.habits, db.habitLogs, db.dayOffs, db.activity];
+  await db.transaction('rw', tables, async () => {
     await db.folders.bulkPut(backup.folders ?? []);
     await db.bookFolders.bulkPut(backup.bookFolders ?? []);
     await db.pageTemplates.bulkPut(templates);
@@ -94,6 +108,10 @@ export async function restoreBackup(file: Blob) {
     await db.strokes.bulkPut(backup.strokes ?? []);
     await db.highlights.bulkPut(backup.highlights ?? []);
     await db.notes.bulkPut(backup.notes ?? []);
+    await db.habits.bulkPut(backup.habits ?? []);
+    await db.habitLogs.bulkPut(backup.habitLogs ?? []);
+    await db.dayOffs.bulkPut(backup.dayOffs ?? []);
+    await db.activity.bulkPut(backup.activity ?? []);
     for (const b of backup.books ?? []) {
       const existing = await db.books.get(b.id);
       if (!existing) continue;
@@ -105,6 +123,7 @@ export async function restoreBackup(file: Blob) {
   return {
     annotations: (backup.strokes?.length ?? 0) + (backup.highlights?.length ?? 0) + (backup.notes?.length ?? 0),
     notebooks: backup.notebooks?.length ?? 0,
+    habits: backup.habits?.length ?? 0,
     /** Books in the backup whose PDF isn't in this library yet; their notes appear once it's imported. */
     missingBooks: (backup.books ?? []).filter((_, i) => !present[i]).map((b) => b.title),
   };

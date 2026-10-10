@@ -76,9 +76,9 @@ export default function LibraryPage() {
 
   async function handleRestore(file: Blob) {
     try {
-      const { annotations, notebooks, missingBooks } = await restoreBackup(file);
+      const { annotations, notebooks, habits, missingBooks } = await restoreBackup(file);
       setMessage(
-        `${annotations} anotações e ${notebooks} caderno(s) restaurados.` +
+        `${annotations} anotações, ${notebooks} caderno(s)${habits ? ` e ${habits} hábito(s)` : ''} restaurados.` +
           (missingBooks.length ? ` Importe os PDFs para ver o resto: ${missingBooks.join(', ')}` : ''),
       );
     } catch (e) {

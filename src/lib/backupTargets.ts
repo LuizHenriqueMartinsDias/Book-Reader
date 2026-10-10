@@ -28,7 +28,7 @@ export function needsBackup(o: { now: number; lastBackupAt: number | null; lastC
 
 /** Whether the library has anything a backup would hold. */
 export async function hasBackupData() {
-  const counts = await Promise.all([db.notes.count(), db.strokes.count(), db.highlights.count(), db.notebooks.count()]);
+  const counts = await Promise.all([db.notes.count(), db.strokes.count(), db.highlights.count(), db.notebooks.count(), db.habitLogs.count()]);
   return counts.some((n) => n > 0);
 }
 

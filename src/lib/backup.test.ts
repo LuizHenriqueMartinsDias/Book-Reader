@@ -30,6 +30,19 @@ describe('backup', () => {
     expect(new TextDecoder().decode(await (await db.files.get(nb.id))!.data.arrayBuffer())).toBe('%PDF-1.4 fake');
   });
 
+  it('round-trips the routine', async () => {
+    await db.habits.add({ id: 'h', name: 'Água', icon: 'water', color: '#2563eb', kind: 'count', goal: 8, unit: 'copos', order: 1, createdAt: 1 });
+    await db.habitLogs.add({ id: 'h|2026-10-10', habitId: 'h', date: '2026-10-10', value: 5, updatedAt: 1 });
+    await db.dayOffs.add({ id: '2026-10-12' });
+    await db.activity.add({ id: 'reading|2026-10-10', kind: 'reading', date: '2026-10-10', seconds: 1800 });
+    const backup = await createBackup();
+    await Promise.all(db.tables.map((t) => t.clear()));
+    expect((await restoreBackup(backup)).habits).toBe(1);
+    expect((await db.habitLogs.get('h|2026-10-10'))?.value).toBe(5);
+    expect(await db.dayOffs.get('2026-10-12')).toBeTruthy();
+    expect((await db.activity.get('reading|2026-10-10'))?.seconds).toBe(1800);
+  });
+
   it('round-trips page templates with their pictures', async () => {
     await db.pageTemplates.add({ id: 't', name: 'Cornell', blob: new Blob(['png-bytes'], { type: 'image/png' }), width: 595, height: 842, thumb: 'data:', createdAt: 1 });
     const backup = await createBackup();
