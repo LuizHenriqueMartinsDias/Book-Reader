@@ -42,13 +42,22 @@ Sem `VITE_PROXY_URL`, a busca continua funcionando e o botão abre a página do 
 
 ## Backup no Google Drive (opcional)
 
-Com um ID de cliente OAuth do Google, o menu "⋯" da Estante ganha "Conectar ao Google Drive": os backups vão direto para uma pasta "Book Reader" no Drive (os 10 mais recentes) e "Restaurar backup" lista os que estão lá. Sem servidor, o acesso do Google dura uma hora e é renovado com um toque, então o backup no Drive é em um toque, não em segundo plano.
+Com um ID de cliente OAuth do Google, o menu "⋯" da Estante ganha "Conectar ao Google Drive": os backups vão direto para uma pasta "Book Reader" no Drive (os 10 mais recentes) e "Restaurar backup" lista os que estão lá. Com o Worker configurado (abaixo), basta conectar uma vez: ao abrir o app, ao voltar para ele e a cada 30 minutos com ele aberto, se o último backup tem mais de um dia e algo mudou, o backup vai ao Drive sozinho, também no celular e no tablet. Sem o Worker, o acesso do Google dura uma hora e é renovado com um toque, então o backup no Drive é em um toque.
 
 1. No [Google Cloud](https://console.cloud.google.com): criar um projeto, ativar a **Google Drive API**, configurar a tela de consentimento OAuth (externa) com o escopo `.../auth/drive.file`.
 2. Criar um **ID do cliente OAuth** do tipo "Aplicativo da Web" com as origens JavaScript `https://<usuario>.github.io` e `http://localhost:5173`.
 3. `gh variable set GOOGLE_CLIENT_ID --body <id>` (build do GitHub Pages) e `VITE_GOOGLE_CLIENT_ID=<id>` em `.env.local`.
 
 Sem `VITE_GOOGLE_CLIENT_ID`, nada do Drive aparece.
+
+### Backup automático (pelo Worker)
+
+O Worker guarda a autorização de longo prazo do Google (cifrada, no KV) e entrega ao aparelho acessos de uma hora; o aparelho guarda só uma chave própria. Só as contas em `ALLOWED_EMAILS` podem conectar.
+
+1. No cliente OAuth: **URIs de redirecionamento autorizados** `https://<worker>.workers.dev/auth/callback` (e `http://localhost:8788/auth/callback` para testes); copiar a **chave secreta do cliente**.
+2. Na tela de consentimento → Branding: página inicial `https://<usuario>.github.io/Book-Reader/`, política de privacidade `https://<usuario>.github.io/Book-Reader/privacidade.html`, domínios autorizados `<usuario>.github.io` e `<worker-subdominio>.workers.dev` (sem logo, para não precisar de verificação). Depois, Público-alvo → **Publicar app**: em modo de teste o Google faz a autorização vencer em 7 dias.
+3. Worker: `GOOGLE_CLIENT_ID` em `[vars]` de `worker/wrangler.toml`; `npx wrangler kv namespace create DRIVE_LINKS` e o binding no `wrangler.toml`; segredos (de dentro de `worker/`) `npx wrangler secret put GOOGLE_CLIENT_SECRET`, `TOKEN_KEY` (`openssl rand -base64 32`) e `ALLOWED_EMAILS` (e-mails separados por vírgula). Para testar localmente, os mesmos valores em `worker/.dev.vars`.
+4. `npm run worker:deploy`. O app usa o mesmo `VITE_PROXY_URL` do download de livros.
 
 Atalhos no leitor: `V` selecionar, `P` caneta, `H` marca-texto, `E` borracha, `Ctrl+Z` / `Ctrl+Shift+Z` desfazer/refazer, `Ctrl +/−/0` zoom, `Ctrl+F` buscar, `←/→` página.
 
