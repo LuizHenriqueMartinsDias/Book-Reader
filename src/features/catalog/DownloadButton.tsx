@@ -1,4 +1,4 @@
-import { BookOpen, Check, Download, ExternalLink, X } from 'lucide-react';
+import { BookOpen, Check, Download, ExternalLink, Loader2, X } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 import { navigate } from '../../App';
 import { resolveFile } from '../../lib/catalog/browse';
@@ -53,18 +53,21 @@ async function download(item: CatalogItem, file?: BookFile | null) {
 
 /**
  * Downloads a book into the library, or opens it when it's already there (`bookId`).
- * `file` skips looking the file up again when the caller already knows it.
+ * `file` skips looking the file up again when the caller already knows it; `icon` is a round
+ * icon-only button, for lists.
  */
 export default function DownloadButton({
   item,
   bookId,
   file,
   large = false,
+  icon = false,
 }: {
   item: CatalogItem;
   bookId?: string;
   file?: BookFile | null;
   large?: boolean;
+  icon?: boolean;
 }) {
   const state = useSyncExternalStore(subscribe, () => downloads.get(item.key) ?? IDLE);
 
@@ -73,6 +76,38 @@ export default function DownloadButton({
   const progress = state.status === 'downloading' ? state.progress : null;
   const fraction = progress?.total ? progress.loaded / progress.total : null;
   const openId = state.status === 'done' ? state.bookId : bookId;
+
+  if (icon) {
+    const round = 'flex size-11 shrink-0 items-center justify-center rounded-full';
+    if (!PROXY_URL)
+      return (
+        <a href={item.pageUrl} target="_blank" rel="noreferrer" aria-label={`Abrir ${item.title} no site`} className={`${round} border border-[var(--border)] hover:bg-[var(--app-bg)]`}>
+          <ExternalLink className="size-4" />
+        </a>
+      );
+    if (openId)
+      return (
+        <button onClick={() => navigate(`#/read/${openId}`)} aria-label={`Ler ${item.title}`} title="Na estante · Abrir" className={`${round} bg-emerald-600/15 text-emerald-700 dark:text-emerald-400`}>
+          <Check className="size-5" />
+        </button>
+      );
+    if (busy)
+      return (
+        <button onClick={() => controllers.get(item.key)?.abort()} aria-label="Cancelar download" title="Cancelar" className={`${round} border border-[var(--border)]`}>
+          <Loader2 className="size-5 animate-spin text-[var(--accent-text)]" />
+        </button>
+      );
+    return (
+      <button
+        onClick={() => download(item, file)}
+        aria-label={`Baixar ${item.title}`}
+        title={state.status === 'error' ? state.message : 'Baixar'}
+        className={`${round} border ${state.status === 'error' ? 'border-red-500 text-red-600' : 'border-[var(--border)] hover:bg-[var(--app-bg)]'}`}
+      >
+        <Download className="size-5" />
+      </button>
+    );
+  }
 
   if (!PROXY_URL)
     return (

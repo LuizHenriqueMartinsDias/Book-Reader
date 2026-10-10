@@ -9,6 +9,30 @@ const TILE = 'w-28 shrink-0 snap-start sm:w-32';
 
 type Load = { status: 'loading' } | { status: 'done'; items: CatalogItem[] } | { status: 'error'; message: string };
 
+/** First page of a shelf (cached for a day), once `enabled` (it has come near the screen). */
+export function useShelf(query: BrowseQuery, enabled = true) {
+  const [load, setLoad] = useState<Load>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+  const key = JSON.stringify(query);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let current = true;
+    setLoad({ status: 'loading' });
+    browseCached(JSON.parse(key) as BrowseQuery)
+      .then((page) => {
+        remember(page.items);
+        if (current) setLoad({ status: 'done', items: page.items });
+      })
+      .catch((e) => current && setLoad({ status: 'error', message: e instanceof Error ? e.message : String(e) }));
+    return () => {
+      current = false;
+    };
+  }, [enabled, key, attempt]);
+
+  return { load, retry: () => setAttempt((n) => n + 1) };
+}
+
 /**
  * A titled row of covers that scrolls sideways, like a store front. Loads when it nears the
  * screen; hides itself when the catalog has nothing for it.
@@ -31,22 +55,7 @@ export default function ShelfRow({
   exclude?: string;
 }) {
   const [ref, near] = useNearViewport<HTMLElement>();
-  const [load, setLoad] = useState<Load>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
-  const key = JSON.stringify(query);
-
-  useEffect(() => {
-    if (!near) return;
-    const ctrl = new AbortController();
-    setLoad({ status: 'loading' });
-    browseCached(JSON.parse(key) as BrowseQuery, ctrl.signal)
-      .then((page) => {
-        remember(page.items);
-        setLoad({ status: 'done', items: page.items });
-      })
-      .catch((e) => !ctrl.signal.aborted && setLoad({ status: 'error', message: e instanceof Error ? e.message : String(e) }));
-    return () => ctrl.abort();
-  }, [near, key, attempt]);
+  const { load, retry } = useShelf(query, near);
 
   const items = load.status === 'done' ? load.items.filter((i) => i.key !== exclude) : [];
   if (load.status === 'done' && !items.length) return null;
@@ -67,7 +76,7 @@ export default function ShelfRow({
       {load.status === 'error' ? (
         <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">
           {navigator.onLine ? 'Não foi possível carregar.' : 'Sem conexão com a internet.'}
-          <button onClick={() => setAttempt((n) => n + 1)} className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1 hover:bg-[var(--panel)]">
+          <button onClick={retry} className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1 hover:bg-[var(--panel)]">
             <RotateCw className="size-3.5" /> Tentar de novo
           </button>
         </div>

@@ -47,6 +47,9 @@ export function remember(list: CatalogItem[]) {
 
 export const recalled = (key: string) => items.get(key);
 
+/** Every book seen in this session, for suggestions while typing a search. */
+export const rememberedItems = () => [...items.values()];
+
 /** The full record of a book (search results lack the description, and Archive items their file). */
 export async function loadItem(key: string, signal?: AbortSignal): Promise<{ item: CatalogItem; file?: BookFile | null }> {
   const [prefix, id] = [key.slice(0, 3), key.slice(3)];
@@ -81,15 +84,26 @@ const CACHE_MAX = 40;
  * First page of a shelf, kept for a day in localStorage: catalogs change slowly, and
  * the home screen then opens without waiting on them.
  */
-export async function browseCached(q: BrowseQuery, signal?: AbortSignal): Promise<CatalogPage> {
+// Shelves asking for the same list at once (the home's ranking and its book of the week) share one request.
+const pending = new Map<string, Promise<CatalogPage>>();
+
+export function browseCached(q: BrowseQuery): Promise<CatalogPage> {
   const key = CACHE_PREFIX + JSON.stringify(q);
+  const shared = pending.get(key);
+  if (shared) return shared;
+  const promise = loadCached(key, q).finally(() => pending.delete(key));
+  pending.set(key, promise);
+  return promise;
+}
+
+async function loadCached(key: string, q: BrowseQuery): Promise<CatalogPage> {
   try {
     const hit = JSON.parse(localStorage.getItem(key) ?? 'null') as { at: number; page: CatalogPage } | null;
     if (hit && Date.now() - hit.at < CACHE_TTL) return hit.page;
   } catch {
     // Unreadable cache entry: fetch again.
   }
-  const page = await browse(q, 1, signal);
+  const page = await browse(q, 1);
   try {
     localStorage.setItem(key, JSON.stringify({ at: Date.now(), page }));
     pruneCache();

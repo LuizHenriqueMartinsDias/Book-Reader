@@ -3,17 +3,20 @@ import { useState } from 'react';
 import type { CatalogItem } from '../../lib/catalog/types';
 import { catalogHref } from './routes';
 
-// Covers for books without one, picked by title so a book always gets the same.
-const PLAIN_COVERS = ['bg-amber-700', 'bg-emerald-800', 'bg-sky-800', 'bg-rose-800', 'bg-violet-800', 'bg-stone-700'];
+// Covers for books without one, picked by title so a book always gets the same (amber-700,
+// emerald-800, sky-800, rose-800, violet-800, stone-700: dark enough for white text).
+const PLAIN_COVERS = ['#b45309', '#065f46', '#075985', '#9f1239', '#5b21b6', '#44403c'];
+
+/** A book's own color, from its title: its plain cover, and the background of its page. */
+export const toneOf = (title: string) => PLAIN_COVERS[[...title].reduce((n, c) => n + c.charCodeAt(0), 0) % PLAIN_COVERS.length];
 
 /** A book cover, or a plain one with the title when the catalog has none (or it fails to load). */
 export function Cover({ item, className = '' }: { item: CatalogItem; className?: string }) {
   const [failed, setFailed] = useState(false);
   if (item.cover && !failed)
     return <img src={item.cover} alt="" loading="lazy" onError={() => setFailed(true)} className={`bg-[var(--panel)] object-cover ${className}`} />;
-  const color = PLAIN_COVERS[[...item.title].reduce((n, c) => n + c.charCodeAt(0), 0) % PLAIN_COVERS.length];
   return (
-    <div className={`flex flex-col justify-between overflow-hidden p-2 text-left text-white ${color} ${className}`}>
+    <div className={`flex flex-col justify-between overflow-hidden p-2 text-left text-white ${className}`} style={{ background: toneOf(item.title) }}>
       <span className="line-clamp-4 font-serif text-xs leading-tight font-semibold">{item.title}</span>
       <span className="line-clamp-2 text-[10px] opacity-80">{item.authors}</span>
     </div>

@@ -1,8 +1,8 @@
-import { Clock, X } from 'lucide-react';
-import { CATEGORIES, featuredAuthors, homeShelves, type Shelf } from '../../lib/catalog/shelves';
+import { featuredAuthors, homeShelves, type Shelf } from '../../lib/catalog/shelves';
 import HomeLayout from '../HomeLayout';
 import CatalogHeader from './CatalogHeader';
 import { useOnShelf, useScrollMemory } from './hooks';
+import { GenreGrid, RankList, WeeklyPick } from './HomeSections';
 import { catalogHref } from './routes';
 import { useCatalogSettings } from './settings';
 import ShelfRow, { Scroller } from './ShelfRow';
@@ -11,48 +11,26 @@ const chip = 'shrink-0 rounded-full border border-[var(--border)] bg-[var(--pane
 
 const shelfHref = (shelf: Shelf) => (shelf.id.startsWith('categoria:') ? catalogHref.category(shelf.id.slice('categoria:'.length)) : catalogHref.shelf(shelf.id));
 
-/** The catalog's front page: genres, authors and shelves of books to browse. */
+/** The catalog's front page: the book of the week, genres, authors, the most downloaded and shelves to browse. */
 export default function HomeView() {
   useScrollMemory(location.hash);
-  const { language, openOnly, recentSearches, clearRecent } = useCatalogSettings();
+  const { language, openOnly } = useCatalogSettings();
   const onShelf = useOnShelf();
+  const shelves = homeShelves(language);
+  // The most downloaded books: the chart, and where the book of the week is picked from.
+  const popularShelf = shelves.find((s) => s.id === 'populares')!;
+  const popular = { ...popularShelf.filter, source: popularShelf.source, language, openOnly };
 
   return (
     <HomeLayout active="catalog">
       <div className="min-h-full">
         <CatalogHeader home />
         <main className="mx-auto max-w-5xl px-4 pb-10 sm:px-6">
-          {!!recentSearches.length && (
-            <section className="mt-5">
-              <div className="mb-2 flex items-center justify-between text-sm text-[var(--muted)]">
-                <span>Buscas recentes</span>
-                <button onClick={clearRecent} className="flex items-center gap-1 hover:text-[var(--app-fg)]">
-                  <X className="size-3.5" /> Limpar
-                </button>
-              </div>
-              <Scroller className="gap-2">
-                {recentSearches.map((q) => (
-                  <a key={q} href={catalogHref.search(q)} className={`${chip} flex items-center gap-1.5`}>
-                    <Clock className="size-3.5 text-[var(--muted)]" /> {q}
-                  </a>
-                ))}
-              </Scroller>
-            </section>
-          )}
+          <WeeklyPick query={popular} onShelf={onShelf} />
+          <GenreGrid />
 
-          <section className="mt-5">
-            <h2 className="mb-2 text-sm text-[var(--muted)]">Gêneros</h2>
-            <Scroller className="gap-2">
-              {CATEGORIES.map((c) => (
-                <a key={c.id} href={catalogHref.category(c.id)} className={chip}>
-                  {c.label}
-                </a>
-              ))}
-            </Scroller>
-          </section>
-
-          <section className="mt-4">
-            <h2 className="mb-2 text-sm text-[var(--muted)]">Autores</h2>
+          <section className="mt-8">
+            <h2 className="mb-3 text-lg font-semibold">Autores</h2>
             <Scroller className="gap-2">
               {featuredAuthors(language).map((a) => (
                 <a key={a} href={catalogHref.author(a)} className={chip}>
@@ -62,7 +40,9 @@ export default function HomeView() {
             </Scroller>
           </section>
 
-          {homeShelves(language).map((shelf) => (
+          <RankList title="Mais baixados" subtitle="Project Gutenberg" query={popular} href={catalogHref.shelf('populares')} onShelf={onShelf} />
+
+          {shelves.filter((shelf) => shelf.id !== 'populares').map((shelf) => (
             <ShelfRow
               key={`${shelf.id}|${language}|${openOnly}`}
               title={shelf.title}
