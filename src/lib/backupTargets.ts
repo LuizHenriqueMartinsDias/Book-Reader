@@ -1,10 +1,13 @@
 import { db, lastChangeAt } from '../db/schema';
 import { createBackup, download } from './backup';
+import { currentToken, driveAvailable, DriveSignInCancelled, forgetToken, getToken } from './drive/auth';
+import { DriveError, uploadBackup } from './drive/files';
 
 export const DAY = 24 * 60 * 60 * 1000;
 /** Backups kept in the backup folder; older ones are deleted. */
 const KEEP = 10;
-const NAME = /^book-reader-backup-\d{4}-\d{2}-\d{2}\.json$/;
+/** File names of backups (others in a backup folder are left alone). */
+export const BACKUP_NAME = /^book-reader-backup-\d{4}-\d{2}-\d{2}\.json$/;
 
 /** `book-reader-backup-2026-10-10.json`, by the local date (one file per day, overwritten). */
 export function backupFileName(date = new Date()) {
@@ -89,7 +92,7 @@ async function canWrite(dir: FolderHandle, ask: boolean) {
 /** The backups to delete from a folder's file names: all but the `keep` newest (other files are left alone). */
 export function backupsToRemove(names: string[], keep = KEEP) {
   return names
-    .filter((n) => NAME.test(n))
+    .filter((n) => BACKUP_NAME.test(n))
     .sort()
     .reverse()
     .slice(keep);
@@ -107,6 +110,7 @@ async function writeToFolder(dir: FolderHandle, blob: Blob, name: string) {
 // ---- Saving ----
 
 export type BackupResult =
+  | { via: 'drive' }
   | { via: 'folder'; folder: string }
   | { via: 'share' }
   | { via: 'download' }
@@ -115,13 +119,36 @@ export type BackupResult =
   | { via: 'share-blocked'; file: File };
 
 /** Whether a result means the backup was saved somewhere. */
-export const savedBackup = (r: BackupResult) => r.via === 'folder' || r.via === 'share' || r.via === 'download';
+export const savedBackup = (r: BackupResult) => r.via === 'drive' || r.via === 'folder' || r.via === 'share' || r.via === 'download';
+
+async function toDrive(token: string) {
+  try {
+    await uploadBackup(token, await createBackup(), backupFileName());
+  } catch (e) {
+    // Expired: the next tap signs in again.
+    if (e instanceof DriveError && e.status === 401) forgetToken();
+    throw e;
+  }
+}
 
 /**
- * Backs up in one tap, the best way the device has: into the chosen backup folder (computers),
- * through the share sheet so it goes to Google Drive, Files… (phones and tablets), or else as a download.
+ * Backs up in one tap, the best way the device has: straight into Google Drive (when connected,
+ * `drive` being the account), into the chosen backup folder (computers), through the share sheet
+ * so it goes to Drive, Files… (phones and tablets), or else as a download.
  */
-export async function backupNow(): Promise<BackupResult> {
+export async function backupNow({ drive }: { drive?: string | null } = {}): Promise<BackupResult> {
+  if (drive && driveAvailable()) {
+    let token: string;
+    try {
+      // Before the slow part, like the folder's permission: Google's window needs the tap.
+      token = await getToken(drive);
+    } catch (e) {
+      if (e instanceof DriveSignInCancelled) return { via: 'cancelled' };
+      throw e;
+    }
+    await toDrive(token);
+    return { via: 'drive' };
+  }
   const dir = canPickFolder() ? await getBackupFolder() : null;
   // Ask for the folder before the slow part: the prompt needs the tap that started this.
   if (dir && (await canWrite(dir, true))) {
@@ -150,10 +177,18 @@ export async function shareBackup(file: File): Promise<BackupResult> {
 }
 
 /**
- * On opening the app: saves a backup into the backup folder, without asking, if one is set and
- * still allowed, the last backup is over a day old and something changed. True if it saved one.
+ * On opening the app: saves a backup into Google Drive (signed in within the hour) or the backup
+ * folder, without asking, if it's still allowed, the last backup is over a day old and something
+ * changed. True if it saved one.
  */
-export async function autoBackup(lastBackupAt: number | null): Promise<boolean> {
+export async function autoBackup(lastBackupAt: number | null, drive?: string | null): Promise<boolean> {
+  // Google Drive only while a sign-in from a recent tap is still good (an hour): no window without a tap.
+  const token = drive && driveAvailable() ? currentToken() : null;
+  if (token) {
+    if (!(await backupDue(lastBackupAt, DAY))) return false;
+    await toDrive(token);
+    return true;
+  }
   if (!canPickFolder()) return false;
   const dir = await getBackupFolder();
   if (!dir || !(await backupDue(lastBackupAt, DAY)) || !(await canWrite(dir, false))) return false;

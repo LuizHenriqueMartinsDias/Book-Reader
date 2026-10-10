@@ -63,6 +63,8 @@ interface UiState {
   lastBackupAt: number | null;
   /** Ink being written goes straight to the screen (Chrome's low-latency canvas) and reaches ahead to where the pen is going. */
   lowLatencyInk: boolean;
+  /** The Google account whose Drive gets the backups, or null when not connected. */
+  driveAccount: string | null;
   set: (patch: Partial<Omit<UiState, "set" | "addCustomColor" | "removeCustomColor">>) => void;
 }
 
@@ -100,6 +102,7 @@ export const useUi = create<UiState>()(
       stickyColor: '#fef08a',
       lastBackupAt: null,
       lowLatencyInk: true,
+      driveAccount: null,
       set: (patch) =>
         set((s) => {
           const next = patch.tool === 'pen' || patch.tool === 'marker' ? { ...patch, lastInkTool: patch.tool } : patch;

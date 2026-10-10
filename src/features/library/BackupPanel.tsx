@@ -1,4 +1,4 @@
-import { Download, FolderOpen, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Cloud, Download, FolderOpen, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   autoBackup,
@@ -13,6 +13,8 @@ import {
   shareBackup,
   type BackupResult,
 } from '../../lib/backupTargets';
+import { driveAvailable, DriveSignInCancelled, getToken, loadGoogle, revokeDrive } from '../../lib/drive/auth';
+import { downloadBackup, driveEmail, forgetDriveFolder, listBackups, type DriveBackup } from '../../lib/drive/files';
 import { formatBytes, protectStorage, storageStatus, type StorageStatus } from '../../lib/storage';
 import { useUi } from '../../store/ui';
 import { useToast } from '../Toast';
@@ -31,7 +33,8 @@ const ago = (t: number) => {
 function report(r: BackupResult) {
   if (savedBackup(r)) useUi.getState().set({ lastBackupAt: Date.now() });
   const toast = useToast.getState();
-  if (r.via === 'folder') toast.show(`Backup salvo na pasta “${r.folder}”`);
+  if (r.via === 'drive') toast.show('Backup salvo no Google Drive');
+  else if (r.via === 'folder') toast.show(`Backup salvo na pasta “${r.folder}”`);
   else if (r.via === 'download') toast.show('Backup baixado');
   else if (r.via === 'share') toast.show('Backup feito');
   // Building it took long enough that the browser wants a new tap to open the share sheet.
@@ -41,16 +44,16 @@ function report(r: BackupResult) {
 const fail = (e: unknown) => useToast.getState().show(`Falha no backup: ${e instanceof Error ? e.message : e}`);
 
 /** The one-tap backup, with its outcome shown and remembered. */
-export const runBackup = () => backupNow().then(report, fail);
+export const runBackup = () => backupNow({ drive: useUi.getState().driveAccount }).then(report, fail);
 
 let autoBackupStarted = false;
 
-/** On opening the app: the automatic backup into the backup folder, if one is set and due. */
+/** On opening the app: the automatic backup into Google Drive or the backup folder, if set and due. */
 export function runAutoBackup() {
   // Once per app start (React's strict mode runs effects twice in development).
   if (autoBackupStarted) return;
   autoBackupStarted = true;
-  autoBackup(useUi.getState().lastBackupAt).then(
+  autoBackup(useUi.getState().lastBackupAt, useUi.getState().driveAccount).then(
     (saved) => {
       if (!saved) return;
       useUi.getState().set({ lastBackupAt: Date.now() });
@@ -74,6 +77,11 @@ export function BackupReminder() {
       live = false;
     };
   }, [lastBackupAt]);
+
+  // Google's sign-in script ready before the tap, so its window isn't blocked by the wait.
+  useEffect(() => {
+    if (due && useUi.getState().driveAccount && driveAvailable()) loadGoogle().catch(() => {});
+  }, [due]);
 
   if (!due) return null;
   return (
@@ -109,14 +117,36 @@ export function BackupReminder() {
 
 const item = 'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--app-bg)]';
 
-/** The "⋯" menu's part about keeping the data safe: storage protection, backup now, backup folder. */
+/** Connects Google Drive (Google's window, from a tap): backups go there from now on. */
+async function connectDrive() {
+  try {
+    const email = await driveEmail(await getToken(null));
+    // Another account may have a folder of its own.
+    if (email !== useUi.getState().driveAccount) await forgetDriveFolder();
+    useUi.getState().set({ driveAccount: email });
+    useToast.getState().show(`Google Drive conectado: ${email}`, { label: 'Fazer backup', run: runBackup });
+  } catch (e) {
+    if (!(e instanceof DriveSignInCancelled)) useToast.getState().show(`Não foi possível conectar: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+async function disconnectDrive() {
+  revokeDrive();
+  await forgetDriveFolder();
+  useUi.getState().set({ driveAccount: null });
+  useToast.getState().show('Google Drive desconectado');
+}
+
+/** The "⋯" menu's part about keeping the data safe: storage protection, backup now, Google Drive, backup folder. */
 export function BackupMenuSection({ onDone }: { onDone: () => void }) {
   const lastBackupAt = useUi((s) => s.lastBackupAt);
+  const driveAccount = useUi((s) => s.driveAccount);
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const [folder, setFolder] = useState<{ name: string; allowed: boolean } | null>(null);
 
   useEffect(() => {
     storageStatus().then(setStorage);
+    if (driveAvailable()) loadGoogle().catch(() => {});
     if (canPickFolder())
       getBackupFolder().then(async (dir) => dir && setFolder({ name: dir.name, allowed: await folderAllowed(dir) }));
   }, []);
@@ -162,9 +192,45 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
         <Download className="size-4 shrink-0" />
         <span className="min-w-0">
           Salvar backup das anotações
-          <span className="block text-xs text-[var(--muted)]">{lastBackupAt == null ? 'Nenhum backup ainda' : `Último: ${ago(lastBackupAt)}`}</span>
+          <span className="block text-xs text-[var(--muted)]">
+            {driveAccount && driveAvailable() ? 'No Google Drive · ' : ''}
+            {lastBackupAt == null ? 'Nenhum backup ainda' : `Último: ${ago(lastBackupAt)}`}
+          </span>
         </span>
       </button>
+      {driveAvailable() &&
+        (driveAccount ? (
+          <div className="flex items-center gap-2.5 px-2.5 py-2">
+            <Cloud className="size-4 shrink-0 text-green-600" />
+            <span className="min-w-0 flex-1">
+              Google Drive
+              <span className="block truncate text-xs text-[var(--muted)]">{driveAccount}</span>
+            </span>
+            <button
+              className="rounded-full border border-[var(--border)] px-2.5 py-0.5 text-xs hover:bg-[var(--app-bg)]"
+              onClick={() => {
+                onDone();
+                disconnectDrive();
+              }}
+            >
+              Desconectar
+            </button>
+          </div>
+        ) : (
+          <button
+            className={item}
+            onClick={() => {
+              onDone();
+              connectDrive();
+            }}
+          >
+            <Cloud className="size-4 shrink-0" />
+            <span className="min-w-0">
+              Conectar ao Google Drive
+              <span className="block text-xs text-[var(--muted)]">Backups direto numa pasta do seu Drive</span>
+            </span>
+          </button>
+        ))}
       {canPickFolder() && (
         <button
           className={item}
@@ -188,5 +254,91 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
         </button>
       )}
     </>
+  );
+}
+
+const dateOf = (b: DriveBackup) => new Date(b.modifiedTime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/**
+ * "Restaurar backup" with Google Drive connected: one of the backups there (newest first), or a
+ * file as before. Restoring adds to what's on this device; it doesn't delete anything.
+ */
+export function RestoreDialog({ onRestore, onFile, onClose }: { onRestore: (backup: Blob) => Promise<void>; onFile: () => void; onClose: () => void }) {
+  const account = useUi((s) => s.driveAccount);
+  const [backups, setBackups] = useState<DriveBackup[] | null>(null);
+  const [state, setState] = useState<'idle' | 'loading' | 'restoring'>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  // Signing in may open Google's window, so it waits for a tap unless the sign-in is still good.
+  const load = async () => {
+    setState('loading');
+    setError(null);
+    try {
+      setBackups(await listBackups(await getToken(account)));
+    } catch (e) {
+      if (!(e instanceof DriveSignInCancelled)) setError(e instanceof Error ? e.message : String(e));
+    }
+    setState('idle');
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-2xl bg-[var(--panel)] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Restaurar backup</h2>
+          <button aria-label="Fechar" className="rounded-md p-1 hover:bg-[var(--app-bg)]" onClick={onClose}>
+            <X className="size-5" />
+          </button>
+        </div>
+        <p className="mb-4 text-sm text-[var(--muted)]">O backup é juntado ao que já está neste aparelho; nada é apagado.</p>
+
+        <div className="mb-1.5 flex items-center gap-2 text-xs font-medium text-[var(--muted)]">
+          <Cloud className="size-3.5" /> Google Drive · {account}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-[var(--border)]">
+          {backups === null ? (
+            <button disabled={state !== 'idle'} onClick={load} className="w-full px-4 py-6 text-sm font-medium text-[var(--accent-text)] disabled:opacity-60">
+              {state === 'loading' ? 'Buscando backups…' : 'Ver backups no Google Drive'}
+            </button>
+          ) : backups.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-[var(--muted)]">Nenhum backup no Google Drive ainda.</p>
+          ) : (
+            backups.map((b) => (
+              <button
+                key={b.id}
+                disabled={state !== 'idle'}
+                className="flex w-full items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-2.5 text-left text-sm last:border-b-0 hover:bg-[var(--app-bg)] disabled:opacity-60"
+                onClick={async () => {
+                  if (!confirm(`Restaurar o backup de ${dateOf(b)}? Ele é juntado ao que já está aqui.`)) return;
+                  setState('restoring');
+                  try {
+                    await onRestore(await downloadBackup(await getToken(account), b.id));
+                    onClose();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : String(e));
+                    setState('idle');
+                  }
+                }}
+              >
+                <span>{dateOf(b)}</span>
+                <span className="text-xs text-[var(--muted)]">{formatBytes(b.size)}</span>
+              </button>
+            ))
+          )}
+        </div>
+        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        {state === 'restoring' && <p className="mt-2 text-sm text-[var(--muted)]">Restaurando…</p>}
+
+        <button
+          className="mt-4 h-10 rounded-full border border-[var(--border)] text-sm hover:bg-[var(--app-bg)]"
+          onClick={() => {
+            onClose();
+            onFile();
+          }}
+        >
+          Restaurar de um arquivo…
+        </button>
+      </div>
+    </div>
   );
 }

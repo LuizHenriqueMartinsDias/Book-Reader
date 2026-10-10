@@ -11,7 +11,7 @@ Leitor pessoal de livros em PDF e EPUB com anotações — roda no navegador, in
 - **Cadernos** (aba "Cadernos"): pastas por matéria; cadernos com páginas A4 (liso, pautado, quadriculado, pontilhado) ou tela infinita; caneta, marca-texto, borracha, laço (mover, redimensionar, mudar cor, duplicar, copiar/colar), texto, imagens (arquivo, colar, arrastar), formas (linha, seta, retângulo, elipse) e "desenhar e segurar" para endireitar; régua (arrastar, girar com dois dedos, traços retos ao longo da borda, marcações em cm); girar a folha com dois dedos (a página sob os dedos, ou a tela infinita inteira), com "Endireitar"; S Pen escreve e o dedo navega; importar PDF como caderno para escrever por cima; exportar caderno em PDF; capa personalizável (qualquer cor, padrões como listras, couro e kraft, ou uma imagem sua, com o título numa etiqueta), mostrada na lista no lugar da primeira página.
 - **Estudo com livros**: envie um trecho destacado para um caderno (com link de volta à página) e abra livro e caderno lado a lado, com divisória ajustável.
 - **Exportar**: gera um PDF com destaques e traços gravados e as notas como comentários; backup/restauração das anotações em JSON.
-- **Backup**: em um toque pelo menu "⋯" da Estante (no tablet/celular abre o "Compartilhar" para mandar ao Google Drive ou Arquivos; no computador baixa ou salva sozinho numa pasta escolhida, todo dia em que houver mudanças); aviso na Estante depois de uma semana sem backup; mostra se o armazenamento está protegido.
+- **Backup**: em um toque pelo menu "⋯" da Estante (direto no Google Drive, se conectado; no tablet/celular abre o "Compartilhar" para mandar ao Drive ou Arquivos; no computador baixa ou salva sozinho numa pasta escolhida, todo dia em que houver mudanças); aviso na Estante depois de uma semana sem backup; mostra se o armazenamento está protegido.
 - **Receber livros**: com o app instalado no Android, "Compartilhar → Book Reader" em qualquer app adiciona o PDF/EPUB à estante; no computador (Chrome/Edge), "Abrir com → Book Reader".
 
 Tudo fica salvo localmente no navegador (IndexedDB). Livros são identificados pelo hash do arquivo, então um backup restaurado em outro dispositivo reconecta as anotações quando o mesmo PDF for importado.
@@ -38,6 +38,16 @@ gh variable set PROXY_URL --body https://book-proxy.<conta>.workers.dev   # usad
 ```
 
 Sem `VITE_PROXY_URL`, a busca continua funcionando e o botão abre a página do livro no Internet Archive.
+
+## Backup no Google Drive (opcional)
+
+Com um ID de cliente OAuth do Google, o menu "⋯" da Estante ganha "Conectar ao Google Drive": os backups vão direto para uma pasta "Book Reader" no Drive (os 10 mais recentes) e "Restaurar backup" lista os que estão lá. Sem servidor, o acesso do Google dura uma hora e é renovado com um toque, então o backup no Drive é em um toque, não em segundo plano.
+
+1. No [Google Cloud](https://console.cloud.google.com): criar um projeto, ativar a **Google Drive API**, configurar a tela de consentimento OAuth (externa) com o escopo `.../auth/drive.file`.
+2. Criar um **ID do cliente OAuth** do tipo "Aplicativo da Web" com as origens JavaScript `https://<usuario>.github.io` e `http://localhost:5173`.
+3. `gh variable set GOOGLE_CLIENT_ID --body <id>` (build do GitHub Pages) e `VITE_GOOGLE_CLIENT_ID=<id>` em `.env.local`.
+
+Sem `VITE_GOOGLE_CLIENT_ID`, nada do Drive aparece.
 
 Atalhos no leitor: `V` selecionar, `P` caneta, `H` marca-texto, `E` borracha, `Ctrl+Z` / `Ctrl+Shift+Z` desfazer/refazer, `Ctrl +/−/0` zoom, `Ctrl+F` buscar, `←/→` página.
 

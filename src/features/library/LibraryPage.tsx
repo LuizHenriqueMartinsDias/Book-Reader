@@ -4,11 +4,12 @@ import { useRef, useState } from 'react';
 import { navigate } from '../../App';
 import { db, type Book } from '../../db/schema';
 import { restoreBackup } from '../../lib/backup';
+import { driveAvailable } from '../../lib/drive/auth';
 import { normalize } from '../../lib/catalog/text';
 import { useUi, type LibrarySort, type Theme } from '../../store/ui';
 import FolderBar, { folderCounts, inFolder, useFolderFilter } from '../FolderBar';
 import HomeLayout from '../HomeLayout';
-import { BackupMenuSection, BackupReminder } from './BackupPanel';
+import { BackupMenuSection, BackupReminder, RestoreDialog } from './BackupPanel';
 import BookCard from './BookCard';
 import ContinueReading from './ContinueReading';
 import { ACCEPTED_FILES, importBook, isBookFile } from './importBook';
@@ -38,6 +39,8 @@ export default function LibraryPage() {
   const { theme, set, librarySort } = useUi();
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const driveAccount = useUi((s) => s.driveAccount);
   const q = normalize(query);
   const shown = books
     ?.filter((b) => inFolder(b.folderId, filter) && (!q || normalize(`${b.title} ${b.author ?? ''}`).includes(q)))
@@ -71,7 +74,7 @@ export default function LibraryPage() {
     if (results.length === 1 && results[0].status === 'added') navigate(`#/read/${results[0].id}`);
   }
 
-  async function handleRestore(file: File) {
+  async function handleRestore(file: Blob) {
     try {
       const { annotations, notebooks, missingBooks } = await restoreBackup(file);
       setMessage(
@@ -146,7 +149,9 @@ export default function LibraryPage() {
                     className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--app-bg)]"
                     onClick={() => {
                       setMenuOpen(false);
-                      backupInput.current?.click();
+                      // With Google Drive connected, its backups come first; a file is still an option.
+                      if (driveAccount && driveAvailable()) setRestoring(true);
+                      else backupInput.current?.click();
                     }}
                   >
                     <Upload className="size-4" /> Restaurar backup
@@ -250,6 +255,8 @@ export default function LibraryPage() {
             {shown?.map((book) => <BookCard key={book.id} book={book} folders={folders} />)}
           </div>
         </main>
+
+        {restoring && <RestoreDialog onRestore={handleRestore} onFile={() => backupInput.current?.click()} onClose={() => setRestoring(false)} />}
 
         {dragging && (
           <div className="pointer-events-none fixed inset-0 z-20 flex items-center justify-center bg-amber-500/15 text-lg font-medium ring-4 ring-amber-500 ring-inset">
