@@ -68,11 +68,11 @@ export default function BookView({ itemKey }: { itemKey: string }) {
             <div className="flex gap-4 sm:gap-6">
               <Cover item={item} className="aspect-[2/3] w-28 shrink-0 rounded-md shadow-lg ring-1 ring-black/5 sm:w-44" />
               <div className="flex min-w-0 flex-1 flex-col">
-                <h1 className="text-xl leading-tight font-semibold sm:text-3xl">{item.title}</h1>
+                <h1 className="font-serif text-xl leading-tight font-semibold sm:text-3xl">{item.title}</h1>
                 <div className="mt-1.5 flex flex-wrap gap-x-2 text-sm">
                   {item.authors ? (
                     item.authors.split(';').map((a) => (
-                      <a key={a} href={catalogHref.author(a.trim())} className="font-medium text-amber-600 hover:underline">
+                      <a key={a} href={catalogHref.author(a.trim())} className="font-medium text-[var(--accent-text)] hover:underline">
                         {a.trim()}
                       </a>
                     ))
@@ -98,9 +98,9 @@ export default function BookView({ itemKey }: { itemKey: string }) {
             {summary && (
               <section className="mt-8 max-w-3xl">
                 <h2 className="mb-2 text-lg font-semibold">Sobre este livro</h2>
-                <p className={`text-sm leading-relaxed whitespace-pre-line ${long && !expanded ? 'line-clamp-6' : ''}`}>{summary}</p>
+                <p className={`font-serif text-[15px] leading-relaxed whitespace-pre-line ${long && !expanded ? 'line-clamp-6' : ''}`}>{summary}</p>
                 {long && (
-                  <button onClick={() => setExpanded((e) => !e)} className="mt-1 text-sm font-medium text-amber-600 hover:underline">
+                  <button onClick={() => setExpanded((e) => !e)} className="mt-1 text-sm font-medium text-[var(--accent-text)] hover:underline">
                     {expanded ? 'Mostrar menos' : 'Mostrar mais'}
                   </button>
                 )}

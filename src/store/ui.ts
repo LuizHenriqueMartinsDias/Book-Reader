@@ -8,7 +8,7 @@ export type Theme = 'light' | 'sepia' | 'dark';
 /** How pages advance: continuous vertical scroll, or one spread at a time with a transition. */
 export type ViewMode = 'scroll' | 'flip' | 'slide' | 'instant';
 export type SpreadLayout = 'auto' | 'single' | 'double';
-export type EpubFont = 'original' | 'serif' | 'sans';
+export type EpubFont = 'original' | 'literata' | 'serif' | 'sans';
 
 /** Thickness a pen starts with, by kind (each kind then remembers its own). */
 export const BRUSH_WIDTHS: Record<Brush, number> = { pen: 2, fineliner: 1.5, brush: 6, pencil: 2 };

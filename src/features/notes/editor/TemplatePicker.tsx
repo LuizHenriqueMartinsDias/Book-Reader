@@ -77,7 +77,7 @@ export default function TemplatePicker({ current, onPick, onPickAll }: Props) {
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-2 text-xs">
         {!disabled && !managing ? (
-          <button className="text-left text-amber-700 underline-offset-2 hover:underline dark:text-amber-400" onClick={onPickAll}>
+          <button className="text-left text-[var(--accent-text)] underline-offset-2 hover:underline" onClick={onPickAll}>
             Usar este modelo em todas as páginas
           </button>
         ) : (

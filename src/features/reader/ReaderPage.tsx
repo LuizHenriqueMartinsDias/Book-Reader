@@ -40,7 +40,7 @@ function PdfReader({ bookId, startPage }: { bookId: string; startPage?: number }
     return (
       <div className="p-8">
         <p className="mb-4">{state.message}</p>
-        <a href="#/" className="text-amber-600 underline">
+        <a href="#/" className="text-[var(--accent-text)] underline">
           Voltar à estante
         </a>
       </div>

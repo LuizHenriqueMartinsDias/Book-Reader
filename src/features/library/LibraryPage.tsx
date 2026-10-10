@@ -168,7 +168,7 @@ export default function LibraryPage() {
         {books && books.length === 0 && (
           <p className="mt-4 text-center text-sm text-[var(--muted)]">
             Ou{' '}
-            <a href="#/explorar" className="font-medium text-amber-600 underline">
+            <a href="#/explorar" className="font-medium text-[var(--accent-text)] underline">
               busque livros gratuitos
             </a>{' '}
             em domínio público.

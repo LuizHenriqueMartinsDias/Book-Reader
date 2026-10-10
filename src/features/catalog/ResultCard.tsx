@@ -6,7 +6,7 @@ import { catalogHref } from './routes';
 export const RIGHTS_STYLE = {
   'public-domain': 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   'open-license': 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
-  unknown: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  unknown: 'bg-amber-500/15 text-[var(--accent-text)]',
 };
 
 export const SOURCE_LABEL = { gutenberg: 'Gutenberg', archive: 'Internet Archive' };

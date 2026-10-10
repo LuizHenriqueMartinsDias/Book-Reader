@@ -142,7 +142,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
             key={id}
             title={label}
             onClick={() => editor.set({ tool: id })}
-            className={`rounded-md p-1.5 ${editor.tool === id ? 'bg-[var(--panel)] text-amber-600 shadow-sm' : 'opacity-70 hover:opacity-100'}`}
+            className={`rounded-md p-1.5 ${editor.tool === id ? 'bg-[var(--panel)] text-[var(--accent-text)] shadow-sm' : 'opacity-70 hover:opacity-100'}`}
           >
             <Icon className="size-5" />
           </button>
@@ -156,7 +156,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
               key={id}
               title={label}
               onClick={() => editor.set({ shape: id })}
-              className={`rounded-md p-1.5 ${editor.shape === id ? 'bg-[var(--app-bg)] text-amber-600' : ''}`}
+              className={`rounded-md p-1.5 ${editor.shape === id ? 'bg-[var(--app-bg)] text-[var(--accent-text)]' : ''}`}
             >
               <Icon className="size-4" />
             </button>
@@ -171,7 +171,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
               key={id}
               title={label}
               onClick={() => editor.set({ nodeShape: id })}
-              className={`rounded-md p-1.5 ${editor.nodeShape === id ? 'bg-[var(--app-bg)] text-amber-600' : ''}`}
+              className={`rounded-md p-1.5 ${editor.nodeShape === id ? 'bg-[var(--app-bg)] text-[var(--accent-text)]' : ''}`}
             >
               <Icon className="size-4" />
             </button>
@@ -179,7 +179,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
           <button
             title={editor.nodeFilled ? 'Caixas com fundo colorido' : 'Caixas sem fundo'}
             onClick={() => editor.set({ nodeFilled: !editor.nodeFilled })}
-            className={`rounded-md p-1.5 ${editor.nodeFilled ? 'bg-[var(--app-bg)] text-amber-600' : 'opacity-60'}`}
+            className={`rounded-md p-1.5 ${editor.nodeFilled ? 'bg-[var(--app-bg)] text-[var(--accent-text)]' : 'opacity-60'}`}
           >
             <PaintBucket className="size-4" />
           </button>
@@ -208,7 +208,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
               key={id}
               title={title}
               onClick={() => editor.set({ eraserMode: id })}
-              className={`rounded-md px-2 py-1 text-xs whitespace-nowrap ${editor.eraserMode === id ? 'bg-[var(--app-bg)] font-medium text-amber-600' : 'opacity-70 hover:opacity-100'}`}
+              className={`rounded-md px-2 py-1 text-xs whitespace-nowrap ${editor.eraserMode === id ? 'bg-[var(--app-bg)] font-medium text-[var(--accent-text)]' : 'opacity-70 hover:opacity-100'}`}
             >
               {label}
             </button>
@@ -252,7 +252,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
       )}
 
       {divider}
-      <button className={`${btn} ${rulerOn ? 'bg-amber-500/15 text-amber-600' : ''}`} title={rulerOn ? 'Guardar régua (R)' : 'Régua (R)'} onClick={onToggleRuler}>
+      <button className={`${btn} ${rulerOn ? 'bg-amber-500/15 text-[var(--accent-text)]' : ''}`} title={rulerOn ? 'Guardar régua (R)' : 'Régua (R)'} onClick={onToggleRuler}>
         <Ruler className="size-5" />
       </button>
       <button className={btn} title="Inserir imagem" onClick={() => imageInput.current?.click()}>
@@ -284,7 +284,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
       <div className="ml-auto flex shrink-0 items-center gap-1">
         {rotated && (
           <button
-            className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-500 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400"
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-500 bg-amber-500/10 px-2 py-1 text-xs font-medium text-[var(--accent-text)]"
             title="Desfazer o giro da folha"
             onClick={() => {
               editor.set({ pageRotation: {} });
@@ -296,7 +296,7 @@ export default function NoteToolbar({ notebook, zoomPercent, onZoom, onInsertIma
         )}
         <button
           className={`flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${
-            editor.fingerDraws ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'border-[var(--border)] text-[var(--muted)]'
+            editor.fingerDraws ? 'border-amber-500 bg-amber-500/10 text-[var(--accent-text)]' : 'border-[var(--border)] text-[var(--muted)]'
           }`}
           title={
             editor.fingerDraws

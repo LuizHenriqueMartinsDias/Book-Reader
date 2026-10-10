@@ -93,7 +93,7 @@ export default function TextItemView({ item, editing, original }: Props) {
       )}
       {item.source && !editing && (
         <button
-          className="pointer-events-auto mt-0.5 flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-700"
+          className="pointer-events-auto mt-0.5 flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[var(--accent-text)]"
           style={{ fontSize: Math.max(10, item.fontSize * 0.7) }}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => openSource(item.source!)}

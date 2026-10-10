@@ -104,7 +104,7 @@ export default function EpubToolbar({ book, location, fullscreen }: Props) {
           <ThemeIcon className="size-5" />
         </button>
         <button
-          className={`${btn} ${ui.sidebarOpen ? 'text-amber-600' : ''}`}
+          className={`${btn} ${ui.sidebarOpen ? 'text-[var(--accent-text)]' : ''}`}
           title="Sumário, notas e busca"
           onClick={() => ui.set({ sidebarOpen: !ui.sidebarOpen })}
         >

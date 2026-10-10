@@ -95,7 +95,7 @@ export function ListView({ list: spec }: { list: ListSpec | null }) {
         ) : (
           <>
             {spec.subtitle && <p className="text-xs tracking-wide text-[var(--muted)] uppercase">{spec.subtitle}</p>}
-            <h1 className="mb-5 text-2xl font-semibold">{spec.title}</h1>
+            <h1 className="mb-5 font-serif text-2xl font-semibold">{spec.title}</h1>
             <div className={grid}>
               {list.items.map((item) => (
                 <BookTile key={item.key} item={item} onShelf={onShelf.has(item.key)} />

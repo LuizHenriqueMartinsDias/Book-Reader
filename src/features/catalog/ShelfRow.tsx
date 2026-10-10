@@ -59,7 +59,7 @@ export default function ShelfRow({
           {subtitle && <p className="text-xs text-[var(--muted)]">{subtitle}</p>}
         </div>
         {href && load.status === 'done' && (
-          <a href={href} className="flex shrink-0 items-center gap-0.5 text-sm font-medium text-amber-600 hover:underline">
+          <a href={href} className="flex shrink-0 items-center gap-0.5 text-sm font-medium text-[var(--accent-text)] hover:underline">
             Ver tudo <ChevronRight className="size-4" />
           </a>
         )}

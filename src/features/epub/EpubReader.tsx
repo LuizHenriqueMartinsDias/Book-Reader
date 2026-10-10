@@ -14,6 +14,7 @@ import { useFullscreen } from '../reader/useFullscreen';
 import { useSplit } from '../split/splitStore';
 import EpubStickies from './EpubStickies';
 import EpubToolbar from './EpubToolbar';
+import { literataFontFaces } from '../../lib/fonts';
 import { EPUB_FONTS, EPUB_THEMES, FONT_SIZES } from './epubTheme';
 
 type State = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; book: Book; epub: EpubBook };
@@ -42,7 +43,7 @@ export default function EpubReader({ bookId, startCfi }: { bookId: string; start
     return (
       <div className="p-8">
         <p className="mb-4">Não foi possível abrir este EPUB: {state.message}</p>
-        <a href="#/" className="text-amber-600 underline">
+        <a href="#/" className="text-[var(--accent-text)] underline">
           Voltar à estante
         </a>
       </div>
@@ -162,6 +163,8 @@ function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startC
       allowScriptedContent: false,
     });
     const paged = flow === 'paginated';
+    // The book's pages are documents of their own: give them the app's reading typeface.
+    r.hooks.content.register((contents: Contents) => contents.addStylesheetCss(literataFontFaces(), 'app-fonts'));
 
     r.on('relocated', (loc: Location) => onRelocated.current(loc));
 

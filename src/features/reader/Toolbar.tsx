@@ -105,7 +105,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
             key={id}
             title={label}
             onClick={() => ui.set({ tool: id })}
-            className={`rounded-md p-1.5 ${ui.tool === id ? 'bg-[var(--panel)] text-amber-600 shadow-sm' : 'opacity-70 hover:opacity-100'}`}
+            className={`rounded-md p-1.5 ${ui.tool === id ? 'bg-[var(--panel)] text-[var(--accent-text)] shadow-sm' : 'opacity-70 hover:opacity-100'}`}
           >
             <Icon className="size-5" />
           </button>
@@ -121,7 +121,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
           }
           onClick={() => ui.set({ stylusAlwaysInks: !ui.stylusAlwaysInks })}
           className={`ml-1 flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${
-            ui.stylusAlwaysInks ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400' : 'border-[var(--border)] text-[var(--muted)]'
+            ui.stylusAlwaysInks ? 'border-amber-500 bg-amber-500/10 text-[var(--accent-text)]' : 'border-[var(--border)] text-[var(--muted)]'
           }`}
         >
           <PenTool className="size-4" /> Caneta escreve
@@ -173,7 +173,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
           <Minus className="size-4" />
         </button>
         <button
-          className={`w-14 rounded-md py-1 text-center text-sm tabular-nums hover:bg-[var(--app-bg)] ${fitWidth ? 'text-amber-600' : ''}`}
+          className={`w-14 rounded-md py-1 text-center text-sm tabular-nums hover:bg-[var(--app-bg)] ${fitWidth ? 'text-[var(--accent-text)]' : ''}`}
           title={fitWidth ? 'Ajustado à largura' : 'Ajustar à largura (Ctrl 0)'}
           onClick={() => onZoom(null)}
         >
@@ -223,7 +223,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
           {exporting ? <Loader2 className="size-5 animate-spin" /> : <FileDown className="size-5" />}
         </button>
         <button
-          className={`${btn} ${ui.sidebarOpen ? 'text-amber-600' : ''}`}
+          className={`${btn} ${ui.sidebarOpen ? 'text-[var(--accent-text)]' : ''}`}
           title="Sumário, notas e busca"
           onClick={() => ui.set({ sidebarOpen: !ui.sidebarOpen })}
         >

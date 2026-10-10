@@ -9,6 +9,8 @@ export const EPUB_THEMES: Record<Theme, { background: string; color: string; lin
 
 export const EPUB_FONTS: Record<EpubFont, { label: string; family: string | null }> = {
   original: { label: 'Original', family: null },
+  // Bundled with the app (lib/fonts.ts); each page of the book gets its @font-face.
+  literata: { label: 'Literata', family: 'Literata, Georgia, serif' },
   serif: { label: 'Serifa', family: 'Georgia, "Iowan Old Style", "Times New Roman", serif' },
   sans: { label: 'Sem serifa', family: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
 };

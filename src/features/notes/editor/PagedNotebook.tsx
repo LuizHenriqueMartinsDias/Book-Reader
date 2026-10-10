@@ -234,7 +234,7 @@ export default function PagedNotebook({ notebook, pages, pdf, zoom, onZoom, onSc
         })}
         <button
           onClick={() => addPage(notebook.id)}
-          className="mx-auto mb-8 flex items-center gap-2 rounded-lg border-2 border-dashed border-[var(--border)] px-6 py-3 text-sm text-[var(--muted)] hover:border-amber-500 hover:text-amber-600"
+          className="mx-auto mb-8 flex items-center gap-2 rounded-lg border-2 border-dashed border-[var(--border)] px-6 py-3 text-sm text-[var(--muted)] hover:border-amber-500 hover:text-[var(--accent-text)]"
         >
           <Plus className="size-4" /> Nova página
         </button>

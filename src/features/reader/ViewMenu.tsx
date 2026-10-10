@@ -37,7 +37,7 @@ export default function ViewMenu({ className }: { className: string }) {
                 onClick={() => set({ viewMode: id })}
                 className={`flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left ${viewMode === id ? 'bg-amber-500/15' : 'hover:bg-[var(--app-bg)]'}`}
               >
-                <Icon className={`size-5 shrink-0 ${viewMode === id ? 'text-amber-600' : 'text-[var(--muted)]'}`} />
+                <Icon className={`size-5 shrink-0 ${viewMode === id ? 'text-[var(--accent-text)]' : 'text-[var(--muted)]'}`} />
                 <span>
                   <span className="block font-medium">{label}</span>
                   <span className="block text-xs text-[var(--muted)]">{hint}</span>

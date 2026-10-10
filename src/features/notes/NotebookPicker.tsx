@@ -32,7 +32,7 @@ export default function NotebookPicker({ title, onPick, onClose }: Props) {
         </div>
         <ul className="overflow-y-auto p-2">
           <li>
-            <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left text-amber-600 hover:bg-[var(--app-bg)]" onClick={createAndPick}>
+            <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left text-[var(--accent-text)] hover:bg-[var(--app-bg)]" onClick={createAndPick}>
               <span className="flex h-12 w-9 items-center justify-center rounded border-2 border-dashed border-current">
                 <Plus className="size-4" />
               </span>

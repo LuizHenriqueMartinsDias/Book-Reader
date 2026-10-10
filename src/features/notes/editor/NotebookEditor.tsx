@@ -58,7 +58,7 @@ export default function NotebookEditor({ notebookId, onClose }: Props) {
     return (
       <div className="p-8">
         <p className="mb-4">Caderno não encontrado.</p>
-        <a href="#/cadernos" className="text-amber-600 underline">
+        <a href="#/cadernos" className="text-[var(--accent-text)] underline">
           Voltar aos cadernos
         </a>
       </div>

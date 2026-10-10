@@ -160,7 +160,7 @@ function NoteItem({ note, highlight, autoFocus }: { note: Note; highlight?: High
   return (
     <div ref={card} className="group rounded-lg border border-[var(--border)] p-2.5 focus-within:border-amber-500">
       <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--muted)]">
-        <button className="hover:text-amber-600 hover:underline" onClick={() => jumpTo(note.cfi ?? note.page)}>
+        <button className="hover:text-[var(--accent-text)] hover:underline" onClick={() => jumpTo(note.cfi ?? note.page)}>
           <Unit /> {note.page}
         </button>
         <span className="flex items-center gap-2">
@@ -169,7 +169,7 @@ function NoteItem({ note, highlight, autoFocus }: { note: Note; highlight?: High
           ) : (
             <button
               title={note.cfi ? 'Mostrar como post-it ao lado do trecho' : 'Colar na página como post-it'}
-              className="flex items-center gap-0.5 hover:text-amber-600"
+              className="flex items-center gap-0.5 hover:text-[var(--accent-text)]"
               onClick={async () => {
                 let stuck: Note;
                 if (note.cfi) {

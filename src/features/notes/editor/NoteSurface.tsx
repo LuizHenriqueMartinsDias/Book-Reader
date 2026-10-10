@@ -797,7 +797,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     const settledIds = new Set(settled.map((c) => c.id));
     commitItems([...moved, ...settled], [...before, ...items.filter((i) => settledIds.has(i.id))]);
   };
-  const pill = (active: boolean) => `rounded-md p-1.5 ${active ? 'bg-[var(--app-bg)] text-amber-600' : 'hover:bg-[var(--app-bg)]'}`;
+  const pill = (active: boolean) => `rounded-md p-1.5 ${active ? 'bg-[var(--app-bg)] text-[var(--accent-text)]' : 'hover:bg-[var(--app-bg)]'}`;
   const extra = soleBox ? (
     <>
       {(['round', 'rect', 'ellipse', 'diamond'] as const).map((shape) => (
