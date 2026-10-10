@@ -5,7 +5,11 @@ export const MARKER_OPACITY = 0.35;
 /** A pencil line lets a little of what's under it through. */
 export const PENCIL_OPACITY = 0.88;
 
-type InkLike = Pick<Stroke, 'tool' | 'width' | 'points'> & { brush?: Brush };
+type InkLike = Pick<Stroke, 'tool' | 'width' | 'points'> & { brush?: Brush; opacity?: number };
+
+/** How opaque a stroke draws: the marker's and pencil's own see-through times the opacity picked for it. */
+export const inkOpacity = (stroke: Pick<Stroke, 'tool' | 'opacity'> & { brush?: Brush }) =>
+  (stroke.tool === 'marker' ? MARKER_OPACITY : stroke.brush === 'pencil' ? PENCIL_OPACITY : 1) * (stroke.opacity ?? 1);
 
 /** How each kind of pen turns points and pressure into a shape. */
 function brushOptions(stroke: InkLike): StrokeOptions {
@@ -78,14 +82,13 @@ function pencilFill(ctx: CanvasRenderingContext2D, color: string): CanvasPattern
 }
 
 /** Fills a stroke's outline the way its tool and pen look. */
-export function fillInk(ctx: CanvasRenderingContext2D, path: Path2D, stroke: Pick<Stroke, 'tool' | 'color'> & { brush?: Brush }) {
+export function fillInk(ctx: CanvasRenderingContext2D, path: Path2D, stroke: Pick<Stroke, 'tool' | 'color' | 'opacity'> & { brush?: Brush }) {
   ctx.save();
+  ctx.globalAlpha = inkOpacity(stroke);
   if (stroke.tool === 'marker') {
-    ctx.globalAlpha = MARKER_OPACITY;
     ctx.globalCompositeOperation = 'multiply';
     ctx.fillStyle = stroke.color;
   } else if (stroke.brush === 'pencil') {
-    ctx.globalAlpha = PENCIL_OPACITY;
     ctx.fillStyle = pencilFill(ctx, stroke.color);
   } else ctx.fillStyle = stroke.color;
   ctx.fill(path);

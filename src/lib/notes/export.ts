@@ -4,7 +4,7 @@ import { db, type NodeItem, type NoteItem, type Paper } from '../../db/schema';
 import { getBookFile } from '../../db/repo';
 import { userToDisplayMatrix, viewToUserSpace } from '../coords';
 import { viewBoxOf } from '../export';
-import { hexToRgb, MARKER_OPACITY, outlineToSvgPath, PENCIL_OPACITY, strokeOutline } from '../ink';
+import { hexToRgb, inkOpacity, outlineToSvgPath, strokeOutline } from '../ink';
 import { barbs, connectorPoints, heads, midpoint, nodesById } from './connectors';
 import { nodeTextBox } from './diagram';
 import { isSticky, STICKY_HEADER, STICKY_ICON, STICKY_INK } from './sticky';
@@ -149,7 +149,8 @@ async function drawItem(
           x: 0,
           y: 0,
           color: color(item.color),
-          ...(item.tool === 'marker' ? { opacity: MARKER_OPACITY, blendMode: BlendMode.Multiply } : item.brush === 'pencil' ? { opacity: PENCIL_OPACITY } : {}),
+          opacity: inkOpacity(item),
+          ...(item.tool === 'marker' ? { blendMode: BlendMode.Multiply } : {}),
         });
       return;
     }

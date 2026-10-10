@@ -31,9 +31,10 @@ const SAMPLE: Point[] = Array.from({ length: 48 }, (_, i) => {
 
 /**
  * The pen settings button of a toolbar: kind of pen (for the pen) and thickness, with a
- * preview. `brushes: false` leaves out the kinds (shapes use the pen's thickness only).
+ * preview. `brushes: false` leaves out the kinds (shapes use the pen's thickness only); `opacity: false`
+ * leaves out the opacity, for a toolbar that shows it on its own.
  */
-export default function InkSettings({ tool, brushes = true }: { tool: 'pen' | 'marker'; brushes?: boolean }) {
+export default function InkSettings({ tool, brushes = true, opacity: showOpacity = true }: { tool: 'pen' | 'marker'; brushes?: boolean; opacity?: boolean }) {
   const ui = useUi();
   const [open, setOpen] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -42,6 +43,7 @@ export default function InkSettings({ tool, brushes = true }: { tool: 'pen' | 'm
   const width = tool === 'pen' ? ui.penWidth : ui.markerWidth;
   const color = tool === 'pen' ? ui.penColor : ui.markerColor;
   const brush = tool === 'pen' ? ui.penBrush : undefined;
+  const opacity = tool === 'pen' ? ui.penOpacity : ui.markerOpacity;
   const setWidth = (w: number) => ui.set(tool === 'pen' ? { penWidth: w } : { markerWidth: w });
   const Icon = tool === 'marker' ? Highlighter : (BRUSHES.find((b) => b.id === ui.penBrush)?.icon ?? PenLine);
 
@@ -52,8 +54,8 @@ export default function InkSettings({ tool, brushes = true }: { tool: 'pen' | 'm
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.clearRect(0, 0, 240, 68);
-    drawStroke(ctx, { tool, brush, color, width, points: SAMPLE });
-  }, [open, tool, brush, color, width]);
+    drawStroke(ctx, { tool, brush, color, width, opacity, points: SAMPLE });
+  }, [open, tool, brush, color, width, opacity]);
 
   useEffect(() => {
     if (!open) return;
@@ -133,10 +135,55 @@ export default function InkSettings({ tool, brushes = true }: { tool: 'pen' | 'm
                 </button>
               ))}
             </div>
+            {showOpacity && (
+              <div className="mt-3">
+                <OpacitySlider tool={tool} />
+              </div>
+            )}
             <canvas ref={previewRef} className="mt-3 h-[68px] w-[240px] rounded-lg bg-white ring-1 ring-black/5" />
           </div>
         </>
       )}
     </>
+  );
+}
+
+/** How see-through new strokes of the pen or marker are (10–100%), with quick picks. */
+export function OpacitySlider({ tool }: { tool: 'pen' | 'marker' }) {
+  const ui = useUi();
+  const opacity = tool === 'pen' ? ui.penOpacity : ui.markerOpacity;
+  const color = tool === 'pen' ? ui.penColor : ui.markerColor;
+  const set = (o: number) => ui.set(tool === 'pen' ? { penOpacity: o } : { markerOpacity: o });
+  const percent = Math.round(opacity * 100);
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs font-medium text-[var(--muted)]">
+        <span>Opacidade</span>
+        <span className="tabular-nums">{percent}%</span>
+      </div>
+      <input
+        type="range"
+        min={10}
+        max={100}
+        step={5}
+        value={percent}
+        onChange={(e) => set(Number(e.target.value) / 100)}
+        aria-label="Opacidade"
+        aria-valuetext={`${percent}%`}
+        className="w-full"
+        style={{ accentColor: color }}
+      />
+      <div className="mt-1.5 flex gap-1">
+        {[25, 50, 75, 100].map((p) => (
+          <button
+            key={p}
+            onClick={() => set(p / 100)}
+            className={`flex-1 rounded-md border px-1.5 py-0.5 text-xs tabular-nums ${percent === p ? 'border-amber-500 bg-amber-500/10' : 'border-[var(--border)]'}`}
+          >
+            {p}%
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

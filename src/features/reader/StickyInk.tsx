@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { Note, Point } from '../../db/schema';
 import { drawStroke, strokeHit } from '../../lib/ink';
 import { STICKY_HEADER } from '../../lib/notes/sticky';
-import { useUi } from '../../store/ui';
+import { inkStyle, useUi } from '../../store/ui';
 import { sizeCanvas } from './canvasSize';
 
 type Ink = NonNullable<Note['ink']>[number];
@@ -76,8 +76,7 @@ export default function StickyInk({ ink, w, h, scale, onInk }: { ink: Ink[]; w: 
     }
     const erase = ui.tool === 'eraser' || (stylus && (e.buttons & 34) !== 0);
     const tool = ui.tool === 'pen' || ui.tool === 'marker' ? ui.tool : ui.lastInkTool;
-    const style = tool === 'pen' ? { tool, brush: ui.penBrush, color: ui.penColor, width: ui.penWidth } : { tool, color: ui.markerColor, width: ui.markerWidth };
-    live.current = { id: e.pointerId, stroke: erase ? null : { ...style, points: [point(e)] }, erased: new Set() };
+    live.current = { id: e.pointerId, stroke: erase ? null : { ...inkStyle(tool), points: [point(e)] }, erased: new Set() };
     if (erase) eraseAt(point(e));
     draw();
   };

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Brush, Point } from '../db/schema';
-import { useUi } from '../store/ui';
-import { strokeOutline } from './ink';
+import { inkStyle, useUi } from '../store/ui';
+import { inkOpacity, MARKER_OPACITY, PENCIL_OPACITY, strokeOutline } from './ink';
 
 /** Width of a stroke's outline across its middle, for a straight line at a given pressure. */
 function widthAt(brush: Brush, pressure: number) {
@@ -36,5 +36,20 @@ describe('pen thickness per kind', () => {
     expect(useUi.getState().penWidth).toBe(3.5);
     useUi.getState().set({ penBrush: 'brush' });
     expect(useUi.getState().penWidth).toBe(10);
+  });
+});
+
+describe('ink opacity', () => {
+  it('multiplies the picked opacity with the marker and pencil see-through', () => {
+    expect(inkOpacity({ tool: 'pen' })).toBe(1);
+    expect(inkOpacity({ tool: 'pen', opacity: 0.5 })).toBe(0.5);
+    expect(inkOpacity({ tool: 'pen', brush: 'pencil', opacity: 0.5 })).toBeCloseTo(PENCIL_OPACITY * 0.5);
+    expect(inkOpacity({ tool: 'marker', opacity: 0.5 })).toBeCloseTo(MARKER_OPACITY * 0.5);
+  });
+
+  it('leaves the opacity out of fully opaque strokes', () => {
+    useUi.getState().set({ penOpacity: 1, markerOpacity: 0.4 });
+    expect(inkStyle('pen')).not.toHaveProperty('opacity');
+    expect(inkStyle('marker')).toMatchObject({ tool: 'marker', opacity: 0.4 });
   });
 });

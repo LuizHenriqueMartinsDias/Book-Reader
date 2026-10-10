@@ -12,7 +12,7 @@ import { bboxOf, eraserHits, itemsInLasso, rotateVec, screenToLocal, transformIt
 import { defaultInk, drawConnector, drawItems, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
-import { useUi } from '../../../store/ui';
+import { inkStyle, useUi } from '../../../store/ui';
 import { sizeCanvas } from '../../reader/canvasSize';
 import { useNoteEditor } from './editorStore';
 import ImageItemView from './ImageItemView';
@@ -127,11 +127,6 @@ function newConnector(from: NodeItem, to: ConnectorEnd): Omit<ConnectorItem, 'id
     label: '',
     fontSize: Math.round(textSize * 0.85),
   };
-}
-
-function inkStyle(tool: 'pen' | 'marker') {
-  const ui = useUi.getState();
-  return tool === 'pen' ? { tool, brush: ui.penBrush, color: ui.penColor, width: ui.penWidth } : { tool, color: ui.markerColor, width: ui.markerWidth };
 }
 
 /**

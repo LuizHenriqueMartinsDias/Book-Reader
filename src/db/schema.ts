@@ -60,6 +60,8 @@ export interface Stroke {
   /** Pen strokes only; absent on older strokes, which are all `pen`. */
   brush?: Brush;
   color: string;
+  /** How opaque the ink is, 0–1, on top of the marker's and pencil's own see-through; absent = 1. */
+  opacity?: number;
   width: number;
   points: Point[];
   createdAt: number;
@@ -95,7 +97,7 @@ export interface Note {
   color?: string;
   collapsed?: boolean;
   /** Handwriting on the post-it, in points from its top-left corner (it moves with it). */
-  ink?: Pick<Stroke, 'tool' | 'brush' | 'color' | 'width' | 'points'>[];
+  ink?: Pick<Stroke, 'tool' | 'brush' | 'color' | 'opacity' | 'width' | 'points'>[];
   body: string;
   createdAt: number;
   updatedAt: number;
@@ -205,6 +207,8 @@ export interface StrokeItem extends NoteItemBase {
   /** Pen strokes only; absent on older strokes, which are all `pen`. */
   brush?: Brush;
   color: string;
+  /** How opaque the ink is, 0–1, on top of the marker's and pencil's own see-through; absent = 1. */
+  opacity?: number;
   width: number;
   points: Point[];
 }

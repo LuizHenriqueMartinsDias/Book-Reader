@@ -5,7 +5,7 @@ import { newId } from '../../db/repo';
 import { drawStroke, strokeHit } from '../../lib/ink';
 import type { PageSize } from '../../lib/pdf';
 import { useHistory } from '../../store/history';
-import { useUi } from '../../store/ui';
+import { inkStyle, useUi } from '../../store/ui';
 import { sizeCanvas } from './canvasSize';
 import { useReader } from './readerStore';
 
@@ -13,12 +13,6 @@ const ERASER_RADIUS_PX = 10;
 
 /** The stylus' eraser end (32) or side button (2) is down: it erases while held. */
 const penErases = (e: { pointerType: string; buttons: number }) => e.pointerType === 'pen' && (e.buttons & 34) !== 0;
-
-/** Current color and width settings of an ink tool. */
-function inkStyle(tool: InkTool) {
-  const ui = useUi.getState();
-  return tool === 'pen' ? { tool, brush: ui.penBrush, color: ui.penColor, width: ui.penWidth } : { tool, color: ui.markerColor, width: ui.markerWidth };
-}
 
 interface Props {
   pageNumber: number;

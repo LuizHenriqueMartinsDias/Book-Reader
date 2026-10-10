@@ -32,6 +32,9 @@ interface UiState {
   brushWidths: Partial<Record<Brush, number>>;
   penWidth: number;
   markerColor: string;
+  /** Opacity of new pen and marker strokes, 0.1–1. */
+  penOpacity: number;
+  markerOpacity: number;
   markerWidth: number;
   theme: Theme;
   viewMode: ViewMode;
@@ -68,6 +71,8 @@ export const useUi = create<UiState>()(
       brushWidths: {},
       penWidth: 2,
       markerColor: MARKER_COLORS[0],
+      penOpacity: 1,
+      markerOpacity: 1,
       markerWidth: 14,
       theme: 'light',
       viewMode: 'scroll',
@@ -106,3 +111,12 @@ export const useUi = create<UiState>()(
     },
   ),
 );
+
+/** What a new stroke of the pen or marker is drawn with: color, kind of pen, thickness and opacity. */
+export function inkStyle(tool: InkKind) {
+  const ui = useUi.getState();
+  const opacity = tool === 'pen' ? ui.penOpacity : ui.markerOpacity;
+  const style = tool === 'pen' ? { tool, brush: ui.penBrush, color: ui.penColor, width: ui.penWidth } : { tool, color: ui.markerColor, width: ui.markerWidth };
+  // Fully opaque ink leaves the field out, like strokes drawn before there was a choice.
+  return opacity < 1 ? { ...style, opacity } : style;
+}

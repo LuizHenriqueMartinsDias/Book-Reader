@@ -24,7 +24,7 @@ import type { NodeShape, ShapeKind } from '../../../db/schema';
 import { STICKY_COLORS } from '../../../lib/notes/sticky';
 import { MARKER_PALETTE, PEN_PALETTE, useUi, type InkKind } from '../../../store/ui';
 import ColorPicker from '../../ColorPicker';
-import InkSettings from '../../InkSettings';
+import InkSettings, { OpacitySlider } from '../../InkSettings';
 import { useNoteEditor, type EraserMode, type NoteTool } from './editorStore';
 
 const TOOLS: { id: NoteTool; icon: typeof PenLine; label: string }[] = [
@@ -106,7 +106,10 @@ export default function ToolRail({ rulerOn, onToggleRuler }: { rulerOn: boolean;
         </button>
         <div className="mx-1.5 my-1 shrink-0 bg-[var(--border)] max-md:w-px md:h-px" />
         <button className={railBtn} title={`Opções: ${TOOL_NAMES[editor.tool]}`} aria-label={`Opções: ${TOOL_NAMES[editor.tool]}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          <span className="size-6 rounded-full ring-2 ring-[var(--panel)] outline-2 outline-[var(--border)]" style={{ background: color }} />
+          <span
+            className="size-6 rounded-full ring-2 ring-[var(--panel)] outline-2 outline-[var(--border)]"
+            style={{ background: color, opacity: editor.tool === 'pen' ? ui.penOpacity : editor.tool === 'marker' ? ui.markerOpacity : 1 }}
+          />
         </button>
       </div>
 
@@ -222,6 +225,7 @@ function ToolOptions() {
       {showsInk && (
         <>
           <InkColors kind={usesMarker ? 'marker' : 'pen'} color={color} onPick={setColor} />
+          {(editor.tool === 'pen' || editor.tool === 'marker') && <OpacitySlider tool={editor.tool} />}
           {editor.tool === 'text' || editor.tool === 'diagram' ? (
             <div>
               <div className={label}>Tamanho do texto</div>
@@ -236,7 +240,7 @@ function ToolOptions() {
           ) : (
             <div className="flex items-center justify-between">
               <span className={label.replace('mb-1.5 ', '')}>{editor.tool === 'pen' ? 'Tipo e espessura' : 'Espessura'}</span>
-              <InkSettings tool={usesMarker ? 'marker' : 'pen'} brushes={editor.tool === 'pen'} />
+              <InkSettings tool={usesMarker ? 'marker' : 'pen'} brushes={editor.tool === 'pen'} opacity={false} />
             </div>
           )}
         </>
