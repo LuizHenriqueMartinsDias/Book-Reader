@@ -43,6 +43,7 @@ export default defineConfig(({ mode }) => ({
         shortcuts: [
           { name: 'Cadernos', url: './#/cadernos', icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' }] },
           { name: 'Explorar', url: './#/explorar', icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' }] },
+          { name: 'Rotina', url: './#/rotina', icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' }] },
         ],
         // Computers (Chrome, Edge): "Open with → Book Reader" for PDFs and EPUBs.
         file_handlers: [{ action: './', accept: { 'application/pdf': ['.pdf'], 'application/epub+zip': ['.epub'] } }],

@@ -1,16 +1,17 @@
-import { Compass, Library, NotebookPen } from 'lucide-react';
+import { CalendarCheck, Compass, Library, NotebookPen } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-export type HomeSection = 'books' | 'catalog' | 'notes';
+export type HomeSection = 'books' | 'catalog' | 'notes' | 'routine';
 
 const SECTIONS: { id: HomeSection; href: string; label: string; icon: typeof Library }[] = [
   { id: 'books', href: '#/', label: 'Estante', icon: Library },
   { id: 'catalog', href: '#/explorar', label: 'Explorar', icon: Compass },
   { id: 'notes', href: '#/cadernos', label: 'Cadernos', icon: NotebookPen },
+  { id: 'routine', href: '#/rotina', label: 'Rotina', icon: CalendarCheck },
 ];
 
 /**
- * The app's main screens (shelf, free books, notebooks) with the way between them: a bar at the
+ * The app's main screens (shelf, free books, notebooks, routine) with the way between them: a bar at the
  * bottom on phones, a side menu from tablets up, where `aside` (the screen's folders) goes too.
  */
 export default function HomeLayout({ active, aside, children }: { active: HomeSection; aside?: ReactNode; children: ReactNode }) {
@@ -37,7 +38,7 @@ export default function HomeLayout({ active, aside, children }: { active: HomeSe
 
       <div className="min-w-0 flex-1 pb-20 md:pb-0">{children}</div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-[var(--border)] bg-[var(--panel)] pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-[var(--border)] bg-[var(--panel)] pb-[env(safe-area-inset-bottom)] md:hidden">
         {SECTIONS.map(({ id, href, label, icon: Icon }) => (
           <a
             key={id}
