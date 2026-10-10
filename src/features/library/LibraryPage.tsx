@@ -109,7 +109,7 @@ export default function LibraryPage() {
           href="#/explorar"
           className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium hover:bg-[var(--app-bg)]"
         >
-          <Globe className="size-4" /> Buscar livros grátis
+          <Globe className="size-4" /> Livros grátis
         </a>
         <button
           className="flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-amber-400"

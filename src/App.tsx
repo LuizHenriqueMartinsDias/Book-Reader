@@ -11,13 +11,13 @@ import { useUi } from './store/ui';
 
 type Route =
   | { name: 'library' }
-  | { name: 'catalog' }
+  | { name: 'catalog'; path: string; params: URLSearchParams }
   | { name: 'notes' }
   | { name: 'notebook'; notebookId: string }
   | { name: 'reader'; bookId: string; startAt: StartAt; notebookId: string | null };
 
 /**
- * #/ · #/explorar · #/cadernos · #/caderno/<id> ·
+ * #/ · #/explorar[/…] (see features/catalog/routes.ts) · #/cadernos · #/caderno/<id> ·
  * #/read/<book>[?p=<page>|cfi=<cfi>][&caderno=<notebook>] (the notebook opens side by side).
  */
 function parseRoute(): Route {
@@ -36,7 +36,7 @@ function parseRoute(): Route {
   const notebook = path.match(/^\/caderno\/([^/]+)/);
   if (notebook) return { name: 'notebook', notebookId: decodeURIComponent(notebook[1]) };
   if (path.startsWith('/cadernos')) return { name: 'notes' };
-  if (path.startsWith('/explorar')) return { name: 'catalog' };
+  if (path.startsWith('/explorar')) return { name: 'catalog', path, params };
   return { name: 'library' };
 }
 
@@ -80,7 +80,7 @@ function Screen({ route }: { route: Route }) {
     case 'notes':
       return <NotesHome />;
     case 'catalog':
-      return <CatalogPage />;
+      return <CatalogPage path={route.path} params={route.params} />;
     default:
       return <LibraryPage />;
   }

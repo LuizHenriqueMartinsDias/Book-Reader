@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:relevance="http://a9.com/-/opensearch/extensions/relevance/1.0/">
+<id>http://www.gutenberg.org/ebooks/search.opds/?query=s.poetry+l.pt&amp;sort_order=downloads</id>
+<updated>2026-10-09T22:53:24Z</updated>
+<title>Books: s.poetry  Language: Portuguese </title>
+<subtitle>Free eBooks since 1971.</subtitle>
+<author>
+<name>Project Gutenberg</name>
+<uri>https://www.gutenberg.org</uri>
+<email>webmaster@gutenberg.org</email>
+</author>
+<icon>https://www.gutenberg.org/gutenberg/favicon.ico</icon>
+<link rel="search" type="application/opensearchdescription+xml" title="Project Gutenberg Catalog Search" href="https://www.gutenberg.org/catalog/osd-books.xml"/>
+<link rel="self" title="This Page" type="application/atom+xml;profile=opds-catalog" href="/ebooks/search.opds/?query=s.poetry+l.pt&amp;sort_order=downloads"/>
+<link rel="alternate" type="text/html" title="HTML Page" href="/ebooks/search/?query=s.poetry+l.pt&amp;sort_order=downloads"/>
+<link rel="start" title="Start Page" type="application/atom+xml;profile=opds-catalog" href="/ebooks.opds/"/>
+<link rel="next" title="Next Page" type="application/atom+xml;profile=opds-catalog" href="/ebooks/search.opds/?query=s.poetry+l.pt&amp;sort_order=downloads&amp;start_index=26"/>
+<opensearch:itemsPerPage>25</opensearch:itemsPerPage>
+<opensearch:startIndex>1</opensearch:startIndex>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/3333.opds</id>
+<title>Os Lusíadas (Portuguese)</title>
+<content type="text">Luís de Camões</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/3333.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/31509.opds</id>
+<title>Obras Completas de Luis de Camões, Tomo II (Portuguese)</title>
+<content type="text">Luís de Camões</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/31509.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/20874.opds</id>
+<title>Raios de extincta luz (Portuguese)</title>
+<content type="text">Antero de Quental</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/20874.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/61653.opds</id>
+<title>Poesias Completas (Portuguese)</title>
+<content type="text">Machado de Assis</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/61653.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/37192.opds</id>
+<title>Obras Completas de Luis de Camões, Tomo III (Portuguese)</title>
+<content type="text">Luís de Camões</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/37192.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/23526.opds</id>
+<title>A Velhice do Padre Eterno (Portuguese)</title>
+<content type="text">Abílio Manuel Guerra Junqueiro</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/23526.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/58689.opds</id>
+<title>Poesias Eroticas, Burlescas, e Satyricas de M.M. de Barbosa du Bocage (Portuguese)</title>
+<content type="text">Manuel Maria Barbosa du Bocage</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/58689.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/27599.opds</id>
+<title>Flores do Campo (Portuguese)</title>
+<content type="text">João de Deus</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/27599.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/20940.opds</id>
+<title>Claridades do sul (Portuguese)</title>
+<content type="text">António Duarte Gomes Leal</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/20940.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/8698.opds</id>
+<title>O Livro de Cesario Verde (Portuguese)</title>
+<content type="text">Cesário Verde</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/8698.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/27236.opds</id>
+<title>Os Lusíadas (Portuguese)</title>
+<content type="text">Luís de Camões</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/27236.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/20142.opds</id>
+<title>Os sonetos completos de Anthero de Quental (Portuguese)</title>
+<content type="text">Antero de Quental</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/20142.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/17610.opds</id>
+<title>Livro de Máguas (Portuguese)</title>
+<content type="text">Florbela Espanca</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/17610.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/63439.opds</id>
+<title>Romanceiro III: Romances Cavalherescos Antigos (Portuguese)</title>
+<content type="text">Visconde de João Batista da Silva Leitão de Almeida Garrett Almeida Garrett</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/63439.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/25925.opds</id>
+<title>Poesias (Portuguese)</title>
+<content type="text">Alexandre Herculano</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/25925.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/74854.opds</id>
+<title>Cantos :  Collecção de poesias (Portuguese)</title>
+<content type="text">Antônio Gonçalves Dias</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/74854.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/68691.opds</id>
+<title>Livro de "Soror Saudade" (Portuguese)</title>
+<content type="text">Florbela Espanca</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/68691.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/71724.opds</id>
+<title>Obras poeticas de Gregorio de Mattos Guerra - Tomo I :  precedidas de vida do poeta pelo licenceado Manuel Pereira Rebello (Portuguese)</title>
+<content type="text">Gregório de Matos</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/71724.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/24462.opds</id>
+<title>O desastre de Lisboa em 1755: poesia (Portuguese)</title>
+<content type="text">Augusto de Oliveira Cardoso Fonseca</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/24462.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/27535.opds</id>
+<title>Despedidas: 1895-1899 (Portuguese)</title>
+<content type="text">António Pereira Nobre</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/27535.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/17639.opds</id>
+<title>A Alma Nova (Portuguese)</title>
+<content type="text">Guilherme Avelino Chave de Azevedo</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/17639.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/70764.opds</id>
+<title>Parnaso portuguez moderno :  precedido de um estudo da poesia moderna portugueza (Portuguese)</title>
+<content type="text">544 downloads</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/70764.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/24846.opds</id>
+<title>A Saudade: Canto elegiaco (Portuguese)</title>
+<content type="text">Henrique Ernesto de Almeida Coutinho</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/24846.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/27413.opds</id>
+<title>Á Ilha da Madeira (Portuguese)</title>
+<content type="text">José Ramos Coelho</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/27413.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:24Z</updated>
+<id>https://www.gutenberg.org/ebooks/63438.opds</id>
+<title>Romanceiro I: Romances da Renascença (Portuguese)</title>
+<content type="text">Visconde de João Batista da Silva Leitão de Almeida Garrett Almeida Garrett</content>
+<link type="application/atom+xml;profile=opds-catalog" rel="subsection" href="/ebooks/63438.opds"/>
+<link type="image/png" rel="http://opds-spec.org/image/thumbnail" href="data:image/png;base64,AA=="/>
+</entry>
+</feed>

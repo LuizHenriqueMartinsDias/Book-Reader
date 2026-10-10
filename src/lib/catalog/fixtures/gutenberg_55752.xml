@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:opds="http://opds-spec.org/2010/catalog" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:relevance="http://a9.com/-/opensearch/extensions/relevance/1.0/">
+<id>http://www.gutenberg.org/ebooks/55752.opds</id>
+<updated>2026-10-09T22:53:25Z</updated>
+<title>Dom Casmurro by Machado de Assis</title>
+<subtitle>Free eBooks since 1971.</subtitle>
+<author>
+<name>Project Gutenberg</name>
+<uri>https://www.gutenberg.org</uri>
+<email>webmaster@gutenberg.org</email>
+</author>
+<icon>https://www.gutenberg.org/gutenberg/favicon.ico</icon>
+<link rel="search" type="application/opensearchdescription+xml" title="Project Gutenberg Catalog Search" href="https://www.gutenberg.org/catalog/osd-books.xml"/>
+<link rel="self" title="This Page" type="application/atom+xml;profile=opds-catalog" href="/ebooks/55752.opds"/>
+<link rel="alternate" type="text/html" title="HTML Page" href="/ebooks/55752"/>
+<link rel="start" title="Start Page" type="application/atom+xml;profile=opds-catalog" href="/ebooks.opds/"/>
+<opensearch:itemsPerPage>25</opensearch:itemsPerPage>
+<opensearch:startIndex>1</opensearch:startIndex>
+<entry>
+<updated>2026-10-09T22:53:25Z</updated>
+<title>Dom Casmurro</title>
+<content type="xhtml">
+<div xmlns="http://www.w3.org/1999/xhtml">
+<p>This edition had all images removed.</p>
+<p>
+Title:
+Dom Casmurro
+</p>
+<p>
+Note:
+Wikipedia page about this book: https:<a href="//fr.wikipedia.org/wiki/Dom_Casmurro">//fr.wikipedia.org/wiki/Dom_Casmurro</a>
+</p>
+<p>
+Note:
+Wikipedia page about this book: https:<a href="//en.wikipedia.org/wiki/Dom_Casmurro">//en.wikipedia.org/wiki/Dom_Casmurro</a>
+</p>
+<p>
+Credits:
+Produced by Laura Natal Rodriguez &amp; Marc D'Hooghe at Free<br />Literature (online soon in an extended version,also linking<br />to free sources for education worldwide ... MOOC's,<br />educational materials,...) (Images generously made available<br />by the Bibliotheca Nacional Digital Brasil.)
+</p>
+<p>
+Summary:
+"Dom Casmurro" by Machado de Assis is a novel published in 1900. Bento Santiago, a wealthy lawyer in his fifties, attempts to reconnect the two ends of his life by recounting his childhood memories, his time in seminary, and his marriage to Capitu. At the heart of his narrative lies his morbid jealousy and suspicions of adultery. But can readers trust this unreliable narrator's version of events? The novel leaves the central question of Capitu's guilt deliberately ambiguous, inviting multiple interpretations. (This is an automatically generated summary.)
+</p>
+<p>
+Reading Level:
+Reading ease score: 63.9 (8th &amp; 9th grade). Neither easy nor difficult to read.
+</p>
+<p>Author: Machado de Assis, 1839-1908</p>
+<p>EBook No.: 55752</p>
+<p>Published: Oct 15, 2017</p>
+<p>Downloads: 4420</p>
+<p>Language: Portuguese</p>
+<p>Subject: Adultery -- Fiction</p><p>Subject: Authorship -- Fiction</p><p>Subject: Catholic Church -- Fiction</p><p>Subject: Reminiscing in old age -- Fiction</p>
+<p>LoCC: Language and Literatures: Romance literatures: French, Italian, Spanish, Portuguese</p>
+<p>Category: Text</p>
+<p>Rights: Public domain in the USA.</p>
+</div>
+</content>
+<id>urn:gutenberg:55752:2</id>
+<published>2017-10-15T00:00:00+00:00</published>
+<rights>Public domain in the USA.</rights>
+<author>
+<name>Machado de Assis</name>
+</author>
+<category scheme="http://purl.org/dc/terms/LCSH" term="Adultery -- Fiction"/><category scheme="http://purl.org/dc/terms/LCSH" term="Authorship -- Fiction"/><category scheme="http://purl.org/dc/terms/LCSH" term="Catholic Church -- Fiction"/><category scheme="http://purl.org/dc/terms/LCSH" term="Reminiscing in old age -- Fiction"/>
+<category scheme="http://purl.org/dc/terms/LCC" term="PQ" label="Language and Literatures: Romance literatures: French, Italian, Spanish, Portuguese"/>
+<category scheme="http://purl.org/dc/terms/DCMIType" term="Text"/>
+<dcterms:language>pt</dcterms:language>
+<relevance:score>1</relevance:score>
+<link type="application/epub+zip" rel="http://opds-spec.org/acquisition" title="EPUB (older e-readers, no images)" length="227285" href="https://www.gutenberg.org/ebooks/55752.epub.noimages"/>
+<link type="application/x-mobipocket-ebook" rel="http://opds-spec.org/acquisition" title="Kindle (no images)" length="352767" href="https://www.gutenberg.org/ebooks/55752.kindle.noimages"/>
+<link type="image/jpeg" rel="http://opds-spec.org/image" href="https://www.gutenberg.org/cache/epub/55752/pg55752.cover.medium.jpg"/>
+<link type="image/jpeg" rel="http://opds-spec.org/image/thumbnail" href="https://www.gutenberg.org/cache/epub/55752/pg55752.cover.small.jpg"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/author/9685.opds" title="By Machado de Assis…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/subject/30.opds" title="On Adultery -- Fiction…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/subject/2669.opds" title="On Authorship -- Fiction…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/subject/29038.opds" title="On Catholic Church -- Fiction…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/subject/31717.opds" title="On Reminiscing in old age -- Fiction…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/bookshelf/645.opds" title="In Category: Novels…"/>
+</entry>
+<entry>
+<updated>2026-10-09T22:53:25Z</updated>
+<title>Dom Casmurro</title>
+<content type="xhtml">
+<div xmlns="http://www.w3.org/1999/xhtml">
+<p>This edition has images.</p>
+<p>
+Title:
+Dom Casmurro
+</p>
+<p>
+Note:
+Wikipedia page about this book: https:<a href="//fr.wikipedia.org/wiki/Dom_Casmurro">//fr.wikipedia.org/wiki/Dom_Casmurro</a>
+</p>
+<p>
+Note:
+Wikipedia page about this book: https:<a href="//en.wikipedia.org/wiki/Dom_Casmurro">//en.wikipedia.org/wiki/Dom_Casmurro</a>
+</p>
+<p>
+Credits:
+Produced by Laura Natal Rodriguez &amp; Marc D'Hooghe at Free<br />Literature (online soon in an extended version,also linking<br />to free sources for education worldwide ... MOOC's,<br />educational materials,...) (Images generously made available<br />by the Bibliotheca Nacional Digital Brasil.)
+</p>
+<p>
+Summary:
+"Dom Casmurro" by Machado de Assis is a novel published in 1900. Bento Santiago, a wealthy lawyer in his fifties, attempts to reconnect the two ends of his life by recounting his childhood memories, his time in seminary, and his marriage to Capitu. At the heart of his narrative lies his morbid jealousy and suspicions of adultery. But can readers trust this unreliable narrator's version of events? The novel leaves the central question of Capitu's guilt deliberately ambiguous, inviting multiple interpretations. (This is an automatically generated summary.)
+</p>
+<p>
+Reading Level:
+Reading ease score: 63.9 (8th &amp; 9th grade). Neither easy nor difficult to read.
+</p>
+<p>Author: Machado de Assis, 1839-1908</p>
+<p>EBook No.: 55752</p>
+<p>Published: Oct 15, 2017</p>
+<p>Downloads: 4420</p>
+<p>Language: Portuguese</p>
+<p>Subject: Adultery -- Fiction</p><p>Subject: Authorship -- Fiction</p><p>Subject: Catholic Church -- Fiction</p><p>Subject: Reminiscing in old age -- Fiction</p>
+<p>LoCC: Language and Literatures: Romance literatures: French, Italian, Spanish, Portuguese</p>
+<p>Category: Text</p>
+<p>Rights: Public domain in the USA.</p>
+</div>
+</content>
+<id>urn:gutenberg:55752:3</id>
+<published>2017-10-15T00:00:00+00:00</published>
+<rights>Public domain in the USA.</rights>
+<author>
+<name>Machado de Assis</name>
+</author>
+<category scheme="http://purl.org/dc/terms/LCSH" term="Adultery -- Fiction"/><category scheme="http://purl.org/dc/terms/LCSH" term="Authorship -- Fiction"/><category scheme="http://purl.org/dc/terms/LCSH" term="Catholic Church -- Fiction"/><category scheme="http://purl.org/dc/terms/LCSH" term="Reminiscing in old age -- Fiction"/>
+<category scheme="http://purl.org/dc/terms/LCC" term="PQ" label="Language and Literatures: Romance literatures: French, Italian, Spanish, Portuguese"/>
+<category scheme="http://purl.org/dc/terms/DCMIType" term="Text"/>
+<dcterms:language>pt</dcterms:language>
+<relevance:score>1</relevance:score>
+<link type="application/epub+zip" rel="http://opds-spec.org/acquisition" title="EPUB3 (E-readers incl. Send-to-Kindle)" length="222389" href="https://www.gutenberg.org/ebooks/55752.epub3.images"/>
+<link type="application/epub+zip" rel="http://opds-spec.org/acquisition" title="EPUB (older e-readers)" length="227285" href="https://www.gutenberg.org/ebooks/55752.epub.images"/>
+<link type="application/x-mobipocket-ebook" rel="http://opds-spec.org/acquisition" title="Kindles (kf8)" length="366154" href="https://www.gutenberg.org/ebooks/55752.kf8.images"/>
+<link type="application/x-mobipocket-ebook" rel="http://opds-spec.org/acquisition" title="Older Kindles" length="348416" href="https://www.gutenberg.org/ebooks/55752.kindle.images"/>
+<link type="image/jpeg" rel="http://opds-spec.org/image" href="https://www.gutenberg.org/cache/epub/55752/pg55752.cover.medium.jpg"/>
+<link type="image/jpeg" rel="http://opds-spec.org/image/thumbnail" href="https://www.gutenberg.org/cache/epub/55752/pg55752.cover.small.jpg"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/author/9685.opds" title="By Machado de Assis…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/subject/30.opds" title="On Adultery -- Fiction…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/subject/2669.opds" title="On Authorship -- Fiction…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/subject/29038.opds" title="On Catholic Church -- Fiction…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/subject/31717.opds" title="On Reminiscing in old age -- Fiction…"/>
+<link type="application/atom+xml;profile=opds-catalog" rel="related" href="/ebooks/bookshelf/645.opds" title="In Category: Novels…"/>
+</entry>
+</feed>

@@ -35,6 +35,8 @@ export interface Book {
   locations?: string;
   /** Library folder (`bookFolders`); absent or null when the book isn't in one. */
   folderId?: string | null;
+  /** Catalog entry it was downloaded from (`pg:<id>`, `ia:<identifier>`), so the catalog shows it as on the shelf. */
+  catalogKey?: string;
 }
 
 /** Kept apart from `books` so listing the library doesn't load every PDF into memory. */
