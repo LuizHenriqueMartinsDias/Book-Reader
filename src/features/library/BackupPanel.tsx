@@ -13,8 +13,9 @@ import {
   shareBackup,
   type BackupResult,
 } from '../../lib/backupTargets';
-import { driveAvailable, DriveSignInCancelled, getToken, loadGoogle, revokeDrive } from '../../lib/drive/auth';
+import { driveAvailable, DriveSignInCancelled, forgetToken, getToken, loadGoogle, revokeDrive } from '../../lib/drive/auth';
 import { downloadBackup, driveEmail, forgetDriveFolder, listBackups, type DriveBackup } from '../../lib/drive/files';
+import { DriveRelink, finishLink, isLinked, LINK_ROUTE, linkAvailable, startLink, unlink } from '../../lib/drive/link';
 import { formatBytes, protectStorage, storageStatus, type StorageStatus } from '../../lib/storage';
 import { useUi } from '../../store/ui';
 import { useToast } from '../Toast';
@@ -46,21 +47,60 @@ const fail = (e: unknown) => useToast.getState().show(`Falha no backup: ${e inst
 /** The one-tap backup, with its outcome shown and remembered. */
 export const runBackup = () => backupNow({ drive: useUi.getState().driveAccount }).then(report, fail);
 
+/** How often the automatic backup checks whether one is due while the app is open. */
+const AUTO_EVERY = 30 * 60 * 1000;
 let autoBackupStarted = false;
+let autoBackupRunning = false;
 
-/** On opening the app: the automatic backup into Google Drive or the backup folder, if set and due. */
+function tryAutoBackup() {
+  if (autoBackupRunning || document.visibilityState === 'hidden') return;
+  autoBackupRunning = true;
+  autoBackup(useUi.getState().lastBackupAt, useUi.getState().driveAccount)
+    .then(
+      (saved) => {
+        if (!saved) return;
+        useUi.getState().set({ lastBackupAt: Date.now() });
+        useToast.getState().show('Backup automático salvo');
+      },
+      (e) => {
+        // The Worker lost Google's access (revoked or expired): it takes a new consent.
+        if (e instanceof DriveRelink) useToast.getState().show('O backup automático no Google Drive parou. Reconecte o Drive.', { label: 'Reconectar', run: startLink });
+        // Otherwise tried again next time; the reminder catches it if it keeps failing.
+      },
+    )
+    .finally(() => (autoBackupRunning = false));
+}
+
+/**
+ * The automatic backup into Google Drive or the backup folder, if set and due: on opening the app,
+ * on coming back to it, and every half hour while it's open.
+ */
 export function runAutoBackup() {
   // Once per app start (React's strict mode runs effects twice in development).
   if (autoBackupStarted) return;
   autoBackupStarted = true;
-  autoBackup(useUi.getState().lastBackupAt, useUi.getState().driveAccount).then(
-    (saved) => {
-      if (!saved) return;
-      useUi.getState().set({ lastBackupAt: Date.now() });
-      useToast.getState().show('Backup automático salvo');
-    },
-    () => {}, // Tried again next time; the reminder catches it if it keeps failing.
-  );
+  tryAutoBackup();
+  setInterval(tryAutoBackup, AUTO_EVERY);
+  document.addEventListener('visibilitychange', tryAutoBackup);
+}
+
+/**
+ * Back from Google's consent page (`#/drive-conectado?…`): keeps the link and shows the shelf.
+ * The fragment, with the device key, is replaced right away so it doesn't stay in the history.
+ */
+export async function receiveDriveLink() {
+  const hash = location.hash;
+  if (!hash.startsWith(LINK_ROUTE)) return;
+  location.replace(`${location.pathname}${location.search}#/`);
+  const result = await finishLink(hash);
+  if ('error' in result) return useToast.getState().show(result.error);
+  // Another account may have a folder of its own; a popup sign-in of another account is dropped.
+  if (result.email !== useUi.getState().driveAccount) {
+    forgetToken();
+    await forgetDriveFolder();
+  }
+  useUi.getState().set({ driveAccount: result.email });
+  useToast.getState().show('Backup automático no Google Drive ligado', { label: 'Fazer backup', run: runBackup });
 }
 
 /** Notice at the top of the shelf when the annotations haven't been backed up in a while. */
@@ -131,6 +171,7 @@ async function connectDrive() {
 }
 
 async function disconnectDrive() {
+  await unlink();
   revokeDrive();
   await forgetDriveFolder();
   useUi.getState().set({ driveAccount: null });
@@ -143,9 +184,11 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
   const driveAccount = useUi((s) => s.driveAccount);
   const [storage, setStorage] = useState<StorageStatus | null>(null);
   const [folder, setFolder] = useState<{ name: string; allowed: boolean } | null>(null);
+  const [linked, setLinked] = useState(false);
 
   useEffect(() => {
     storageStatus().then(setStorage);
+    isLinked().then(setLinked);
     if (driveAvailable()) loadGoogle().catch(() => {});
     if (canPickFolder())
       getBackupFolder().then(async (dir) => dir && setFolder({ name: dir.name, allowed: await folderAllowed(dir) }));
@@ -204,8 +247,16 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
             <Cloud className="size-4 shrink-0 text-green-600" />
             <span className="min-w-0 flex-1">
               Google Drive
-              <span className="block truncate text-xs text-[var(--muted)]">{driveAccount}</span>
+              <span className="block truncate text-xs text-[var(--muted)]">
+                {driveAccount}
+                {linked && ' · backup automático'}
+              </span>
             </span>
+            {linkAvailable() && !linked && (
+              <button className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-semibold text-stone-900 hover:bg-amber-400" onClick={startLink}>
+                Ativar backup automático
+              </button>
+            )}
             <button
               className="rounded-full border border-[var(--border)] px-2.5 py-0.5 text-xs hover:bg-[var(--app-bg)]"
               onClick={() => {
@@ -221,13 +272,15 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
             className={item}
             onClick={() => {
               onDone();
-              connectDrive();
+              // With the Worker, linked once for good (automatic backups); else Google's popup.
+              if (linkAvailable()) startLink();
+              else connectDrive();
             }}
           >
             <Cloud className="size-4 shrink-0" />
             <span className="min-w-0">
               Conectar ao Google Drive
-              <span className="block text-xs text-[var(--muted)]">Backups direto numa pasta do seu Drive</span>
+              <span className="block text-xs text-[var(--muted)]">{linkAvailable() ? 'Backup automático numa pasta do seu Drive' : 'Backups direto numa pasta do seu Drive'}</span>
             </span>
           </button>
         ))}

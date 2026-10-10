@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../../db/schema';
-import { backupNow, backupFileName } from '../backupTargets';
+import { autoBackup, backupNow, backupFileName } from '../backupTargets';
 import { forgetToken } from './auth';
 import { downloadBackup, driveEmail, forgetDriveFolder, listBackups, uploadBackup } from './files';
+import { finishLink, forgetLinkedToken } from './link';
 
 interface FakeFile {
   id: string;
@@ -185,6 +186,7 @@ describe('backing up with Google Drive connected', () => {
     });
     vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'client-id');
     forgetToken();
+    forgetLinkedToken();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -206,5 +208,26 @@ describe('backing up with Google Drive connected', () => {
     expect(await backupNow({ drive: 'eu@gmail.com' })).toEqual({ via: 'download' });
     expect(drive.calls).toEqual([]);
     vi.restoreAllMocks();
+  });
+
+  it('backs up into Drive by itself, with no window, once linked through the Worker', async () => {
+    vi.stubEnv('VITE_PROXY_URL', 'https://proxy.test');
+    const popup = vi.fn();
+    vi.stubGlobal('google', { accounts: { oauth2: { ...google.accounts.oauth2, initTokenClient: () => ({ requestAccessToken: popup, callback() {} }) } } });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => (url === 'https://proxy.test/drive/token' ? Promise.resolve(Response.json({ access_token: 'tok', expires_in: 3600 })) : drive.handler(url, init))),
+    );
+
+    // Not linked, no sign-in this hour: it waits for a tap.
+    expect(await autoBackup(null, 'eu@gmail.com')).toBe(false);
+    expect(drive.calls).toEqual([]);
+
+    await finishLink('#/drive-conectado?k=device-key&email=eu%40gmail.com');
+    expect(await autoBackup(Date.now(), 'eu@gmail.com')).toBe(false);
+    expect(await autoBackup(null, 'eu@gmail.com')).toBe(true);
+    expect(JSON.parse([...drive.files.values()].find((f) => f.name === backupFileName())!.content).notes).toHaveLength(1);
+    expect(await backupNow({ drive: 'eu@gmail.com' })).toEqual({ via: 'drive' });
+    expect(popup).not.toHaveBeenCalled();
   });
 });

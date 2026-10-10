@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import CatalogPage from './features/catalog/CatalogPage';
-import { runAutoBackup } from './features/library/BackupPanel';
+import { receiveDriveLink, runAutoBackup } from './features/library/BackupPanel';
 import LibraryPage from './features/library/LibraryPage';
 import SharedImport, { receiveOpenedFiles } from './features/library/SharedImport';
 import RoutinePage from './features/routine/RoutinePage';
@@ -24,7 +24,8 @@ type Route =
 /**
  * #/ · #/explorar[/…] (see features/catalog/routes.ts) · #/cadernos · #/caderno/<id> ·
  * #/read/<book>[?p=<page>|cfi=<cfi>][&caderno=<notebook>] (the notebook opens side by side) ·
- * #/compartilhado (books shared from other apps) · #/rotina.
+ * #/compartilhado (books shared from other apps) · #/rotina · #/drive-conectado (back from linking
+ * Google Drive, see BackupPanel's receiveDriveLink; then the shelf).
  */
 function parseRoute(): Route {
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?');
@@ -63,7 +64,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    runAutoBackup();
+    // Back from linking Google Drive, the first automatic backup can go right away.
+    receiveDriveLink().then(runAutoBackup, runAutoBackup);
     receiveOpenedFiles();
   }, []);
 

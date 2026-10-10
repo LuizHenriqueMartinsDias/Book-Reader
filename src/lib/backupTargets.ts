@@ -2,6 +2,7 @@ import { db, lastChangeAt } from '../db/schema';
 import { createBackup, download } from './backup';
 import { currentToken, driveAvailable, DriveSignInCancelled, forgetToken, getToken } from './drive/auth';
 import { DriveError, uploadBackup } from './drive/files';
+import { forgetLinkedToken, isLinked, linkedToken } from './drive/link';
 
 export const DAY = 24 * 60 * 60 * 1000;
 /** Backups kept in the backup folder; older ones are deleted. */
@@ -125,8 +126,11 @@ async function toDrive(token: string) {
   try {
     await uploadBackup(token, await createBackup(), backupFileName());
   } catch (e) {
-    // Expired: the next tap signs in again.
-    if (e instanceof DriveError && e.status === 401) forgetToken();
+    // Expired: the next tap signs in again (or the Worker hands a new one).
+    if (e instanceof DriveError && e.status === 401) {
+      forgetToken();
+      forgetLinkedToken();
+    }
     throw e;
   }
 }
@@ -177,17 +181,20 @@ export async function shareBackup(file: File): Promise<BackupResult> {
 }
 
 /**
- * On opening the app: saves a backup into Google Drive (signed in within the hour) or the backup
- * folder, without asking, if it's still allowed, the last backup is over a day old and something
- * changed. True if it saved one.
+ * On opening the app (and now and then while it's open): saves a backup into Google Drive (linked
+ * through the Worker, or signed in within the hour) or the backup folder, without asking, if it's
+ * still allowed, the last backup is over a day old and something changed. True if it saved one.
  */
 export async function autoBackup(lastBackupAt: number | null, drive?: string | null): Promise<boolean> {
-  // Google Drive only while a sign-in from a recent tap is still good (an hour): no window without a tap.
-  const token = drive && driveAvailable() ? currentToken() : null;
-  if (token) {
-    if (!(await backupDue(lastBackupAt, DAY))) return false;
-    await toDrive(token);
-    return true;
+  if (drive && driveAvailable()) {
+    // Without the Worker, only while a sign-in from a recent tap is still good (an hour): no window without a tap.
+    const linked = await isLinked();
+    const token = linked ? null : currentToken();
+    if (linked || token) {
+      if (!(await backupDue(lastBackupAt, DAY))) return false;
+      await toDrive(token ?? (await linkedToken())!);
+      return true;
+    }
   }
   if (!canPickFolder()) return false;
   const dir = await getBackupFolder();

@@ -1,7 +1,10 @@
+import { linkedToken } from './link';
+
 /**
  * Signing in to Google Drive from the browser (Google Identity Services token flow). Without a
  * server there's no lasting sign-in: Google gives an access token good for an hour, renewed with
  * a tap (a popup that closes by itself once the app was allowed). The token stays in this tab only.
+ * Linked through the app's Worker (link.ts), tokens come from there instead, with no popup.
  */
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -75,11 +78,12 @@ export function forgetToken() {
 let client: TokenClient | null = null;
 
 /**
- * A Drive access token: the current one, or a new one through Google's popup, which must come
- * from a tap. `account` hints which Google account (once known), so it isn't asked again.
+ * A Drive access token: from the Worker when linked, else the current one, or a new one through
+ * Google's popup, which must come from a tap. `account` hints which Google account (once known),
+ * so it isn't asked again.
  */
 export async function getToken(account?: string | null): Promise<string> {
-  const token = currentToken();
+  const token = (await linkedToken()) ?? currentToken();
   if (token) return token;
   const google = await loadGoogle();
   return new Promise<string>((resolve, reject) => {
