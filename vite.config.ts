@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => ({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Own service worker (src/sw.ts): it also receives books shared from other apps.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Book Reader',
@@ -25,8 +29,18 @@ export default defineConfig(({ mode }) => ({
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
         ],
+        // Android's "Share → Book Reader" (read when the app is installed). Relative: the app
+        // lives under /Book-Reader/ on GitHub Pages and at / in development.
+        share_target: {
+          action: './compartilhar',
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: { files: [{ name: 'books', accept: ['application/pdf', '.pdf', 'application/epub+zip', '.epub'] }] },
+        },
+        // Computers (Chrome, Edge): "Open with → Book Reader" for PDFs and EPUBs.
+        file_handlers: [{ action: './', accept: { 'application/pdf': ['.pdf'], 'application/epub+zip': ['.epub'] } }],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,mjs,css,html,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },

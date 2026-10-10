@@ -11,6 +11,8 @@ Leitor pessoal de livros em PDF e EPUB com anotações — roda no navegador, in
 - **Cadernos** (aba "Cadernos"): pastas por matéria; cadernos com páginas A4 (liso, pautado, quadriculado, pontilhado) ou tela infinita; caneta, marca-texto, borracha, laço (mover, redimensionar, mudar cor, duplicar, copiar/colar), texto, imagens (arquivo, colar, arrastar), formas (linha, seta, retângulo, elipse) e "desenhar e segurar" para endireitar; régua (arrastar, girar com dois dedos, traços retos ao longo da borda, marcações em cm); girar a folha com dois dedos (a página sob os dedos, ou a tela infinita inteira), com "Endireitar"; S Pen escreve e o dedo navega; importar PDF como caderno para escrever por cima; exportar caderno em PDF.
 - **Estudo com livros**: envie um trecho destacado para um caderno (com link de volta à página) e abra livro e caderno lado a lado, com divisória ajustável.
 - **Exportar**: gera um PDF com destaques e traços gravados e as notas como comentários; backup/restauração das anotações em JSON.
+- **Backup**: em um toque pelo menu "⋯" da Estante (no tablet/celular abre o "Compartilhar" para mandar ao Google Drive ou Arquivos; no computador baixa ou salva sozinho numa pasta escolhida, todo dia em que houver mudanças); aviso na Estante depois de uma semana sem backup; mostra se o armazenamento está protegido.
+- **Receber livros**: com o app instalado no Android, "Compartilhar → Book Reader" em qualquer app adiciona o PDF/EPUB à estante; no computador (Chrome/Edge), "Abrir com → Book Reader".
 
 Tudo fica salvo localmente no navegador (IndexedDB). Livros são identificados pelo hash do arquivo, então um backup restaurado em outro dispositivo reconecta as anotações quando o mesmo PDF for importado.
 

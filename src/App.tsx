@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import CatalogPage from './features/catalog/CatalogPage';
 import { runAutoBackup } from './features/library/BackupPanel';
 import LibraryPage from './features/library/LibraryPage';
+import SharedImport, { receiveOpenedFiles } from './features/library/SharedImport';
 import NotebookEditor from './features/notes/editor/NotebookEditor';
 import NotesHome from './features/notes/NotesHome';
 import SendQuoteDialog from './features/notes/SendQuoteDialog';
@@ -14,12 +15,14 @@ type Route =
   | { name: 'library' }
   | { name: 'catalog'; path: string; params: URLSearchParams }
   | { name: 'notes' }
+  | { name: 'shared' }
   | { name: 'notebook'; notebookId: string }
   | { name: 'reader'; bookId: string; startAt: StartAt; notebookId: string | null };
 
 /**
  * #/ · #/explorar[/…] (see features/catalog/routes.ts) · #/cadernos · #/caderno/<id> ·
- * #/read/<book>[?p=<page>|cfi=<cfi>][&caderno=<notebook>] (the notebook opens side by side).
+ * #/read/<book>[?p=<page>|cfi=<cfi>][&caderno=<notebook>] (the notebook opens side by side) ·
+ * #/compartilhado (books shared from other apps).
  */
 function parseRoute(): Route {
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?');
@@ -37,6 +40,7 @@ function parseRoute(): Route {
   const notebook = path.match(/^\/caderno\/([^/]+)/);
   if (notebook) return { name: 'notebook', notebookId: decodeURIComponent(notebook[1]) };
   if (path.startsWith('/cadernos')) return { name: 'notes' };
+  if (path.startsWith('/compartilhado')) return { name: 'shared' };
   if (path.startsWith('/explorar')) return { name: 'catalog', path, params };
   return { name: 'library' };
 }
@@ -55,7 +59,10 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  useEffect(runAutoBackup, []);
+  useEffect(() => {
+    runAutoBackup();
+    receiveOpenedFiles();
+  }, []);
 
   useEffect(() => {
     document.documentElement.className = `theme-${theme}`;
@@ -82,6 +89,8 @@ function Screen({ route }: { route: Route }) {
       return <NotebookEditor key={route.notebookId} notebookId={route.notebookId} />;
     case 'notes':
       return <NotesHome />;
+    case 'shared':
+      return <SharedImport />;
     case 'catalog':
       return <CatalogPage path={route.path} params={route.params} />;
     default:
