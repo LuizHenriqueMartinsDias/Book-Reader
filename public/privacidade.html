@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Book Reader · Privacidade</title>
+    <style>
+      :root { color-scheme: light dark; --bg: #faf9f7; --text: #1c1917; --muted: #57534e; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #1c1917; --text: #f5f5f4; --muted: #a8a29e; } }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, sans-serif; }
+      main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
+      h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+      h2 { font-size: 1.1rem; margin-top: 2rem; }
+      p.updated { color: var(--muted); margin-top: 0; }
+      a { color: inherit; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Política de privacidade do Book Reader</h1>
+      <p class="updated">Atualizada em 10 de outubro de 2026</p>
+
+      <p>
+        O Book Reader é um leitor de PDFs e EPUBs com anotações, cadernos e rotina, de uso pessoal. Ele funciona no
+        navegador: livros, anotações, cadernos e hábitos ficam guardados <strong>só no seu aparelho</strong>. Não há
+        contas, anúncios nem estatísticas de uso.
+      </p>
+
+      <h2>Google Drive</h2>
+      <p>
+        Se você conectar o Google Drive, o app pede apenas o acesso <code>drive.file</code>: ele só vê e altera os
+        arquivos que ele mesmo criou, numa pasta "Book Reader" do seu Drive, onde salva os backups das suas
+        anotações. Ele não lê nenhum outro arquivo seu. O app também lê o e-mail da conta, para mostrar qual Drive
+        está conectado.
+      </p>
+      <p>
+        Para o backup automático, o servidor do app (um Cloudflare Worker) guarda a autorização de longo prazo do
+        Google, cifrada, junto com o e-mail da conta. Ele a usa apenas para entregar ao seu aparelho acessos
+        temporários ao Drive. Os backups não passam pelo servidor: vão do aparelho direto ao Google Drive.
+      </p>
+      <p>
+        "Desconectar" no app apaga essa autorização do servidor e a revoga no Google. Você também pode revogá-la a
+        qualquer momento em <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+        Os dados do Google não são vendidos, compartilhados nem usados para nada além do backup.
+      </p>
+
+      <h2>Download de livros</h2>
+      <p>
+        Ao baixar um livro do Internet Archive ou do Project Gutenberg, o arquivo passa pelo mesmo servidor, que
+        apenas o repassa ao aparelho e não guarda nada.
+      </p>
+
+      <h2>Contato</h2>
+      <p>
+        Dúvidas: abra uma issue em
+        <a href="https://github.com/LuizHenriqueMartinsDias/Book-Reader">github.com/LuizHenriqueMartinsDias/Book-Reader</a>.
+      </p>
+    </main>
+  </body>
+</html>
