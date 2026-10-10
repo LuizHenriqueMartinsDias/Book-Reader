@@ -1,13 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Download, FilePlus2, Moon, MoreHorizontal, Search, Sun, SunDim, Upload } from 'lucide-react';
+import { FilePlus2, Moon, MoreHorizontal, Search, Sun, SunDim, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { navigate } from '../../App';
 import { db, type Book } from '../../db/schema';
-import { createBackup, download, restoreBackup } from '../../lib/backup';
+import { restoreBackup } from '../../lib/backup';
 import { normalize } from '../../lib/catalog/text';
 import { useUi, type LibrarySort, type Theme } from '../../store/ui';
 import FolderBar, { folderCounts, inFolder, useFolderFilter } from '../FolderBar';
 import HomeLayout from '../HomeLayout';
+import { BackupMenuSection, BackupReminder } from './BackupPanel';
 import BookCard from './BookCard';
 import ContinueReading from './ContinueReading';
 import { ACCEPTED_FILES, importBook, isBookFile } from './importBook';
@@ -126,7 +127,7 @@ export default function LibraryPage() {
             {menuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute top-12 right-0 z-20 w-60 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1.5 text-sm shadow-xl">
+                <div className="absolute top-12 right-0 z-20 w-72 overflow-hidden max-sm:fixed max-sm:top-16 max-sm:right-4 max-sm:left-4 max-sm:w-auto rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1.5 text-sm shadow-xl">
                   <div className="px-2.5 pt-1.5 pb-1 text-xs text-[var(--muted)]">Tema</div>
                   <div className="flex gap-1 px-1 pb-1.5">
                     {THEMES.map(({ id, icon: Icon, label }) => (
@@ -139,15 +140,8 @@ export default function LibraryPage() {
                       </button>
                     ))}
                   </div>
-                  <button
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--app-bg)]"
-                    onClick={async () => {
-                      setMenuOpen(false);
-                      download(await createBackup(), `book-reader-backup-${new Date().toISOString().slice(0, 10)}.json`);
-                    }}
-                  >
-                    <Download className="size-4" /> Salvar backup das anotações
-                  </button>
+                  <div className="my-1 border-t border-[var(--border)]" />
+                  <BackupMenuSection onDone={() => setMenuOpen(false)} />
                   <button
                     className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--app-bg)]"
                     onClick={() => {
@@ -192,6 +186,8 @@ export default function LibraryPage() {
         </header>
 
         <div className="md:hidden">{folderBar('chips')}</div>
+
+        <BackupReminder />
 
         {(busy || message) && (
           <div className="mx-4 mt-4 flex items-start justify-between gap-4 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-sm sm:mx-6">

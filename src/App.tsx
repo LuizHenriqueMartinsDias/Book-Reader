@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import CatalogPage from './features/catalog/CatalogPage';
+import { runAutoBackup } from './features/library/BackupPanel';
 import LibraryPage from './features/library/LibraryPage';
 import NotebookEditor from './features/notes/editor/NotebookEditor';
 import NotesHome from './features/notes/NotesHome';
@@ -53,6 +54,8 @@ export default function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+
+  useEffect(runAutoBackup, []);
 
   useEffect(() => {
     document.documentElement.className = `theme-${theme}`;

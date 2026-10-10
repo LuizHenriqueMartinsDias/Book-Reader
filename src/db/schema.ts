@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type DBCore, type EntityTable, type Middleware } from 'dexie';
 
 /**
  * All coordinates are in page *view* space at scale 1: PDF points, origin at the top-left
@@ -321,6 +321,12 @@ export interface NoteAsset {
   height: number;
 }
 
+/** Small app values that must live in IndexedDB, e.g. a backup folder's handle (not storable in localStorage). */
+export interface Setting {
+  key: string;
+  value: unknown;
+}
+
 export class BookDB extends Dexie {
   books!: EntityTable<Book, 'id'>;
   files!: EntityTable<BookFile, 'bookId'>;
@@ -336,6 +342,7 @@ export class BookDB extends Dexie {
   noteItems!: EntityTable<NoteItem, 'id'>;
   noteAssets!: EntityTable<NoteAsset, 'id'>;
   pageTemplates!: EntityTable<PageTemplate, 'id'>;
+  settings!: EntityTable<Setting, 'key'>;
 
   constructor(name = 'book-reader') {
     super(name);
@@ -363,6 +370,53 @@ export class BookDB extends Dexie {
     this.version(4).stores({
       pageTemplates: 'id, createdAt',
     });
+    // v5: app settings. Only adds a table.
+    this.version(5).stores({
+      settings: 'key',
+    });
+    this.use(changeTracker);
+  }
+}
+
+/** What a backup holds: writes to these mean there's something new to back up (books' reading position doesn't count). */
+const BACKED_UP = new Set(['strokes', 'highlights', 'notes', 'folders', 'bookFolders', 'notebooks', 'notePages', 'noteItems', 'noteAssets', 'pageTemplates']);
+const CHANGED_AT_KEY = 'book-reader-changed-at';
+
+/**
+ * Notes the time of every write (deletions too) to the backed-up tables, so the backup reminder
+ * knows if anything changed without scanning every stroke.
+ */
+const changeTracker: Middleware<DBCore> = {
+  stack: 'dbcore',
+  name: 'changeTracker',
+  create: (down) => ({
+    ...down,
+    table: (name) => {
+      const table = down.table(name);
+      if (!BACKED_UP.has(name)) return table;
+      return {
+        ...table,
+        mutate: async (req) => {
+          const res = await table.mutate(req);
+          try {
+            localStorage.setItem(CHANGED_AT_KEY, String(Date.now()));
+          } catch {
+            // No storage (private mode): the reminder then assumes there were changes.
+          }
+          return res;
+        },
+      };
+    },
+  }),
+};
+
+/** When annotations or notebooks last changed, or null if unknown (nothing recorded on this device yet). */
+export function lastChangeAt(): number | null {
+  try {
+    const v = Number(localStorage.getItem(CHANGED_AT_KEY));
+    return v > 0 ? v : null;
+  } catch {
+    return null;
   }
 }
 
