@@ -1,4 +1,4 @@
-import { Cloud, Download, FolderOpen, ShieldAlert, ShieldCheck, X } from 'lucide-react';
+import { Cloud, CloudUpload, Download, FolderOpen, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   autoBackup,
@@ -243,30 +243,37 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
       </button>
       {driveAvailable() &&
         (driveAccount ? (
-          <div className="flex items-center gap-2.5 px-2.5 py-2">
-            <Cloud className="size-4 shrink-0 text-green-600" />
-            <span className="min-w-0 flex-1">
-              Google Drive
-              <span className="block truncate text-xs text-[var(--muted)]">
-                {driveAccount}
-                {linked && ' · backup automático'}
+          <>
+            <div className="flex items-center gap-2.5 px-2.5 py-2">
+              <Cloud className="size-4 shrink-0 text-green-600" />
+              <span className="min-w-0 flex-1">
+                Google Drive
+                <span className="block truncate text-xs text-[var(--muted)]">
+                  {driveAccount}
+                  {linked && ' · backup automático'}
+                </span>
               </span>
-            </span>
+              <button
+                className="rounded-full border border-[var(--border)] px-2.5 py-0.5 text-xs hover:bg-[var(--app-bg)]"
+                onClick={() => {
+                  onDone();
+                  disconnectDrive();
+                }}
+              >
+                Desconectar
+              </button>
+            </div>
+            {/* Connected through Google's popup only: one more consent and backups go by themselves. */}
             {linkAvailable() && !linked && (
-              <button className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-semibold text-stone-900 hover:bg-amber-400" onClick={startLink}>
-                Ativar backup automático
+              <button className={item} onClick={startLink}>
+                <CloudUpload className="size-4 shrink-0" />
+                <span className="min-w-0">
+                  Ativar backup automático
+                  <span className="block text-xs text-[var(--muted)]">Entre no Google uma vez e o backup vai ao Drive sozinho</span>
+                </span>
               </button>
             )}
-            <button
-              className="rounded-full border border-[var(--border)] px-2.5 py-0.5 text-xs hover:bg-[var(--app-bg)]"
-              onClick={() => {
-                onDone();
-                disconnectDrive();
-              }}
-            >
-              Desconectar
-            </button>
-          </div>
+          </>
         ) : (
           <button
             className={item}
