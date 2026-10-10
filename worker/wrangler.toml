@@ -1,3 +1,10 @@
 name = "book-proxy"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
+
+# Automatic Google Drive backups (src/drive.ts). Secrets, set with
+# `npx wrangler secret put <NAME> --config worker/wrangler.toml` (and in worker/.dev.vars to test locally):
+# GOOGLE_CLIENT_SECRET, TOKEN_KEY (`openssl rand -base64 32`), ALLOWED_EMAILS (the owner's Google account).
+# Plus a KV namespace bound as DRIVE_LINKS ([[kv_namespaces]]). Without them /auth and /drive answer 503.
+[vars]
+GOOGLE_CLIENT_ID = "114645512834-172tgi7dj45ppsecth1t4kmhv0gg4ku9.apps.googleusercontent.com"

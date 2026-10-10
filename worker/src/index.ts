@@ -1,14 +1,16 @@
+import { handleAuth, handleDriveApi, type DriveEnv } from './drive';
 import { allowedOrigin, bookType, isAllowedTarget } from './validate';
 
 const MAX_REDIRECTS = 5;
 const MAX_BYTES = 500 * 1024 * 1024;
 
 /**
- * CORS proxy for the Book Reader app: GET /fetch?url=<book url> streams a PDF or EPUB from an
- * allowed host (the Internet Archive and Project Gutenberg don't send CORS headers on files).
+ * Book Reader's Worker. GET /fetch?url=<book url> is a CORS proxy that streams a PDF or EPUB from
+ * an allowed host (the Internet Archive and Project Gutenberg don't send CORS headers on files).
+ * /auth/* and /drive/* keep a lasting Google Drive access for automatic backups (see drive.ts).
  */
 export default {
-  async fetch(request: Request): Promise<Response> {
+  async fetch(request: Request, env: DriveEnv): Promise<Response> {
     const origin = allowedOrigin(request.headers.get('Origin'));
     const cors: Record<string, string> = origin
       ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Expose-Headers': 'Content-Length, Content-Disposition', Vary: 'Origin' }
@@ -16,10 +18,16 @@ export default {
     const fail = (status: number, message: string) => new Response(message, { status, headers: { ...cors, 'Content-Type': 'text/plain; charset=utf-8' } });
 
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: origin ? 204 : 403, headers: { ...cors, 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Max-Age': '86400' } });
+      return new Response(null, {
+        status: origin ? 204 : 403,
+        headers: { ...cors, 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Authorization', 'Access-Control-Max-Age': '86400' },
+      });
     }
-    if (!origin) return fail(403, 'Origem não permitida');
     const { pathname, searchParams } = new URL(request.url);
+    // Page navigations to and from Google's consent page: they carry no Origin.
+    if (pathname.startsWith('/auth/')) return handleAuth(request, env);
+    if (!origin) return fail(403, 'Origem não permitida');
+    if (pathname.startsWith('/drive/')) return handleDriveApi(request, env, cors);
     if (request.method !== 'GET' || pathname !== '/fetch') return fail(404, 'Não encontrado');
 
     let target = isAllowedTarget(searchParams.get('url'));
