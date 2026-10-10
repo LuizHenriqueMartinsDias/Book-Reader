@@ -5,8 +5,8 @@ import { navigate } from '../../App';
 import { deleteNotebook, searchNotebooks, updateNotebook } from '../../db/notes';
 import { db, type Folder, type Notebook } from '../../db/schema';
 import { paperCss } from '../../lib/notes/render';
-import FolderBar, { inFolder, MoveToFolder, useFolderFilter } from '../FolderBar';
-import HomeTabs from '../HomeTabs';
+import FolderBar, { folderCounts, inFolder, MoveToFolder, useFolderFilter } from '../FolderBar';
+import HomeLayout from '../HomeLayout';
 import { notebookFromPdf } from './importPdf';
 import NewNotebookDialog from './NewNotebookDialog';
 
@@ -32,59 +32,66 @@ export default function NotesHome() {
     }
   }
 
+  const allNotebooks = useLiveQuery(() => db.notebooks.toArray(), []) ?? [];
+  const folderBar = (layout: 'chips' | 'list') => (
+    <FolderBar kind="notebooks" layout={layout} folders={folders} filter={filter} onFilter={setFilter} counts={folderCounts(allNotebooks)} />
+  );
+
   return (
-    <div className="min-h-full">
-      <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)]/90 px-4 py-3 backdrop-blur sm:px-6">
-        <HomeTabs active="notes" />
-        <label className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-2.5 py-1.5 focus-within:border-amber-500">
-          <Search className="size-4 text-[var(--muted)]" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar nos cadernos…" className="w-40 bg-transparent text-sm outline-none sm:w-56" />
-        </label>
-        <button className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm hover:bg-[var(--app-bg)]" onClick={() => pdfInput.current?.click()}>
-          <FileUp className="size-4" /> Importar PDF
-        </button>
-        <button className="flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-amber-400" onClick={() => setCreating(true)}>
-          <Plus className="size-4" /> Novo caderno
-        </button>
-        <input
-          ref={pdfInput}
-          type="file"
-          accept="application/pdf,.pdf"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) importPdf(f);
-            e.target.value = '';
-          }}
-        />
-      </header>
-
-      <FolderBar kind="notebooks" folders={folders} filter={filter} onFilter={setFilter} />
-
-      {busy && <p className="mx-4 mt-3 text-sm text-[var(--muted)] sm:mx-6">{busy}</p>}
-
-      <main className="p-4 sm:p-6">
-        {shown?.length === 0 && (
-          <button
-            onClick={() => setCreating(true)}
-            className="mx-auto mt-12 flex max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-[var(--border)] px-8 py-12 text-center text-[var(--muted)]"
-          >
-            <Plus className="size-10" />
-            <span className="text-base font-medium text-[var(--app-fg)]">{query ? 'Nada encontrado' : 'Nenhum caderno aqui'}</span>
-            <span className="text-sm">Crie um caderno com páginas ou uma tela infinita, ou importe um PDF para escrever por cima.</span>
+    <HomeLayout active="notes" aside={folderBar('list')}>
+      <div className="min-h-full">
+        <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)]/90 px-4 py-3 backdrop-blur sm:px-6">
+          <h1 className="mr-auto font-serif text-2xl font-bold">Cadernos</h1>
+          <label className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-2.5 py-1.5 focus-within:border-amber-500">
+            <Search className="size-4 text-[var(--muted)]" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar nos cadernos…" className="w-40 bg-transparent text-sm outline-none sm:w-56" />
+          </label>
+          <button className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2 text-sm hover:bg-[var(--app-bg)]" onClick={() => pdfInput.current?.click()}>
+            <FileUp className="size-4" /> Importar PDF
           </button>
-        )}
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-5 gap-y-8">
-          {shown?.map((nb) => (
-            <NotebookCard key={nb.id} notebook={nb} folders={folders} />
-          ))}
-        </div>
-      </main>
+          <button className="flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-amber-400" onClick={() => setCreating(true)}>
+            <Plus className="size-4" /> Novo caderno
+          </button>
+          <input
+            ref={pdfInput}
+            type="file"
+            accept="application/pdf,.pdf"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importPdf(f);
+              e.target.value = '';
+            }}
+          />
+        </header>
 
-      {creating && (
-        <NewNotebookDialog folders={folders} folderId={filter || null} onClose={() => setCreating(false)} onCreated={(id) => navigate(`#/caderno/${id}`)} />
-      )}
-    </div>
+        <div className="md:hidden">{folderBar('chips')}</div>
+
+        {busy && <p className="mx-4 mt-3 text-sm text-[var(--muted)] sm:mx-6">{busy}</p>}
+
+        <main className="p-4 sm:p-6">
+          {shown?.length === 0 && (
+            <button
+              onClick={() => setCreating(true)}
+              className="mx-auto mt-12 flex max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-[var(--border)] px-8 py-12 text-center text-[var(--muted)]"
+            >
+              <Plus className="size-10" />
+              <span className="text-base font-medium text-[var(--app-fg)]">{query ? 'Nada encontrado' : 'Nenhum caderno aqui'}</span>
+              <span className="text-sm">Crie um caderno com páginas ou uma tela infinita, ou importe um PDF para escrever por cima.</span>
+            </button>
+          )}
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-x-5 gap-y-8">
+            {shown?.map((nb) => (
+              <NotebookCard key={nb.id} notebook={nb} folders={folders} />
+            ))}
+          </div>
+        </main>
+
+        {creating && (
+          <NewNotebookDialog folders={folders} folderId={filter || null} onClose={() => setCreating(false)} onCreated={(id) => navigate(`#/caderno/${id}`)} />
+        )}
+      </div>
+    </HomeLayout>
   );
 }
 

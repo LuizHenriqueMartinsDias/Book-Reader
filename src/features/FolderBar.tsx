@@ -9,6 +9,13 @@ export type FolderFilter = string | null;
 export const inFolder = (folderId: string | null | undefined, filter: FolderFilter) =>
   filter === null || (filter === '' ? !folderId : folderId === filter);
 
+/** Items per folder for the side menu: 'all', '' (no folder) and each folder id. */
+export function folderCounts(items: { folderId?: string | null }[]) {
+  const counts: Record<string, number> = { all: items.length, '': 0 };
+  for (const { folderId } of items) counts[folderId ?? ''] = (counts[folderId ?? ''] ?? 0) + 1;
+  return counts;
+}
+
 /** The folder picked on each screen, kept while the app is open (coming back from a book or notebook). */
 const lastFilter: Record<FolderKind, FolderFilter> = { books: null, notebooks: null };
 export function useFolderFilter(kind: FolderKind) {
@@ -25,10 +32,14 @@ interface Props {
   folders: Folder[];
   filter: FolderFilter;
   onFilter: (filter: FolderFilter) => void;
+  /** `chips`: a row that scrolls sideways (phones); `list`: a column for the side menu. */
+  layout?: 'chips' | 'list';
+  /** How many items each filter holds, keyed by folder id ('all' for every item, '' for no folder). */
+  counts?: Record<string, number>;
 }
 
-/** Folder chips to filter by, plus creating, renaming and deleting folders. */
-export default function FolderBar({ kind, folders, filter, onFilter }: Props) {
+/** Folders to filter by, plus creating, renaming and deleting them. */
+export default function FolderBar({ kind, folders, filter, onFilter, layout = 'chips', counts }: Props) {
   async function addFolder() {
     const name = prompt(kind === 'books' ? 'Nome da pasta (ex.: faculdade, romances)' : 'Nome da pasta (ex.: matéria)')?.trim();
     if (!name) return;
@@ -37,28 +48,46 @@ export default function FolderBar({ kind, folders, filter, onFilter }: Props) {
   }
 
   const what = kind === 'books' ? 'os livros' : 'os cadernos';
+  const editFolder = (folder: Folder) => {
+    const action = prompt(`Pasta "${folder.name}": digite um novo nome, ou "excluir" para apagar a pasta (${what} ficam).`, folder.name)?.trim();
+    if (!action) return;
+    if (action.toLowerCase() === 'excluir') {
+      deleteFolder(kind, folder.id);
+      onFilter(null);
+    } else updateFolder(kind, folder.id, { name: action });
+  };
+  const options = (folder: Folder) =>
+    filter === folder.id && (
+      <button className="ml-0.5 shrink-0 rounded-full p-1 text-[var(--muted)] hover:bg-[var(--app-bg)]" title="Opções da pasta" onClick={() => editFolder(folder)}>
+        <MoreVertical className="size-3.5" />
+      </button>
+    );
+
+  if (layout === 'list')
+    return (
+      <div className="flex flex-col gap-0.5">
+        <div className="px-3 pt-6 pb-1 text-xs font-semibold tracking-wide text-[var(--muted)] uppercase">Pastas</div>
+        <ListItem active={filter === null} onClick={() => onFilter(null)} label="Todos" count={counts?.all} />
+        {folders.map((folder) => (
+          <div key={folder.id} className="flex items-center">
+            <ListItem active={filter === folder.id} onClick={() => onFilter(folder.id)} label={folder.name} color={folder.color} count={counts?.[folder.id]} />
+            {options(folder)}
+          </div>
+        ))}
+        {folders.length > 0 && <ListItem active={filter === ''} onClick={() => onFilter('')} label="Sem pasta" count={counts?.['']} />}
+        <button onClick={addFolder} className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm text-[var(--muted)] hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]">
+          <FolderPlus className="size-4" /> Nova pasta
+        </button>
+      </div>
+    );
+
   return (
     <div className="flex gap-1.5 overflow-x-auto px-4 pt-4 pb-1 sm:px-6 [scrollbar-width:none]">
       <Chip active={filter === null} onClick={() => onFilter(null)} label="Todos" />
       {folders.map((folder) => (
         <div key={folder.id} className="flex shrink-0 items-center">
           <Chip active={filter === folder.id} onClick={() => onFilter(folder.id)} label={folder.name} color={folder.color} />
-          {filter === folder.id && (
-            <button
-              className="ml-0.5 rounded-full p-1 text-[var(--muted)] hover:bg-[var(--panel)]"
-              title="Opções da pasta"
-              onClick={() => {
-                const action = prompt(`Pasta "${folder.name}": digite um novo nome, ou "excluir" para apagar a pasta (${what} ficam).`, folder.name)?.trim();
-                if (!action) return;
-                if (action.toLowerCase() === 'excluir') {
-                  deleteFolder(kind, folder.id);
-                  onFilter(null);
-                } else updateFolder(kind, folder.id, { name: action });
-              }}
-            >
-              <MoreVertical className="size-3.5" />
-            </button>
-          )}
+          {options(folder)}
         </div>
       ))}
       {folders.length > 0 && <Chip active={filter === ''} onClick={() => onFilter('')} label="Sem pasta" />}
@@ -80,6 +109,19 @@ function Chip({ active, onClick, label, color }: { active: boolean; onClick: () 
     >
       {color && <span className="size-2.5 rounded-full" style={{ background: color }} />}
       {label}
+    </button>
+  );
+}
+
+function ListItem({ active, onClick, label, color, count }: { active: boolean; onClick: () => void; label: string; color?: string; count?: number }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex h-10 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 text-left text-sm ${active ? 'bg-[var(--app-bg)] font-semibold' : 'hover:bg-[var(--app-bg)]'}`}
+    >
+      <span className="size-2.5 shrink-0 rounded-full" style={{ background: color ?? 'transparent' }} />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {count !== undefined && <span className="text-xs text-[var(--muted)] tabular-nums">{count}</span>}
     </button>
   );
 }

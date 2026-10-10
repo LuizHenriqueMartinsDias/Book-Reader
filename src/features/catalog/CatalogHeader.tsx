@@ -6,8 +6,8 @@ import { catalogHref } from './routes';
 import { LANGUAGES, useCatalogSettings } from './settings';
 
 /**
- * Search box and filters on every catalog screen. The arrow goes back a screen, or to the
- * library from the catalog's home.
+ * Search box and filters on every catalog screen, with an arrow back a screen except on the
+ * catalog's home (a main screen, reached from the app's navigation).
  */
 export default function CatalogHeader({ query = '', home = false, autoFocus = false }: { query?: string; home?: boolean; autoFocus?: boolean }) {
   const [input, setInput] = useState(query);
@@ -15,17 +15,18 @@ export default function CatalogHeader({ query = '', home = false, autoFocus = fa
   const { language, setLanguage, openOnly, setOpenOnly, addRecent } = useCatalogSettings();
 
   function back() {
-    if (home) navigate('#/');
-    else if (history.length > 1) history.back();
+    if (history.length > 1) history.back();
     else navigate(catalogHref.home);
   }
 
   return (
     <header className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--panel)]/95 px-4 py-3 backdrop-blur sm:px-6">
       <div className="mx-auto flex max-w-5xl items-center gap-2">
-        <button onClick={back} className="rounded-md p-2 hover:bg-[var(--app-bg)]" title={home ? 'Voltar à estante' : 'Voltar'}>
-          <ArrowLeft className="size-5" />
-        </button>
+        {!home && (
+          <button onClick={back} className="rounded-md p-2 hover:bg-[var(--app-bg)]" title="Voltar">
+            <ArrowLeft className="size-5" />
+          </button>
+        )}
         <form
           className="flex flex-1 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--app-bg)] px-4 focus-within:border-amber-500"
           onSubmit={(e) => {
@@ -63,7 +64,7 @@ export default function CatalogHeader({ query = '', home = false, autoFocus = fa
           )}
         </form>
       </div>
-      <div className="mx-auto mt-2 flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 pl-11 text-sm">
+      <div className={`mx-auto mt-2 flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 text-sm ${home ? '' : 'pl-11'}`}>
         <select
           value={language}
           onChange={(e) => setLanguage(e.target.value as Language)}
