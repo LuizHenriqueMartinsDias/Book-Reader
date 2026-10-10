@@ -1,6 +1,7 @@
 import { Cloud, CloudUpload, Download, FolderOpen, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
+  allowBackupFolder,
   autoBackup,
   backupDue,
   backupNow,
@@ -291,6 +292,26 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
             </span>
           </button>
         ))}
+      {folder && !folder.allowed && (
+        <div className="flex items-center gap-2.5 px-2.5 py-2">
+          <ShieldAlert className="size-4 shrink-0 text-[var(--accent-text)]" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">Pasta “{folder.name}” sem permissão</span>
+            <span className="block text-xs text-[var(--muted)]">No aviso do navegador, escolha permitir em todas as visitas</span>
+          </span>
+          <button
+            className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-semibold text-stone-900 hover:bg-amber-400"
+            onClick={async () => {
+              const allowed = await allowBackupFolder().catch(() => false);
+              setFolder({ ...folder, allowed });
+              // A backup that waited for the permission goes now.
+              if (allowed) tryAutoBackup();
+            }}
+          >
+            Permitir
+          </button>
+        </div>
+      )}
       {canPickFolder() && (
         <button
           className={item}
@@ -307,7 +328,7 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
             {folder ? 'Trocar pasta de backup' : 'Escolher pasta de backup automático'}
             {folder && (
               <span className="block truncate text-xs text-[var(--muted)]">
-                {folder.allowed ? `Salvando todo dia em “${folder.name}”` : `“${folder.name}”: precisa de permissão (salve um backup)`}
+                {folder.allowed ? `Salvando todo dia em “${folder.name}”` : `“${folder.name}”`}
               </span>
             )}
           </span>

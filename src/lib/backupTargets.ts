@@ -73,6 +73,15 @@ export async function chooseBackupFolder(): Promise<string | null> {
   }
 }
 
+/**
+ * Asks again to write into the remembered folder (needs a tap). Asked for a folder kept from an
+ * earlier visit, Chrome offers to allow it on every visit, so it stops asking each time.
+ */
+export async function allowBackupFolder() {
+  const dir = await getBackupFolder();
+  return !!dir && (await canWrite(dir, true));
+}
+
 export async function forgetBackupFolder() {
   await db.settings.delete(FOLDER_KEY);
   folderCache = null;

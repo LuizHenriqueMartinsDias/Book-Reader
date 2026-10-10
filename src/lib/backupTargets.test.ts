@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, lastChangeAt } from '../db/schema';
-import { autoBackup, backupFileName, backupNow, backupsToRemove, chooseBackupFolder, DAY, forgetBackupFolder, needsBackup } from './backupTargets';
+import { allowBackupFolder, autoBackup, backupFileName, backupNow, backupsToRemove, chooseBackupFolder, DAY, forgetBackupFolder, needsBackup } from './backupTargets';
 
 const NOW = Date.UTC(2026, 9, 10, 12);
 
@@ -143,5 +143,18 @@ describe('saving a backup', () => {
     expect(await autoBackup(Date.now())).toBe(false);
     expect(await autoBackup(null)).toBe(true);
     expect(folder.files.size).toBe(1);
+  });
+
+  it('asks again for the remembered folder, so automatic backups go on', async () => {
+    expect(await allowBackupFolder()).toBe(false);
+    const folder = new FakeFolder();
+    win.showDirectoryPicker = vi.fn().mockResolvedValue(folder);
+    await chooseBackupFolder();
+    folder.permission = 'prompt';
+    folder.requestPermission = async () => (folder.permission = 'granted');
+    expect(await autoBackup(null)).toBe(false);
+    expect(await allowBackupFolder()).toBe(true);
+    expect(win.showDirectoryPicker).toHaveBeenCalledTimes(1);
+    expect(await autoBackup(null)).toBe(true);
   });
 });
