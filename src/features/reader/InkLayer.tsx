@@ -7,6 +7,7 @@ import type { PageSize } from '../../lib/pdf';
 import { useHistory } from '../../store/history';
 import { inkStyle, useUi } from '../../store/ui';
 import { sizeCanvas } from './canvasSize';
+import { predictedPoints, repaintLive } from './liveCanvas';
 import { useReader } from './readerStore';
 
 const ERASER_RADIUS_PX = 10;
@@ -37,8 +38,9 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
    * `erase` also covers the stylus' eraser end and side button, whatever tool is selected.
    * `captured`: a stylus stroke started under the select tool (see the page listener below).
    * `stylus`: erasing because the pen's button is held, so letting go of it draws again.
+   * `predicted`: where the pen is about to be, drawn ahead of `points` but never saved.
    */
-  const current = useRef<{ pointerId: number; points: Point[]; mode: 'draw' | 'erase'; ink: InkTool; captured: boolean; stylus: boolean } | null>(null);
+  const current = useRef<{ pointerId: number; points: Point[]; predicted: Point[]; mode: 'draw' | 'erase'; ink: InkTool; captured: boolean; stylus: boolean } | null>(null);
   const penActive = useRef(false);
   const [penHover, setPenHover] = useState(false);
   const frame = useRef(0);
@@ -101,13 +103,12 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
       const canvas = liveRef.current;
       const stroke = current.current;
       if (!canvas) return;
-      const ctx = canvas.getContext('2d')!;
       const ratio = canvas.width / width;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (!stroke || stroke.mode !== 'draw') return;
-      ctx.setTransform(ratio * scale, 0, 0, ratio * scale, 0, 0);
-      drawStroke(ctx, { ...inkStyle(stroke.ink), points: stroke.points }, false);
+      repaintLive(canvas, (ctx) => {
+        if (!stroke || stroke.mode !== 'draw') return;
+        ctx.setTransform(ratio * scale, 0, 0, ratio * scale, 0, 0);
+        drawStroke(ctx, { ...inkStyle(stroke.ink), points: stroke.predicted.length ? [...stroke.points, ...stroke.predicted] : stroke.points }, false);
+      });
     });
   };
 
@@ -117,7 +118,7 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
     const stylusErase = penErases(e);
     const mode = tool === 'eraser' || stylusErase ? 'erase' : 'draw';
     const ink: InkTool = drawing ? (tool as InkTool) : useUi.getState().lastInkTool;
-    current.current = { pointerId: e.pointerId, points: [p], mode, ink, captured, stylus: stylusErase && tool !== 'eraser' };
+    current.current = { pointerId: e.pointerId, points: [p], predicted: [], mode, ink, captured, stylus: stylusErase && tool !== 'eraser' };
     if (mode === 'erase') eraseAt(p[0], p[1]);
     renderLive();
   };
@@ -211,6 +212,7 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
       if (stroke.mode === 'erase') eraseAt(p[0], p[1]);
       else stroke.points.push(p);
     }
+    stroke.predicted = stroke.mode === 'draw' ? predictedPoints(e.nativeEvent, (ev) => toPoint(ev, rect)) : [];
     renderLive();
   };
 

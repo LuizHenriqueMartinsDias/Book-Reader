@@ -61,6 +61,8 @@ interface UiState {
   lastInkTool: 'pen' | 'marker';
   /** When the annotations were last backed up (any way: folder, share, download), or null if never. */
   lastBackupAt: number | null;
+  /** Ink being written goes straight to the screen (Chrome's low-latency canvas) and reaches ahead to where the pen is going. */
+  lowLatencyInk: boolean;
   set: (patch: Partial<Omit<UiState, "set" | "addCustomColor" | "removeCustomColor">>) => void;
 }
 
@@ -97,6 +99,7 @@ export const useUi = create<UiState>()(
       lastInkTool: 'pen',
       stickyColor: '#fef08a',
       lastBackupAt: null,
+      lowLatencyInk: true,
       set: (patch) =>
         set((s) => {
           const next = patch.tool === 'pen' || patch.tool === 'marker' ? { ...patch, lastInkTool: patch.tool } : patch;

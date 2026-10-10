@@ -14,6 +14,7 @@ import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
 import { inkStyle, useUi } from '../../../store/ui';
 import { sizeCanvas } from '../../reader/canvasSize';
+import { predictedPoints, repaintLive } from '../../reader/liveCanvas';
 import { useNoteEditor } from './editorStore';
 import ImageItemView from './ImageItemView';
 import ConnectorLabelView from './ConnectorLabelView';
@@ -51,7 +52,8 @@ const RULER_REACH = 28;
 const HOLD_MS = 550;
 
 type Gesture =
-  | { kind: 'ink'; id: number; tool: 'pen' | 'marker'; points: Point[]; shape: RecognizedShape | null; edge: Edge | null }
+  /** `predicted`: where the pen is about to be, drawn ahead of `points` but never saved. */
+  | { kind: 'ink'; id: number; tool: 'pen' | 'marker'; points: Point[]; predicted?: Point[]; shape: RecognizedShape | null; edge: Edge | null }
   /** `stylus`: erasing because the pen's button is held, so letting go of it goes back to the pen. */
   | { kind: 'erase'; id: number; at: Vec; stylus: boolean }
   | { kind: 'lasso'; id: number; points: Vec[] }
@@ -236,47 +238,46 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     frame.current = requestAnimationFrame(() => {
       const canvas = liveRef.current;
       if (!canvas) return;
-      const ctx = canvas.getContext('2d')!;
       const ratio = canvas.width / Math.max(1, width);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const link = linking.current;
-      if (link) {
+      repaintLive(canvas, (ctx) => {
+        const link = linking.current;
+        if (link) {
+          ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
+          const target = nodeAt(items.filter((i) => i.id !== link.node.id), link.to);
+          const c = newConnector(link.node, { node: target?.id, x: link.to[0], y: link.to[1] });
+          drawConnector(ctx, c, connectorPoints(c, nodeMap));
+          return;
+        }
+        const g = gesture.current ?? (hoverEraser.current && { kind: 'erase' as const, id: -1, at: hoverEraser.current, stylus: true });
+        if (!g) return;
         ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
-        const target = nodeAt(items.filter((i) => i.id !== link.node.id), link.to);
-        const c = newConnector(link.node, { node: target?.id, x: link.to[0], y: link.to[1] });
-        drawConnector(ctx, c, connectorPoints(c, nodeMap));
-        return;
-      }
-      const g = gesture.current ?? (hoverEraser.current && { kind: 'erase' as const, id: -1, at: hoverEraser.current, stylus: true });
-      if (!g) return;
-      ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
-      const ink = inkStyle(g.kind === 'ink' ? g.tool : 'pen');
-      if (g.kind === 'ink') {
-        if (g.shape) drawShape(ctx, { ...g.shape, color: ink.color, width: ink.width });
-        else drawStroke(ctx, { ...ink, points: g.points }, false);
-      } else if (g.kind === 'shape') {
-        drawShape(ctx, { shape: useNoteEditor.getState().shape, x1: g.from[0], y1: g.from[1], x2: g.to[0], y2: g.to[1], color: ink.color, width: ink.width });
-      } else if (g.kind === 'erase') {
-        ctx.save();
-        ctx.strokeStyle = 'rgb(120 113 108 / 0.9)';
-        ctx.lineWidth = 1.5 / view.zoom;
-        ctx.beginPath();
-        ctx.arc(g.at[0], g.at[1], useNoteEditor.getState().eraserSize / view.zoom, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-      } else if (g.kind === 'diagram' && g.points.length > 1) {
-        drawStroke(ctx, { ...inkStyle('pen'), points: g.points }, false);
-      } else if (g.kind === 'lasso' && g.points.length > 1) {
-        ctx.save();
-        ctx.strokeStyle = '#0ea5e9';
-        ctx.lineWidth = 1.5 / view.zoom;
-        ctx.setLineDash([6 / view.zoom, 4 / view.zoom]);
-        ctx.beginPath();
-        g.points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-        ctx.stroke();
-        ctx.restore();
-      }
+        const ink = inkStyle(g.kind === 'ink' ? g.tool : 'pen');
+        if (g.kind === 'ink') {
+          if (g.shape) drawShape(ctx, { ...g.shape, color: ink.color, width: ink.width });
+          else drawStroke(ctx, { ...ink, points: g.predicted?.length ? [...g.points, ...g.predicted] : g.points }, false);
+        } else if (g.kind === 'shape') {
+          drawShape(ctx, { shape: useNoteEditor.getState().shape, x1: g.from[0], y1: g.from[1], x2: g.to[0], y2: g.to[1], color: ink.color, width: ink.width });
+        } else if (g.kind === 'erase') {
+          ctx.save();
+          ctx.strokeStyle = 'rgb(120 113 108 / 0.9)';
+          ctx.lineWidth = 1.5 / view.zoom;
+          ctx.beginPath();
+          ctx.arc(g.at[0], g.at[1], useNoteEditor.getState().eraserSize / view.zoom, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        } else if (g.kind === 'diagram' && g.points.length > 1) {
+          drawStroke(ctx, { ...inkStyle('pen'), points: g.points }, false);
+        } else if (g.kind === 'lasso' && g.points.length > 1) {
+          ctx.save();
+          ctx.strokeStyle = '#0ea5e9';
+          ctx.lineWidth = 1.5 / view.zoom;
+          ctx.setLineDash([6 / view.zoom, 4 / view.zoom]);
+          ctx.beginPath();
+          g.points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
     });
   };
 
@@ -450,6 +451,15 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       } else if (g.kind === 'lasso') g.points.push(p);
       else if (g.kind === 'shape') g.to = p;
       else if (g.kind === 'diagram' && !g.picked) g.points.push([p[0], p[1], ev.pointerType === 'pen' ? ev.pressure || 0.5 : 0.5]);
+    }
+    if (g.kind === 'ink') {
+      const edge = g.edge;
+      g.predicted = g.shape
+        ? []
+        : predictedPoints(e.nativeEvent, (ev) => {
+            const q = strokePoint(ev, edge);
+            return [q[0], q[1], ev.pointerType === 'pen' ? ev.pressure || 0.5 : 0.5];
+          });
     }
     renderLive();
   };

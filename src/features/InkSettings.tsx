@@ -141,6 +141,15 @@ export default function InkSettings({ tool, brushes = true, opacity: showOpacity
               </div>
             )}
             <canvas ref={previewRef} className="mt-3 h-[68px] w-[240px] rounded-lg bg-white ring-1 ring-black/5" />
+            {tool === 'pen' && (
+              <label className="mt-3 flex items-start gap-2 text-xs">
+                <input type="checkbox" checked={ui.lowLatencyInk} onChange={(e) => ui.set({ lowLatencyInk: e.target.checked })} className="mt-0.5 accent-amber-500" />
+                <span>
+                  Escrita rápida
+                  <span className="block text-[var(--muted)]">O traço acompanha a caneta mais de perto. Se aparecerem falhas no traço, desligue (vale ao reabrir o livro ou caderno).</span>
+                </span>
+              </label>
+            )}
           </div>
         </>
       )}
