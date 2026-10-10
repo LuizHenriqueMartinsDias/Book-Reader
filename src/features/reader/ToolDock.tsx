@@ -49,8 +49,10 @@ export default function ToolDock() {
   const ui = useUi();
   // Under the select tool, the colors shown are those of the ink tool the stylus will use.
   const isPen = ui.tool === 'pen' || (ui.tool === 'select' && ui.lastInkTool === 'pen');
-  const colors = isPen ? PEN_COLORS : MARKER_COLORS;
   const color = isPen ? ui.penColor : ui.markerColor;
+  // A color mixed in a notebook's picker shows first, selected, beside the quick ones.
+  const quick = isPen ? PEN_COLORS : MARKER_COLORS;
+  const colors = quick.includes(color) ? quick : [color, ...quick];
   const inking = ui.tool === 'pen' || ui.tool === 'marker' || (ui.tool === 'select' && ui.penDetected && ui.stylusAlwaysInks);
 
   return (

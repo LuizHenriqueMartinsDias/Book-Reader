@@ -18,6 +18,12 @@ export const PEN_COLORS = ['#1f2937', '#dc2626', '#2563eb', '#16a34a', '#9333ea'
 export const MARKER_COLORS = ['#facc15', '#4ade80', '#60a5fa', '#f472b6', '#fb923c'];
 export const HIGHLIGHT_COLORS = MARKER_COLORS;
 
+/** Fuller palettes for the notebook's color options (the quick colors above come first in each). */
+export const PEN_PALETTE = ['#1f2937', '#dc2626', '#2563eb', '#16a34a', '#9333ea', '#6b7280', '#ffffff', '#92400e', '#ea580c', '#ca8a04', '#65a30d', '#0d9488', '#0284c7', '#4f46e5', '#c026d3', '#db2777'];
+export const MARKER_PALETTE = ['#facc15', '#4ade80', '#60a5fa', '#f472b6', '#fb923c', '#a78bfa', '#2dd4bf', '#f87171', '#a3e635', '#d1d5db'];
+const MAX_CUSTOM_COLORS = 12;
+export type InkKind = 'pen' | 'marker';
+
 interface UiState {
   tool: Tool;
   penColor: string;
@@ -35,6 +41,10 @@ interface UiState {
   epubFont: EpubFont;
   /** Order of the shelf's books. */
   librarySort: LibrarySort;
+  /** Colors mixed in the color picker, most recent first, per kind of ink. */
+  customColors: Record<InkKind, string[]>;
+  addCustomColor: (kind: InkKind, color: string) => void;
+  removeCustomColor: (kind: InkKind, color: string) => void;
   /** The last book and notebook opened side by side, to pick up from the notebooks screen. */
   lastSplit: { bookId: string; notebookId: string; page?: number } | null;
   sidebarOpen: boolean;
@@ -46,7 +56,7 @@ interface UiState {
   stickyColor: string;
   /** Ink tool the stylus uses under the select tool: the last one picked. */
   lastInkTool: 'pen' | 'marker';
-  set: (patch: Partial<Omit<UiState, "set">>) => void;
+  set: (patch: Partial<Omit<UiState, "set" | "addCustomColor" | "removeCustomColor">>) => void;
 }
 
 export const useUi = create<UiState>()(
@@ -65,6 +75,14 @@ export const useUi = create<UiState>()(
       epubFontSize: 100,
       epubFont: 'original',
       librarySort: 'recent',
+      customColors: { pen: [], marker: [] },
+      addCustomColor: (kind, color) =>
+        set((s) => {
+          const palette = kind === 'pen' ? PEN_PALETTE : MARKER_PALETTE;
+          if (palette.includes(color)) return {};
+          return { customColors: { ...s.customColors, [kind]: [color, ...s.customColors[kind].filter((c) => c !== color)].slice(0, MAX_CUSTOM_COLORS) } };
+        }),
+      removeCustomColor: (kind, color) => set((s) => ({ customColors: { ...s.customColors, [kind]: s.customColors[kind].filter((c) => c !== color) } })),
       lastSplit: null,
       sidebarOpen: false,
       penDetected: false,
@@ -84,7 +102,7 @@ export const useUi = create<UiState>()(
     }),
     {
       name: 'book-reader-ui',
-      partialize: ({ set: _set, tool: _tool, ...rest }) => rest,
+      partialize: ({ set: _set, tool: _tool, addCustomColor: _add, removeCustomColor: _remove, ...rest }) => rest,
     },
   ),
 );

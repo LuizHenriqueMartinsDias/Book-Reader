@@ -7,6 +7,7 @@ import {
   Lasso,
   Minus,
   PaintBucket,
+  Pipette,
   PenLine,
   Plus,
   Ruler,
@@ -16,11 +17,13 @@ import {
   StickyNote,
   Type,
   Workflow,
+  X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { NodeShape, ShapeKind } from '../../../db/schema';
 import { STICKY_COLORS } from '../../../lib/notes/sticky';
-import { MARKER_COLORS, PEN_COLORS, useUi } from '../../../store/ui';
+import { MARKER_PALETTE, PEN_PALETTE, useUi, type InkKind } from '../../../store/ui';
+import ColorPicker from '../../ColorPicker';
 import InkSettings from '../../InkSettings';
 import { useNoteEditor, type EraserMode, type NoteTool } from './editorStore';
 
@@ -109,11 +112,12 @@ export default function ToolRail({ rulerOn, onToggleRuler }: { rulerOn: boolean;
 
       {open && (
         <>
-          <div className="absolute inset-0 z-20" onClick={() => setOpen(false)} />
+          {/* Below the rail, so another tool can be picked straight away. */}
+          <div className="absolute inset-0 z-10" onClick={() => setOpen(false)} />
           <div
             role="dialog"
             aria-label={`Opções: ${TOOL_NAMES[editor.tool]}`}
-            className="absolute z-30 w-72 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 text-sm shadow-2xl max-md:bottom-20 max-md:left-1/2 max-md:-translate-x-1/2 md:top-1/2 md:left-[4.75rem] md:-translate-y-1/2"
+            className="absolute z-30 max-h-[calc(100%-1.5rem)] w-80 overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 text-sm shadow-2xl max-md:bottom-20 max-md:left-1/2 max-md:-translate-x-1/2 md:top-1/2 md:left-[4.75rem] md:-translate-y-1/2"
           >
             <div className="mb-3 font-semibold">{TOOL_NAMES[editor.tool]}</div>
             <ToolOptions />
@@ -130,7 +134,6 @@ function ToolOptions() {
   const ui = useUi();
   const usesMarker = editor.tool === 'marker';
   const showsInk = ['pen', 'marker', 'shape', 'text', 'diagram'].includes(editor.tool);
-  const colors = usesMarker ? MARKER_COLORS : PEN_COLORS;
   const color = usesMarker ? ui.markerColor : ui.penColor;
   const setColor = (c: string) => ui.set(usesMarker ? { markerColor: c } : { penColor: c });
 
@@ -218,16 +221,7 @@ function ToolOptions() {
 
       {showsInk && (
         <>
-          <div>
-            <div className={label}>Cor</div>
-            <div className="flex flex-wrap gap-1">
-              {colors.map((c) => (
-                <button key={c} aria-label={`Cor ${c}`} aria-pressed={color === c} onClick={() => setColor(c)} className="flex size-10 items-center justify-center">
-                  <span className={`size-7 rounded-full ring-1 ring-black/10 ${color === c ? 'outline-2 outline-offset-2 outline-[var(--app-fg)]' : ''}`} style={{ background: c }} />
-                </button>
-              ))}
-            </div>
-          </div>
+          <InkColors kind={usesMarker ? 'marker' : 'pen'} color={color} onPick={setColor} />
           {editor.tool === 'text' || editor.tool === 'diagram' ? (
             <div>
               <div className={label}>Tamanho do texto</div>
@@ -248,6 +242,86 @@ function ToolOptions() {
         </>
       )}
     </div>
+  );
+}
+
+const swatch = (c: string, on: boolean) => ({
+  className: `block size-7 rounded-full ring-1 ring-black/15 ${on ? 'outline-2 outline-offset-2 outline-[var(--app-fg)]' : ''}`,
+  style: { background: c },
+});
+
+/** The palette, the colors mixed before ("Suas cores") and a picker for any other. */
+function InkColors({ kind, color, onPick }: { kind: InkKind; color: string; onPick: (c: string) => void }) {
+  const custom = useUi((s) => s.customColors[kind]);
+  const { addCustomColor, removeCustomColor } = useUi.getState();
+  const [mixing, setMixing] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const palette = kind === 'pen' ? PEN_PALETTE : MARKER_PALETTE;
+  // One color kept per time the picker is open: each later pick replaces the one this session added.
+  const added = useRef<string | null>(null);
+  const keep = (c: string) => {
+    const mine = added.current;
+    if (mine && mine !== c) removeCustomColor(kind, mine);
+    added.current = palette.includes(c) || (custom.includes(c) && c !== mine) ? null : c;
+    addCustomColor(kind, c);
+  };
+
+  return (
+    <>
+      <div>
+        <div className={label}>Cor</div>
+        <div className="grid grid-cols-8 gap-1">
+          {palette.map((c) => (
+            <button key={c} aria-label={`Cor ${c}`} aria-pressed={color === c} onClick={() => onPick(c)} className="flex size-8 items-center justify-center">
+              <span {...swatch(c, color === c)} />
+            </button>
+          ))}
+        </div>
+      </div>
+      {!!custom.length && (
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className={label.replace('mb-1.5 ', '')}>Suas cores</span>
+            <button onClick={() => setRemoving((r) => !r)} className="text-xs font-medium text-[var(--accent-text)]">
+              {removing ? 'Pronto' : 'Remover'}
+            </button>
+          </div>
+          <div className="grid grid-cols-8 gap-1">
+            {custom.map((c) => (
+              <button
+                key={c}
+                aria-label={removing ? `Remover a cor ${c}` : `Cor ${c}`}
+                aria-pressed={!removing && color === c}
+                onClick={() => (removing ? removeCustomColor(kind, c) : onPick(c))}
+                className="relative flex size-8 items-center justify-center"
+              >
+                <span {...swatch(c, !removing && color === c)} />
+                {removing && (
+                  <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-stone-900 text-white">
+                    <X className="size-3" />
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div>
+        <button
+          onClick={() => {
+            added.current = null;
+            setMixing((m) => !m);
+          }}
+          aria-expanded={mixing} className={`${choice(mixing)} w-full`}>
+          <Pipette className="size-4" /> {mixing ? 'Fechar seletor de cor' : 'Outra cor…'}
+        </button>
+        {mixing && (
+          <div className="mt-3">
+            <ColorPicker value={color} onChange={onPick} onCommit={keep} />
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
