@@ -27,7 +27,17 @@ const DAYS = [
   ['S', 'Sábado'],
 ];
 
+/** The usual units of a counted habit, each with a goal and quick amounts to start from. */
+const UNITS: { unit: string; goal: number; amounts?: number[] }[] = [
+  { unit: 'ml', goal: 2000, amounts: [200, 300, 500] },
+  { unit: 'copos', goal: 8 },
+  { unit: 'páginas', goal: 20 },
+  { unit: 'vezes', goal: 3 },
+  { unit: 'passos', goal: 8000, amounts: [1000, 2000] },
+];
+
 const label = 'mb-1.5 block text-xs font-medium text-[var(--muted)]';
+const chip = (on: boolean) => `h-10 rounded-full border px-4 text-sm ${on ? 'border-amber-500 bg-amber-500/10 font-semibold' : 'border-[var(--border)]'}`;
 const choice = (on: boolean) => `rounded-xl border px-3 py-2 text-left ${on ? 'border-amber-500 bg-amber-500/10' : 'border-[var(--border)]'}`;
 const field = 'h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 outline-none focus:border-amber-500';
 
@@ -51,6 +61,8 @@ export default function HabitDialog({ habit, onClose }: { habit?: Habit; onClose
   const hours = draft.kind === 'time' && inHours;
 
   const [newAmount, setNewAmount] = useState('');
+  // A unit of the user's own, typed (any unit not in the list).
+  const [customUnit, setCustomUnit] = useState(() => !!draft.unit && !UNITS.some((u) => u.unit === draft.unit));
   const amounts = draft.amounts ?? [];
   const isMl = (u?: string) => /^ml$/i.test((u ?? '').trim());
   // Switching a counted habit with a history to milliliters (from glasses, say): how many ml per old unit.
@@ -153,7 +165,11 @@ export default function HabitDialog({ habit, onClose }: { habit?: Habit; onClose
               key={k.id}
               type="button"
               aria-pressed={draft.kind === k.id}
-              onClick={() => draft.kind !== k.id && set({ kind: k.id, goal: k.id === 'check' ? 1 : k.id === 'time' ? 30 : 8, unit: k.id === 'count' ? (draft.unit ?? 'vezes') : undefined })}
+              onClick={() => {
+                if (draft.kind === k.id) return;
+                setCustomUnit(false);
+                set(k.id === 'count' ? { kind: k.id, unit: 'vezes', goal: 3, amounts: undefined } : { kind: k.id, goal: k.id === 'check' ? 1 : 30, unit: undefined, amounts: undefined });
+              }}
               className={choice(draft.kind === k.id)}
             >
               <div className="text-sm font-semibold">{k.title}</div>
@@ -162,45 +178,83 @@ export default function HabitDialog({ habit, onClose }: { habit?: Habit; onClose
           ))}
         </div>
 
+        {draft.kind === 'count' && (
+          <div className="mb-3">
+            <div className={label}>Unidade</div>
+            <div className="flex flex-wrap gap-2">
+              {UNITS.map((u) => {
+                const on = !customUnit && draft.unit === u.unit;
+                return (
+                  <button
+                    key={u.unit}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => {
+                      setCustomUnit(false);
+                      // Each unit comes with a goal and quick amounts that make sense for it.
+                      if (!on) set({ unit: u.unit, goal: u.goal, amounts: u.amounts });
+                    }}
+                    className={chip(on)}
+                  >
+                    {u.unit}
+                  </button>
+                );
+              })}
+              <button type="button" aria-pressed={customUnit} onClick={() => setCustomUnit(true)} className={chip(customUnit)}>
+                Outra
+              </button>
+            </div>
+            {customUnit && (
+              <input
+                aria-label="Outra unidade"
+                autoFocus
+                value={draft.unit ?? ''}
+                onChange={(e) => set({ unit: e.target.value })}
+                placeholder="Ex.: km, xícaras, séries"
+                className={`${field} mt-2`}
+              />
+            )}
+          </div>
+        )}
+
         {draft.kind !== 'check' && (
           <div className="mb-4 flex gap-2.5">
             <div className="flex-1">
               <label htmlFor="habit-goal" className={label}>
                 Meta por dia
               </label>
-              <input
-                id="habit-goal"
-                type="number"
-                inputMode="decimal"
-                min={hours ? 0.25 : 1}
-                step={hours ? 0.25 : 1}
-                value={hours ? draft.goal / 60 : draft.goal}
-                onChange={(e) => set({ goal: Math.round(Number(e.target.value) * (hours ? 60 : 1)) || 0 })}
-                className={field}
-              />
+              <div className="flex h-11 items-center gap-2 rounded-lg border border-[var(--border)] px-3 focus-within:border-amber-500">
+                <input
+                  id="habit-goal"
+                  type="number"
+                  inputMode="decimal"
+                  min={hours ? 0.25 : 1}
+                  step={hours ? 0.25 : 1}
+                  value={hours ? draft.goal / 60 : draft.goal}
+                  onChange={(e) => set({ goal: Math.round(Number(e.target.value) * (hours ? 60 : 1)) || 0 })}
+                  className="min-w-0 flex-1 bg-transparent outline-none"
+                />
+                {draft.kind === 'count' && (
+                  <span className="shrink-0 text-sm text-[var(--muted)]">
+                    {draft.unit}
+                    {isMl(draft.unit) && draft.goal >= 1000 ? ` (${formatAmount(draft.goal, 'ml')})` : ''}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="w-36">
-              {draft.kind === 'count' ? (
-                <>
-                  <label htmlFor="habit-unit" className={label}>
-                    Unidade
-                  </label>
-                  <input id="habit-unit" value={draft.unit ?? ''} onChange={(e) => set({ unit: e.target.value })} placeholder="copos" className={field} />
-                </>
-              ) : (
-                <>
-                  <span className={label}>Em</span>
-                  <div className="grid h-11 grid-cols-2 overflow-hidden rounded-lg border border-[var(--border)] text-sm">
-                    <button type="button" aria-pressed={!hours} className={!hours ? 'bg-amber-500/15 font-semibold' : ''} onClick={() => setInHours(false)}>
-                      min
-                    </button>
-                    <button type="button" aria-pressed={hours} className={hours ? 'bg-amber-500/15 font-semibold' : ''} onClick={() => setInHours(true)}>
-                      horas
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            {draft.kind === 'time' && (
+              <div className="w-36">
+                <span className={label}>Em</span>
+                <div className="grid h-11 grid-cols-2 overflow-hidden rounded-lg border border-[var(--border)] text-sm">
+                  <button type="button" aria-pressed={!hours} className={!hours ? 'bg-amber-500/15 font-semibold' : ''} onClick={() => setInHours(false)}>
+                    min
+                  </button>
+                  <button type="button" aria-pressed={hours} className={hours ? 'bg-amber-500/15 font-semibold' : ''} onClick={() => setInHours(true)}>
+                    horas
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
