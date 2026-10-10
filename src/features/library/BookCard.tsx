@@ -6,12 +6,29 @@ import { deleteBook, getBookFile, updateBook } from '../../db/repo';
 import { MoveToFolder } from '../FolderBar';
 import { notebookFromPdf } from '../notes/importPdf';
 
+/** How far into the book the reader is, 0 to 1. */
+export const bookProgress = (book: Book) =>
+  book.format === 'epub' ? (book.progress ?? 0) : book.pageCount > 1 ? (book.lastPage - 1) / (book.pageCount - 1) : 0;
+
+/** Reached the end (EPUB positions rarely land on exactly 100%). */
+export const isFinished = (book: Book) => !!book.lastOpenedAt && bookProgress(book) >= 0.99;
+
+/** A book's cover (PDFs: their first page, which follows the theme's page filter), or its title. */
+export function BookCover({ book, className = '' }: { book: Book; className?: string }) {
+  const epub = book.format === 'epub';
+  return book.coverThumb ? (
+    <img src={book.coverThumb} alt="" className={`${epub ? '' : 'page-canvas'} bg-[var(--paper)] object-cover object-top ${className}`} />
+  ) : (
+    <div className={`flex items-center justify-center overflow-hidden bg-[var(--panel)] p-1 text-center font-serif text-[10px] text-[var(--app-fg)] ${className}`}>{book.title}</div>
+  );
+}
+
 export default function BookCard({ book, folders }: { book: Book; folders: Folder[] }) {
   // Which side of the card the menu opens to: rightwards when the card is too near the left edge.
   const [menu, setMenu] = useState<false | 'left' | 'right'>(false);
   const epub = book.format === 'epub';
   const folder = folders.find((f) => f.id === book.folderId);
-  const progress = epub ? (book.progress ?? 0) : book.pageCount > 1 ? (book.lastPage - 1) / (book.pageCount - 1) : 0;
+  const progress = bookProgress(book);
 
   return (
     <div className="group relative">
@@ -33,9 +50,17 @@ export default function BookCard({ book, folders }: { book: Book; folders: Folde
         <div className="mt-1.5 flex items-center gap-2 text-xs text-[var(--muted)]">
           {folder && <span className="size-2 shrink-0 rounded-full" style={{ background: folder.color }} title={folder.name} />}
           <div className="h-1 flex-1 overflow-hidden rounded bg-[var(--border)]">
-            <div className="h-full bg-amber-500" style={{ width: `${progress * 100}%` }} />
+            <div className={`h-full ${isFinished(book) ? 'bg-emerald-600' : 'bg-amber-500'}`} style={{ width: `${progress * 100}%` }} />
           </div>
-          {!book.lastOpenedAt ? 'Novo' : epub ? `${Math.round(progress * 100)}%` : `${book.lastPage}/${book.pageCount}`}
+          {!book.lastOpenedAt ? (
+            <span className="font-semibold text-[var(--accent-text)]">Novo</span>
+          ) : isFinished(book) ? (
+            <span className="font-semibold text-emerald-700 dark:text-emerald-400">Lido</span>
+          ) : epub ? (
+            `${Math.round(progress * 100)}%`
+          ) : (
+            `${book.lastPage}/${book.pageCount}`
+          )}
         </div>
       </button>
 

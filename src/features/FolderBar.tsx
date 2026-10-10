@@ -67,14 +67,20 @@ export default function FolderBar({ kind, folders, filter, onFilter, layout = 'c
     return (
       <div className="flex flex-col gap-0.5">
         <div className="px-3 pt-6 pb-1 text-xs font-semibold tracking-wide text-[var(--muted)] uppercase">Pastas</div>
-        <ListItem active={filter === null} onClick={() => onFilter(null)} label="Todos" count={counts?.all} />
+        <div className="flex">
+          <ListItem active={filter === null} onClick={() => onFilter(null)} label="Todos" count={counts?.all} />
+        </div>
         {folders.map((folder) => (
           <div key={folder.id} className="flex items-center">
             <ListItem active={filter === folder.id} onClick={() => onFilter(folder.id)} label={folder.name} color={folder.color} count={counts?.[folder.id]} />
             {options(folder)}
           </div>
         ))}
-        {folders.length > 0 && <ListItem active={filter === ''} onClick={() => onFilter('')} label="Sem pasta" count={counts?.['']} />}
+        {folders.length > 0 && (
+          <div className="flex">
+            <ListItem active={filter === ''} onClick={() => onFilter('')} label="Sem pasta" count={counts?.['']} />
+          </div>
+        )}
         <button onClick={addFolder} className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm text-[var(--muted)] hover:bg-[var(--app-bg)] hover:text-[var(--app-fg)]">
           <FolderPlus className="size-4" /> Nova pasta
         </button>

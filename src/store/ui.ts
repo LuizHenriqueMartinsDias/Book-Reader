@@ -9,6 +9,7 @@ export type Theme = 'light' | 'sepia' | 'dark';
 export type ViewMode = 'scroll' | 'flip' | 'slide' | 'instant';
 export type SpreadLayout = 'auto' | 'single' | 'double';
 export type EpubFont = 'original' | 'literata' | 'serif' | 'sans';
+export type LibrarySort = 'recent' | 'title' | 'added';
 
 /** Thickness a pen starts with, by kind (each kind then remembers its own). */
 export const BRUSH_WIDTHS: Record<Brush, number> = { pen: 2, fineliner: 1.5, brush: 6, pencil: 2 };
@@ -32,6 +33,8 @@ interface UiState {
   /** EPUB text size in percent and typeface. */
   epubFontSize: number;
   epubFont: EpubFont;
+  /** Order of the shelf's books. */
+  librarySort: LibrarySort;
   sidebarOpen: boolean;
   /** Once a stylus is seen, finger touches scroll instead of drawing (palm rejection). */
   penDetected: boolean;
@@ -59,6 +62,7 @@ export const useUi = create<UiState>()(
       spreadLayout: 'auto',
       epubFontSize: 100,
       epubFont: 'original',
+      librarySort: 'recent',
       sidebarOpen: false,
       penDetected: false,
       stylusAlwaysInks: true,

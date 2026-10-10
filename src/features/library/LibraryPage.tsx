@@ -1,13 +1,15 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Download, FilePlus2, Moon, Sun, SunDim, Upload } from 'lucide-react';
+import { Download, FilePlus2, Moon, MoreHorizontal, Search, Sun, SunDim, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { navigate } from '../../App';
-import { db } from '../../db/schema';
+import { db, type Book } from '../../db/schema';
 import { createBackup, download, restoreBackup } from '../../lib/backup';
-import { useUi, type Theme } from '../../store/ui';
+import { normalize } from '../../lib/catalog/text';
+import { useUi, type LibrarySort, type Theme } from '../../store/ui';
 import FolderBar, { folderCounts, inFolder, useFolderFilter } from '../FolderBar';
 import HomeLayout from '../HomeLayout';
 import BookCard from './BookCard';
+import ContinueReading from './ContinueReading';
 import { ACCEPTED_FILES, importBook, isBookFile } from './importBook';
 
 const THEMES: { id: Theme; icon: typeof Sun; label: string }[] = [
@@ -16,12 +18,29 @@ const THEMES: { id: Theme; icon: typeof Sun; label: string }[] = [
   { id: 'dark', icon: Moon, label: 'Escuro' },
 ];
 
+const SORTS: { id: LibrarySort; label: string }[] = [
+  { id: 'recent', label: 'Lidos recentemente' },
+  { id: 'added', label: 'Adicionados recentemente' },
+  { id: 'title', label: 'Título' },
+];
+
+const SORTERS: Record<LibrarySort, (a: Book, b: Book) => number> = {
+  recent: (a, b) => b.lastOpenedAt - a.lastOpenedAt || b.addedAt - a.addedAt,
+  added: (a, b) => b.addedAt - a.addedAt,
+  title: (a, b) => a.title.localeCompare(b.title, 'pt-BR'),
+};
+
 export default function LibraryPage() {
   const books = useLiveQuery(() => db.books.orderBy('lastOpenedAt').reverse().toArray(), []);
   const folders = useLiveQuery(() => db.bookFolders.orderBy('order').toArray(), []) ?? [];
   const [filter, setFilter] = useFolderFilter('books');
-  const shown = books?.filter((b) => inFolder(b.folderId, filter));
-  const { theme, set } = useUi();
+  const { theme, set, librarySort } = useUi();
+  const [query, setQuery] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const q = normalize(query);
+  const shown = books
+    ?.filter((b) => inFolder(b.folderId, filter) && (!q || normalize(`${b.title} ${b.author ?? ''}`).includes(q)))
+    .sort(SORTERS[librarySort]);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -83,34 +102,67 @@ export default function LibraryPage() {
       >
         <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--panel)]/90 px-4 py-3 backdrop-blur sm:px-6">
           <h1 className="mr-auto font-serif text-2xl font-bold">Estante</h1>
-          <div className="flex rounded-lg border border-[var(--border)] p-0.5">
-            {THEMES.map(({ id, icon: Icon, label }) => (
-              <button
-                key={id}
-                title={label}
-                onClick={() => set({ theme: id })}
-                className={`rounded-md p-1.5 ${theme === id ? 'bg-[var(--app-bg)]' : 'opacity-60 hover:opacity-100'}`}
-              >
-                <Icon className="size-4" />
-              </button>
-            ))}
+          {!!books?.length && (
+            <label className="order-last flex h-10 w-full items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--app-bg)] px-4 focus-within:border-amber-500 sm:order-none sm:w-64">
+              <Search className="size-4 shrink-0 text-[var(--muted)]" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                type="search"
+                placeholder="Buscar na estante"
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              />
+            </label>
+          )}
+          <div className="relative">
+            <button
+              aria-label="Mais opções"
+              aria-expanded={menuOpen}
+              className="flex size-10 items-center justify-center rounded-full border border-[var(--border)] hover:bg-[var(--app-bg)]"
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              <MoreHorizontal className="size-5" />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute top-12 right-0 z-20 w-60 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1.5 text-sm shadow-xl">
+                  <div className="px-2.5 pt-1.5 pb-1 text-xs text-[var(--muted)]">Tema</div>
+                  <div className="flex gap-1 px-1 pb-1.5">
+                    {THEMES.map(({ id, icon: Icon, label }) => (
+                      <button
+                        key={id}
+                        onClick={() => set({ theme: id })}
+                        className={`flex flex-1 flex-col items-center gap-1 rounded-lg border py-2 text-xs ${theme === id ? 'border-amber-500 bg-amber-500/10' : 'border-[var(--border)] hover:bg-[var(--app-bg)]'}`}
+                      >
+                        <Icon className="size-4" /> {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--app-bg)]"
+                    onClick={async () => {
+                      setMenuOpen(false);
+                      download(await createBackup(), `book-reader-backup-${new Date().toISOString().slice(0, 10)}.json`);
+                    }}
+                  >
+                    <Download className="size-4" /> Salvar backup das anotações
+                  </button>
+                  <button
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-[var(--app-bg)]"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      backupInput.current?.click();
+                    }}
+                  >
+                    <Upload className="size-4" /> Restaurar backup
+                  </button>
+                </div>
+              </>
+            )}
           </div>
           <button
-            title="Salvar backup das anotações"
-            className="rounded-lg border border-[var(--border)] p-2 hover:bg-[var(--app-bg)]"
-            onClick={async () => download(await createBackup(), `book-reader-backup-${new Date().toISOString().slice(0, 10)}.json`)}
-          >
-            <Download className="size-4" />
-          </button>
-          <button
-            title="Restaurar backup"
-            className="rounded-lg border border-[var(--border)] p-2 hover:bg-[var(--app-bg)]"
-            onClick={() => backupInput.current?.click()}
-          >
-            <Upload className="size-4" />
-          </button>
-          <button
-            className="flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-amber-400"
+            className="flex h-10 items-center gap-2 rounded-full bg-amber-500 px-4 text-sm font-semibold text-stone-900 hover:bg-amber-400"
             onClick={() => fileInput.current?.click()}
           >
             <FilePlus2 className="size-4" /> Adicionar livro
@@ -172,7 +224,28 @@ export default function LibraryPage() {
               em domínio público.
             </p>
           )}
-          {!!books?.length && shown?.length === 0 && (
+          {!!books?.length && filter === null && !q && <ContinueReading books={books} />}
+          {!!books?.length && (
+            <div className="mb-4 flex items-center gap-3">
+              <h2 className="mr-auto text-lg font-semibold">
+                {q ? 'Resultados' : filter === null ? 'Todos os livros' : filter === '' ? 'Sem pasta' : (folders.find((f) => f.id === filter)?.name ?? '')}
+              </h2>
+              <select
+                aria-label="Ordenar"
+                value={librarySort}
+                onChange={(e) => set({ librarySort: e.target.value as LibrarySort })}
+                className="h-9 rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 text-sm"
+              >
+                {SORTS.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {!!books?.length && q && shown?.length === 0 && <p className="mt-12 text-center text-sm text-[var(--muted)]">Nenhum livro com “{query.trim()}”.</p>}
+          {!!books?.length && !q && shown?.length === 0 && (
             <p className="mt-12 text-center text-sm text-[var(--muted)]">
               {filter === '' ? 'Todos os livros estão em pastas.' : 'Nenhum livro nesta pasta. Use "Mover para" no menu de um livro, ou adicione um livro com a pasta aberta.'}
             </p>
