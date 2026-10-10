@@ -43,3 +43,18 @@ export function coverBackground(pattern: CoverPattern, color: string) {
   };
   return [SHEEN, ...layers[pattern], color].join(', ');
 }
+
+const clamp = (n: number) => Math.min(100, Math.max(0, n));
+
+/**
+ * Where a cover picture shows after a drag of (dx, dy) px, on a cover `boxW`×`boxH` px that it
+ * fills (CSS object-fit: cover). Positions work like object-position in percent: only the side
+ * where the picture is larger than the cover can move, and dragging right shows more of its left.
+ */
+export function panCover([x, y]: [number, number], [dx, dy]: [number, number], imageAspect: number, [boxW, boxH]: [number, number]): [number, number] {
+  const width = Math.max(boxW, boxH * imageAspect);
+  const height = width / imageAspect;
+  const overX = width - boxW;
+  const overY = height - boxH;
+  return [overX > 0.5 ? clamp(x - (dx / overX) * 100) : x, overY > 0.5 ? clamp(y - (dy / overY) * 100) : y];
+}

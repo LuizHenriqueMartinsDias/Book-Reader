@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: 'Book Reader',
         short_name: 'Livros',
-        description: 'Leitor pessoal de PDFs com anotações',
+        description: 'Leitor de PDFs e EPUBs com anotações, cadernos e escrita à mão',
+        lang: 'pt-BR',
         theme_color: '#1c1917',
         background_color: '#1c1917',
         display: 'standalone',
@@ -37,6 +38,12 @@ export default defineConfig(({ mode }) => ({
           enctype: 'multipart/form-data',
           params: { files: [{ name: 'books', accept: ['application/pdf', '.pdf', 'application/epub+zip', '.epub'] }] },
         },
+        // Long-pressing the app's icon on Android. No `id`: the installed app is identified by its
+        // start_url, and a new id would make it a different app (reinstall, share target lost).
+        shortcuts: [
+          { name: 'Cadernos', url: './#/cadernos', icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' }] },
+          { name: 'Explorar', url: './#/explorar', icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml' }] },
+        ],
         // Computers (Chrome, Edge): "Open with → Book Reader" for PDFs and EPUBs.
         file_handlers: [{ action: './', accept: { 'application/pdf': ['.pdf'], 'application/epub+zip': ['.epub'] } }],
       },

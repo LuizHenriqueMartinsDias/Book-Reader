@@ -130,6 +130,8 @@ export interface NotebookCover {
   pattern: CoverPattern;
   /** A picture of the user's covering it, in `noteAssets` (so it's backed up and deleted with the notebook). */
   imageId?: string;
+  /** Which part of the picture shows, like CSS object-position, in percent; absent = centered. */
+  imagePos?: [x: number, y: number];
   /** The title on a label; absent = shown. */
   label?: boolean;
   /** What the notebook's card shows: this cover, or its first page. */

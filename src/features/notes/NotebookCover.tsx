@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { COVER_COLORS, updateNotebook } from '../../db/notes';
 import { newId } from '../../db/repo';
 import { db, type CoverPattern, type Notebook, type NotebookCover } from '../../db/schema';
-import { COVER_PATTERNS, coverBackground } from '../../lib/notes/covers';
+import { COVER_PATTERNS, coverBackground, panCover } from '../../lib/notes/covers';
 import { prepareImage } from '../../lib/notes/images';
 import ColorPicker from '../ColorPicker';
 
@@ -16,7 +16,11 @@ export interface CoverDraft {
   show: 'cover' | 'page';
   /** The picture: one already saved, a new one picked (already downscaled), or none. */
   image: { assetId: string } | { blob: Blob; width: number; height: number } | null;
+  /** Which part of the picture shows, in percent (see `NotebookCover.imagePos`). */
+  imagePos: [number, number];
 }
+
+const CENTER: [number, number] = [50, 50];
 
 /** The cover a new notebook starts with, or a notebook's own (opening "Capa…" means showing it). */
 export function coverDraft(notebook?: Notebook): CoverDraft {
@@ -27,6 +31,7 @@ export function coverDraft(notebook?: Notebook): CoverDraft {
     label: cover?.label ?? true,
     show: cover?.show ?? 'cover',
     image: cover?.imageId ? { assetId: cover.imageId } : null,
+    imagePos: cover?.imagePos ?? CENTER,
   };
 }
 
@@ -39,7 +44,14 @@ export async function saveCover(notebookId: string, draft: CoverDraft, previous?
     await db.noteAssets.add({ id: imageId, notebookId, blob: draft.image.blob, width: draft.image.width, height: draft.image.height });
   }
   if (previous?.imageId && previous.imageId !== imageId) await db.noteAssets.delete(previous.imageId);
-  const cover: NotebookCover = { pattern: draft.pattern, show: draft.show, ...(imageId && { imageId }), ...(!draft.label && { label: false }) };
+  const moved = imageId && (draft.imagePos[0] !== 50 || draft.imagePos[1] !== 50);
+  const cover: NotebookCover = {
+    pattern: draft.pattern,
+    show: draft.show,
+    ...(imageId && { imageId }),
+    ...(moved && { imagePos: draft.imagePos }),
+    ...(!draft.label && { label: false }),
+  };
   await updateNotebook(notebookId, { coverColor: draft.color, cover });
 }
 
@@ -64,6 +76,7 @@ interface ArtProps {
   title?: string;
   label?: boolean;
   image?: CoverDraft['image'];
+  imagePos?: [number, number];
   className?: string;
 }
 
@@ -71,11 +84,11 @@ interface ArtProps {
  * A notebook's cover: its color and pattern (or picture), a bound spine on the left and the
  * title on a label. Sizes follow its width, so it reads the same as a card or a small icon.
  */
-export function CoverArt({ color, pattern, title, label = true, image, className = '' }: ArtProps) {
+export function CoverArt({ color, pattern, title, label = true, image, imagePos = CENTER, className = '' }: ArtProps) {
   const url = useImageUrl(image);
   return (
     <div className={`@container relative overflow-hidden ${className}`} style={{ background: coverBackground(pattern, color) }}>
-      {url && <img src={url} alt="" draggable={false} className="absolute inset-0 size-full object-cover" />}
+      {url && <img src={url} alt="" draggable={false} className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${imagePos[0]}% ${imagePos[1]}%` }} />}
       {pattern === 'leather' && !url && <div className="absolute inset-y-[5%] right-[5%] left-[14%] rounded-[3px] border border-dashed border-white/45" />}
       <div className="absolute inset-y-0 left-0 w-[9%] bg-black/20 shadow-[inset_-3px_0_4px_rgba(0,0,0,0.2)]" />
       {label && title && (
@@ -90,7 +103,9 @@ export function CoverArt({ color, pattern, title, label = true, image, className
 /** A notebook's cover as saved. */
 export function NotebookCoverArt({ notebook, label, className }: { notebook: Notebook; label?: boolean; className?: string }) {
   const draft = coverDraft(notebook);
-  return <CoverArt color={draft.color} pattern={draft.pattern} title={notebook.title} label={label ?? draft.label} image={draft.image} className={className} />;
+  return (
+    <CoverArt color={draft.color} pattern={draft.pattern} title={notebook.title} label={label ?? draft.label} image={draft.image} imagePos={draft.imagePos} className={className} />
+  );
 }
 
 /** Whether a notebook's card shows its cover (else its first page, as before covers existed). */
@@ -104,12 +119,35 @@ export function CoverEditor({ draft, onChange, title }: { draft: CoverDraft; onC
   const [mixing, setMixing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const drag = useRef<{ x: number; y: number; pos: [number, number] } | null>(null);
   const custom = !COVER_COLORS.includes(draft.color);
 
   return (
     <div>
       <div className="flex gap-4">
-        <CoverArt {...draft} title={title || 'Caderno'} className="aspect-[3/4] w-24 shrink-0 rounded-l-sm rounded-r-md shadow-md ring-1 ring-black/10" />
+        <div className="w-24 shrink-0">
+          <div
+            // With a picture, dragging the preview picks which part of it shows.
+            className={draft.image ? 'cursor-grab touch-none active:cursor-grabbing' : ''}
+            onPointerDown={(e) => {
+              if (!draft.image) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              drag.current = { x: e.clientX, y: e.clientY, pos: draft.imagePos };
+            }}
+            onPointerMove={(e) => {
+              const start = drag.current;
+              const img = e.currentTarget.querySelector('img');
+              if (!start || !img?.naturalWidth) return;
+              const box = e.currentTarget.getBoundingClientRect();
+              set({ imagePos: panCover(start.pos, [e.clientX - start.x, e.clientY - start.y], img.naturalWidth / img.naturalHeight, [box.width, box.height]) });
+            }}
+            onPointerUp={() => (drag.current = null)}
+            onPointerCancel={() => (drag.current = null)}
+          >
+            <CoverArt {...draft} title={title || 'Caderno'} className="aspect-[3/4] w-full rounded-l-sm rounded-r-md shadow-md ring-1 ring-black/10" />
+          </div>
+          {draft.image && <div className="mt-1 text-center text-[11px] leading-tight text-[var(--muted)]">Arraste para ajustar</div>}
+        </div>
         <div className="min-w-0 flex-1">
           <div className={heading}>Padrão</div>
           <div className="grid grid-cols-4 gap-1.5">
@@ -171,7 +209,7 @@ export function CoverEditor({ draft, onChange, title }: { draft: CoverDraft; onC
           <ImagePlus className="size-4" /> {draft.image ? 'Trocar imagem' : 'Usar uma imagem'}
         </button>
         {draft.image && (
-          <button type="button" onClick={() => set({ image: null })} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-sm text-red-600 hover:bg-[var(--app-bg)]">
+          <button type="button" onClick={() => set({ image: null, imagePos: CENTER })} className="flex h-8 items-center gap-1.5 rounded-full px-3 text-sm text-red-600 hover:bg-[var(--app-bg)]">
             <Trash2 className="size-4" /> Remover
           </button>
         )}
@@ -188,7 +226,7 @@ export function CoverEditor({ draft, onChange, title }: { draft: CoverDraft; onC
             setError(null);
             // A cover is shown small: no need to keep the photo at full size.
             const image = await prepareImage(file, 1200).catch(() => null);
-            if (image) set({ image });
+            if (image) set({ image, imagePos: CENTER });
             else setError('Não foi possível abrir essa imagem.');
           }}
         />
