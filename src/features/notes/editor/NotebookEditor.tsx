@@ -23,6 +23,7 @@ import ToolRail, { ZoomControl } from './ToolRail';
 import PagedNotebook from './PagedNotebook';
 import StretchPageDialog from './StretchPageDialog';
 import RulerOverlay from './RulerOverlay';
+import { useActiveTime } from '../../routine/useActiveTime';
 
 const TOOL_KEYS: Record<string, NoteTool> = { p: 'pen', h: 'marker', e: 'eraser', l: 'lasso', t: 'text', s: 'shape', d: 'diagram', n: 'sticky' };
 
@@ -254,12 +255,17 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
     [pages, currentPage],
   );
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Study time for the routine: writing, typing, moving around the notebook.
+  useActiveTime('study', rootRef);
+
   const registerZoom = useCallback((fn: (z: ZoomChange) => void) => {
     canvasZoom.current = fn;
   }, []);
 
   return (
     <div
+      ref={rootRef}
       className="flex h-full min-h-0 flex-col"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {

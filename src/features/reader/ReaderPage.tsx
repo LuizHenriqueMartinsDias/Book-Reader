@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { db, type Book, type BookFormat } from '../../db/schema';
 import { updateBook } from '../../db/repo';
 import { CSS_UNITS, type PageSize, type PDFDocumentProxy } from '../../lib/pdf';
@@ -17,6 +17,7 @@ import { useFullscreen } from './useFullscreen';
 import PagedView from './views/PagedView';
 import ScrollView from './views/ScrollView';
 import { MAX_ZOOM, MIN_ZOOM, type ZoomChange, type ZoomMode } from './views/types';
+import { useActiveTime } from '../routine/useActiveTime';
 
 /** Where to open a book instead of the last-read spot (links from notebook quotes). */
 export interface StartAt {
@@ -74,6 +75,10 @@ function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentP
   const currentPage = useReader((s) => s.currentPage);
   const scale = useReader((s) => s.scale);
   const fullscreen = useFullscreen();
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Reading time for the routine; turning a page (by key, too) is reading.
+  const readingNow = useActiveTime('reading', rootRef);
+  useEffect(readingNow, [currentPage, readingNow]);
 
   useEffect(() => {
     useReader.setState({ doc });
@@ -159,7 +164,7 @@ function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentP
   const View = viewMode === 'scroll' ? ScrollView : PagedView;
 
   return (
-    <div className="flex h-full flex-col">
+    <div ref={rootRef} className="flex h-full flex-col">
       <FullscreenChrome
         fullscreen={fullscreen.active}
         onExit={fullscreen.toggle}
