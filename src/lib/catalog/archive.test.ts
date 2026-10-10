@@ -17,6 +17,12 @@ describe('buildQuery', () => {
     expect(q).not.toContain('mediatype:movies');
   });
 
+  it('can require every longer word in the title or the author', () => {
+    const q = buildQuery({ query: 'Introduction To Machine Learning', language: 'all', openOnly: false, strict: true });
+    expect(q.startsWith('(title:(Introduction AND Machine AND Learning) OR creator:(Introduction AND Machine AND Learning)) AND')).toBe(true);
+    expect(buildQuery({ query: 'de', language: 'all', openOnly: false, strict: true }).startsWith('(title:(de) OR creator:(de))')).toBe(true);
+  });
+
   it('filters by any of several authors, in any name order, and by subjects', () => {
     const q = buildQuery({ query: '', authors: ['Machado de Assis', 'Eça de Queirós'], subjects: ['poesia', 'short stories'], language: 'all', openOnly: false });
     expect(q.startsWith('*:* AND creator:((Machado AND Assis) OR (Eça AND Queirós)) AND subject:(poesia OR "short stories") AND')).toBe(true);

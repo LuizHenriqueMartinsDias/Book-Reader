@@ -7,8 +7,8 @@ export interface Category {
   label: string;
   /** Words in a book's subjects that put it in this genre. */
   matches: string[];
-  /** Gutenberg subject words, and Archive subjects (free text in any language, any of which may match). */
-  subject: { gutenberg: string; archive: string[] };
+  /** Gutenberg subject words (none: a genre Gutenberg hardly has), and Archive subjects (free text in any language, any of which may match). */
+  subject: { gutenberg?: string; archive: string[] };
 }
 
 export const CATEGORIES: Category[] = [
@@ -16,6 +16,34 @@ export const CATEGORIES: Category[] = [
   { id: 'contos', label: 'Contos', matches: ['short stories', 'contos', 'cuentos', 'nouvelles'], subject: { gutenberg: 'short stories', archive: ['contos', 'conto', 'short stories', 'cuentos', 'nouvelles'] } },
   { id: 'poesia', label: 'Poesia', matches: ['poetry', 'poesia', 'poems', 'poemas', 'poésie'], subject: { gutenberg: 'poetry', archive: ['poesia', 'poesias', 'poemas', 'poetry', 'poems', 'poésie'] } },
   { id: 'teatro', label: 'Teatro', matches: ['drama', 'plays', 'teatro', 'théâtre'], subject: { gutenberg: 'drama', archive: ['teatro', 'drama', 'plays', 'théâtre'] } },
+  {
+    id: 'tecnologia',
+    label: 'Tecnologia e IA',
+    matches: ['computer', 'computação', 'computacao', 'programming', 'programação', 'machine learning', 'artificial intelligence', 'inteligência artificial', 'python', 'data science', 'informática', 'software'],
+    subject: {
+      gutenberg: 'computers',
+      archive: [
+        'machine learning',
+        'artificial intelligence',
+        'inteligência artificial',
+        'deep learning',
+        'data science',
+        'computer science',
+        'ciência da computação',
+        'programming',
+        'programação',
+        'python',
+        'informática',
+        'algorithms',
+      ],
+    },
+  },
+  {
+    id: 'ciencias',
+    label: 'Ciências e matemática',
+    matches: ['science', 'ciência', 'ciencias', 'mathematics', 'matemática', 'physics', 'física', 'chemistry', 'química', 'biology', 'biologia', 'astronomy', 'astronomia'],
+    subject: { gutenberg: 'mathematics', archive: ['mathematics', 'matemática', 'physics', 'física', 'chemistry', 'química', 'biology', 'biologia', 'astronomy', 'astronomia', 'ciência', 'science'] },
+  },
   { id: 'aventura', label: 'Aventura', matches: ['adventure', 'aventura'], subject: { gutenberg: 'adventure', archive: ['aventura', 'aventuras', 'adventure', 'adventure stories'] } },
   { id: 'misterio', label: 'Mistério e policial', matches: ['mystery', 'detective', 'policial', 'mistério'], subject: { gutenberg: 'mystery', archive: ['mistério', 'policial', 'mystery', 'detective and mystery stories'] } },
   { id: 'ficcao-cientifica', label: 'Ficção científica', matches: ['science fiction', 'science-fiction', 'ficção científica'], subject: { gutenberg: 'science fiction', archive: ['ficção científica', 'science fiction', 'ciencia ficción'] } },
@@ -64,9 +92,9 @@ export const featuredAuthors = (language: Language) => (language === 'all' ? [..
 
 const LANGUAGE_NAMES: Record<Exclude<Language, 'all'>, string> = { por: 'em língua portuguesa', eng: 'em inglês', spa: 'em espanhol', fre: 'em francês' };
 
-const categoryShelf = (id: string, title: string): Shelf => {
+const categoryShelf = (id: string, title: string, source: Source = 'gutenberg', subtitle?: string): Shelf => {
   const category = CATEGORIES.find((c) => c.id === id)!;
-  return { id: `categoria:${id}`, title, source: 'gutenberg', filter: { subject: category.subject } };
+  return { id: `categoria:${id}`, title, subtitle, source, filter: { subject: category.subject } };
 };
 
 export function homeShelves(language: Language): Shelf[] {
@@ -80,6 +108,8 @@ export function homeShelves(language: Language): Shelf[] {
       filter: { authors: featuredAuthors(language) },
     },
     categoryShelf('romances', 'Romances'),
+    // Gutenberg has little technology; the Archive has manuals, courses and openly licensed books.
+    categoryShelf('tecnologia', 'Tecnologia e IA', 'archive', 'Internet Archive'),
     categoryShelf('poesia', 'Poesia'),
     categoryShelf('contos', 'Contos'),
     categoryShelf('teatro', 'Teatro'),

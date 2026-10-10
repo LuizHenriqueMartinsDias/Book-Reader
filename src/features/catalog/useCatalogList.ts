@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { dedupe } from '../../lib/catalog/archive';
 import { browse, remember, supports } from '../../lib/catalog/browse';
+import { rankByQuery } from '../../lib/catalog/rank';
 import type { BrowseFilter, BrowseQuery, CatalogItem, Language, Source } from '../../lib/catalog/types';
 
 interface SourceList {
@@ -93,7 +94,11 @@ export function useCatalogList(filter: BrowseFilter, sources: Source[], language
   }, [key, queries]);
 
   const perSource = queries.map((q) => ({ source: q.source, ...(state?.[q.source] ?? EMPTY) }));
-  const items = useMemo(() => interleave(perSource.map((l) => l.items)), [state, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A typed search puts the best title matches first, whichever catalog they come from.
+  const items = useMemo(() => {
+    const mixed = interleave(perSource.map((l) => l.items));
+    return filter.query ? rankByQuery(mixed, filter.query) : mixed;
+  }, [state, key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     items,

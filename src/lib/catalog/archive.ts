@@ -24,6 +24,11 @@ export interface SearchParams {
   authors?: string[];
   /** Books with any of these subjects. */
   subjects?: string[];
+  /**
+   * Every word of `query` in the title or the author, most downloaded first; otherwise words
+   * anywhere (description, full text) by the Archive's relevance, which ranks poorly.
+   */
+  strict?: boolean;
   language: Language;
   /** Only works marked public domain / openly licensed, or old enough to be public domain. */
   openOnly: boolean;
@@ -63,10 +68,24 @@ const authorClause = (name: string) => {
 };
 
 /** Solr query for public, downloadable PDFs and EPUBs (no lending or access-restricted items). */
-export function buildQuery({ query, authors, subjects, language, openOnly }: Omit<SearchParams, 'page'>) {
+/** Words worth requiring: short ones ("to", "de") are left out unless they're all there is. */
+const keyWords = (terms: string) => {
+  const words = terms.split(' ').filter(Boolean);
+  const long = words.filter((w) => w.length > 2 || /\d/.test(w));
+  return (long.length ? long : words).map(quote);
+};
+
+export function buildQuery({ query, authors, subjects, language, openOnly, strict }: Omit<SearchParams, 'page'>) {
   const terms = clean(query);
-  // Matches in the title and author count for more than in the description.
-  const parts = [terms ? `(title:(${terms})^4 OR creator:(${terms})^3 OR (${terms}))` : '*:*'];
+  const all = terms && keyWords(terms).join(' AND ');
+  const parts = [
+    !terms
+      ? '*:*'
+      : strict
+        ? `(title:(${all}) OR creator:(${all}))`
+        : // Matches in the title and author count for more than in the description.
+          `(title:(${terms})^4 OR creator:(${terms})^3 OR (${terms}))`,
+  ];
   const byAuthor = (authors ?? []).map(authorClause).filter(Boolean);
   if (byAuthor.length) parts.push(`creator:(${byAuthor.join(' OR ')})`);
   const bySubject = (subjects ?? []).map(clean).filter(Boolean);
@@ -89,7 +108,7 @@ export async function searchArchive(params: SearchParams, signal?: AbortSignal):
   url.searchParams.set('rows', String(PAGE_SIZE));
   url.searchParams.set('page', String(params.page));
   url.searchParams.set('output', 'json');
-  if (!params.query.trim()) url.searchParams.append('sort[]', 'downloads desc');
+  if (!params.query.trim() || params.strict) url.searchParams.append('sort[]', 'downloads desc');
   const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`Falha na busca (${res.status})`);
   const data = (await res.json()) as { response?: { numFound: number; docs: ArchiveDoc[] } };
@@ -209,7 +228,10 @@ export function dedupe(items: CatalogItem[]) {
   });
 }
 
+/** Text searches look in titles and authors first, and anywhere only when that finds nothing. */
 export async function searchArchiveItems(params: SearchParams, signal?: AbortSignal): Promise<CatalogPage> {
-  const { total, docs } = await searchArchive(params, signal);
+  let found = params.query.trim() && params.strict === undefined ? await searchArchive({ ...params, strict: true }, signal) : null;
+  if (!found?.total) found = await searchArchive({ ...params, strict: false }, signal);
+  const { total, docs } = found;
   return { items: dedupe(docs.map(archiveItem)), hasMore: params.page * PAGE_SIZE < total };
 }
