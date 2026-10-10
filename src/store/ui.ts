@@ -61,7 +61,7 @@ interface UiState {
   lastInkTool: 'pen' | 'marker';
   /** When the annotations were last backed up (any way: folder, share, download), or null if never. */
   lastBackupAt: number | null;
-  /** Ink being written goes straight to the screen (Chrome's low-latency canvas) and reaches ahead to where the pen is going. */
+  /** Ink being written reaches ahead to where the pen is going (the browser's prediction), to keep up with it. */
   lowLatencyInk: boolean;
   /** The Google account whose Drive gets the backups, or null when not connected. */
   driveAccount: string | null;

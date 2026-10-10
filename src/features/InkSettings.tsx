@@ -146,7 +146,7 @@ export default function InkSettings({ tool, brushes = true, opacity: showOpacity
                 <input type="checkbox" checked={ui.lowLatencyInk} onChange={(e) => ui.set({ lowLatencyInk: e.target.checked })} className="mt-0.5 accent-amber-500" />
                 <span>
                   Escrita rápida
-                  <span className="block text-[var(--muted)]">O traço acompanha a caneta mais de perto. Se aparecerem falhas no traço, desligue (vale ao reabrir o livro ou caderno).</span>
+                  <span className="block text-[var(--muted)]">O traço se estende até onde a caneta está indo, para acompanhá-la mais de perto. Se o fim do traço parecer tremer, desligue.</span>
                 </span>
               </label>
             )}

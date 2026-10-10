@@ -1,48 +1,18 @@
 import type { Point } from '../../db/schema';
 import { useUi } from '../../store/ui';
 
-interface Live {
-  ctx: CanvasRenderingContext2D;
-  /** Low-latency canvases only: where a repaint is drawn before it replaces what's on screen. */
-  buffer?: HTMLCanvasElement;
-}
-const lives = new WeakMap<HTMLCanvasElement, Live>();
-
-function live(canvas: HTMLCanvasElement): Live {
-  let l = lives.get(canvas);
-  if (!l) {
-    // A canvas keeps the options of its first getContext call, so every call for a live canvas
-    // goes through here; changing the setting applies to canvases created afterwards.
-    const ctx = canvas.getContext('2d', { desynchronized: useUi.getState().lowLatencyInk })!;
-    l = { ctx, buffer: ctx.getContextAttributes?.().desynchronized ? document.createElement('canvas') : undefined };
-    lives.set(canvas, l);
-  }
-  return l;
-}
-
 /**
- * Clears a canvas that shows ink being written and draws on it with `paint`. With low-latency
- * ink (Chrome's `desynchronized` canvas) its pixels reach the screen right away instead of
- * waiting for the page's next frame. Such a canvas also shows every step as it happens, so the
- * repaint is drawn on a hidden buffer and swapped in at once, so the clearing doesn't flash.
+ * Clears a canvas that shows ink being written and draws on it with `paint`.
+ *
+ * Not a low-latency (`desynchronized`) canvas: these live canvases are see-through layers over
+ * the page, and on Android such a canvas loses its transparency and turns the whole page black.
  */
 export function repaintLive(canvas: HTMLCanvasElement, paint: (ctx: CanvasRenderingContext2D) => void) {
-  const { ctx, buffer } = live(canvas);
-  const target = buffer ? buffer.getContext('2d')! : ctx;
-  if (buffer && (buffer.width !== canvas.width || buffer.height !== canvas.height)) {
-    buffer.width = canvas.width;
-    buffer.height = canvas.height;
-  }
-  target.setTransform(1, 0, 0, 1, 0, 0);
-  target.clearRect(0, 0, canvas.width, canvas.height);
-  target.save();
-  paint(target);
-  target.restore();
-  if (!buffer) return;
-  ctx.save();
+  const ctx = canvas.getContext('2d')!;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalCompositeOperation = 'copy';
-  ctx.drawImage(buffer, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  paint(ctx);
   ctx.restore();
 }
 
