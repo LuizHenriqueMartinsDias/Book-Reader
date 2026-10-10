@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Habit, HabitLog } from '../../db/schema';
-import { addDays, dayKey, dayStatus, easter, fromKey, gridWeeks, holidayName, level, overallLevel, streaks, type DayStatus } from './calendar';
+import { addDays, dayKey, dayStatus, easter, formatAmount, fromKey, gridWeeks, holidayName, level, overallLevel, streaks, type DayStatus } from './calendar';
 
 const habit = (h: Partial<Habit> = {}): Habit => ({ id: 'h', name: 'Academia', icon: 'gym', color: '#ea580c', kind: 'check', goal: 1, order: 1, createdAt: 0, ...h });
 const log = (date: string, value: number, extra: Partial<HabitLog> = {}): HabitLog => ({ id: `h|${date}`, habitId: 'h', date, value, updatedAt: 0, ...extra });
@@ -105,5 +105,15 @@ describe('the year grid', () => {
     expect(overallLevel([st(true), st(false), st(false, 'holiday')])).toBe(2);
     expect(overallLevel([st(false), st(false)])).toBe(0);
     expect(overallLevel([st(false, 'unscheduled')])).toBe('off');
+  });
+});
+
+describe('amounts', () => {
+  it('read in liters from a liter of milliliters up', () => {
+    expect(formatAmount(750, 'ml')).toBe('750 ml');
+    expect(formatAmount(1250, 'ml')).toBe('1,25 L');
+    expect(formatAmount(2000, 'ML')).toBe('2 L');
+    expect(formatAmount(5, 'copos')).toBe('5 copos');
+    expect(formatAmount(1500, 'passos')).toBe('1.500 passos');
   });
 });

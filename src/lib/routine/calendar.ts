@@ -181,6 +181,12 @@ export function dayTitle(key: string) {
   return `${name[0].toUpperCase()}${name.slice(1)}, ${d.getDate()} de ${['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'][d.getMonth()]}`;
 }
 
+/** An amount with its unit: "750 ml", "1,25 L" (milliliters from a liter up), "5 copos". */
+export function formatAmount(value: number, unit = '') {
+  if (/^ml$/i.test(unit.trim()) && value >= 1000) return `${(value / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} L`;
+  return `${value.toLocaleString('pt-BR')} ${unit}`.trim();
+}
+
 /** "1 h 10 min", "45 min", "2 h". */
 export function formatMinutes(minutes: number) {
   const h = Math.floor(minutes / 60);

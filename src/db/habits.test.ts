@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { addActivity, bump, createHabit, deleteHabit, routineData, setDaysOff, setOff, setValue, statusOn } from './habits';
+import { addActivity, addAmount, bump, convertUnit, createHabit, removeAmount, deleteHabit, routineData, setDaysOff, setOff, setValue, statusOn } from './habits';
 import { db } from './schema';
 
 describe('habits', () => {
@@ -36,6 +36,26 @@ describe('habits', () => {
     await setOff(gym.id, '2026-10-13', false);
     data = await routineData('2026-10-12', '2026-10-16');
     expect(['2026-10-13', '2026-10-15'].map((d) => statusOn(data, gym, d).off)).toEqual([null, null]);
+  });
+
+  it('adds amounts through the day and takes any of them back', async () => {
+    const water = await createHabit({ name: 'Água', icon: 'water', color: '#2563eb', kind: 'count', goal: 2000, unit: 'ml', amounts: [200, 500] });
+    await addAmount(water.id, '2026-10-10', 200);
+    await addAmount(water.id, '2026-10-10', 500);
+    await addAmount(water.id, '2026-10-10', 350);
+    await removeAmount(water.id, '2026-10-10');
+    await removeAmount(water.id, '2026-10-10', 0);
+    const log = await db.habitLogs.get(`${water.id}|2026-10-10`);
+    expect(log).toMatchObject({ value: 500, entries: [500] });
+  });
+
+  it('converts a counted habit\'s history to another unit', async () => {
+    const water = await createHabit({ name: 'Água', icon: 'water', color: '#2563eb', kind: 'count', goal: 8, unit: 'copos' });
+    await bump(water, '2026-10-09', 6);
+    await addAmount(water.id, '2026-10-10', 2);
+    await convertUnit(water.id, 250);
+    expect((await db.habitLogs.get(`${water.id}|2026-10-09`))?.value).toBe(1500);
+    expect(await db.habitLogs.get(`${water.id}|2026-10-10`)).toMatchObject({ value: 500, entries: [500] });
   });
 
   it('orders new habits last and deletes one with its history', async () => {

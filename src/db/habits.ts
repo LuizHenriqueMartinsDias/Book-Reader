@@ -47,6 +47,39 @@ export const bump = (habit: Habit, date: string, delta: number) =>
     log.value = habit.auto ? log.value + delta : Math.max(0, log.value + delta);
   });
 
+/** Adds an amount (a glass of 300 ml), remembered so it can be taken back. */
+export const addAmount = (habitId: string, date: string, amount: number) =>
+  changeLog(habitId, date, (log) => {
+    log.entries = [...(log.entries ?? []), amount];
+    log.value += amount;
+  });
+
+/** Takes back one of the day's amounts (the last one by default). */
+export const removeAmount = (habitId: string, date: string, index?: number) =>
+  changeLog(habitId, date, (log) => {
+    const entries = [...(log.entries ?? [])];
+    const [amount] = entries.splice(index ?? entries.length - 1, 1);
+    if (amount === undefined) return;
+    log.entries = entries;
+    log.value = Math.max(0, log.value - amount);
+  });
+
+/**
+ * Changes what a count habit counts in, history and all: `factor` units of the new one per old one
+ * (a glass = 250 ml). Days logged so far are converted, so the grid keeps its meaning.
+ */
+export async function convertUnit(habitId: string, factor: number) {
+  await db.transaction('rw', db.habitLogs, async () => {
+    await db.habitLogs
+      .where('habitId')
+      .equals(habitId)
+      .modify((log) => {
+        log.value = Math.round(log.value * factor);
+        if (log.entries) log.entries = log.entries.map((e) => Math.round(e * factor));
+      });
+  });
+}
+
 /** A day off for one habit (holiday, gym closed). */
 export const setOff = (habitId: string, date: string, off: boolean) =>
   changeLog(habitId, date, (log) => {

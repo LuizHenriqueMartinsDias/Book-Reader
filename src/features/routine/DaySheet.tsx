@@ -42,7 +42,7 @@ export default function DaySheet({ day, habits, data, onClose }: { day: string; 
 
         <div className="-mx-3.5 divide-y divide-[var(--border)]">
           {habits.map((h, i) => (
-            <HabitRow key={h.id} habit={h} status={statuses[i]} day={day} dayOff />
+            <HabitRow key={h.id} habit={h} status={statuses[i]} day={day} log={data.logs.get(`${h.id}|${day}`)} dayOff />
           ))}
         </div>
 

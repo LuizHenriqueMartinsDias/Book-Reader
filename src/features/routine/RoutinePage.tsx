@@ -3,7 +3,7 @@ import { Flame, Pencil, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { createHabit, routineData, statusOn, type RoutineData } from '../../db/habits';
 import type { Habit } from '../../db/schema';
-import { dayKey, dayTitle, formatMinutes, fromKey, gridWeeks, overallLevel, streaks, type DayStatus } from '../../lib/routine/calendar';
+import { dayKey, dayTitle, formatAmount, formatMinutes, fromKey, gridWeeks, overallLevel, streaks, type DayStatus } from '../../lib/routine/calendar';
 import { EMPTY, OVERALL_COLOR, ramp } from '../../lib/routine/ramp';
 import { useUi, type Theme } from '../../store/ui';
 import HomeLayout from '../HomeLayout';
@@ -119,7 +119,7 @@ function Today({ habits, data, today }: { habits: Habit[]; data: RoutineData; to
       </div>
       <div className="divide-y divide-[var(--border)] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)]">
         {[...due, ...resting].map(({ habit, status }) => (
-          <HabitRow key={habit.id} habit={habit} status={status} day={today} />
+          <HabitRow key={habit.id} habit={habit} status={status} day={today} log={data.logs.get(`${habit.id}|${today}`)} />
         ))}
       </div>
     </section>
@@ -229,7 +229,7 @@ function HabitCard({
   const { current, best } = streaks(statusOf, fromKey(weeks[0].days[0]!), fromKey(today));
   const cell = (day: string): Cell => {
     const s = statusOn(data, habit, day);
-    const label = `${shortDate(day)}: ${s.off && !s.value ? 'folga' : habit.kind === 'check' ? (s.met ? 'feito' : 'não feito') : habit.kind === 'time' ? formatMinutes(s.value) : `${s.value} ${habit.unit ?? ''}`}`;
+    const label = `${shortDate(day)}: ${s.off && !s.value ? 'folga' : habit.kind === 'check' ? (s.met ? 'feito' : 'não feito') : habit.kind === 'time' ? formatMinutes(s.value) : formatAmount(s.value, habit.unit)}`;
     if (s.off && day >= created) return { off: true, label };
     return { fill: s.level ? shades[s.level - 1] : EMPTY[theme], label };
   };

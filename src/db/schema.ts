@@ -359,6 +359,8 @@ export interface Habit {
   unit?: string;
   /** `count`: how much each "+" adds; absent = 1. */
   step?: number;
+  /** `count`: quick amounts to add instead of a single "+" (a glass, a mug, a bottle: 200, 300, 500 ml). */
+  amounts?: number[];
   /** Days of the week it's due (0 = Sunday); absent = every day. Other days neither count nor break a streak. */
   days?: number[];
   /** National holidays are days off for it. */
@@ -380,6 +382,8 @@ export interface HabitLog {
   value: number;
   /** A day off for this habit (holiday, gym closed): it neither counts nor breaks the streak. */
   off?: boolean;
+  /** What was added through the day, in order (habits with quick amounts), so one can be taken back. */
+  entries?: number[];
   updatedAt: number;
 }
 
