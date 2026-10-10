@@ -8,6 +8,7 @@ import { useSplit } from '../split/splitStore';
 import { useReader } from './readerStore';
 import SelectionMenu from './SelectionMenu';
 import Sidebar from './Sidebar';
+import ToolDock from './ToolDock';
 import Toolbar from './Toolbar';
 import EpubReader from '../epub/EpubReader';
 import FullscreenChrome from './FullscreenChrome';
@@ -174,7 +175,12 @@ function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentP
         }
       />
       <div className="relative flex min-h-0 flex-1">
-        <View key={viewMode === 'scroll' ? 'scroll' : 'paged'} doc={doc} sizes={sizes} zoom={zoom} onZoom={changeZoom} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1">
+            <View key={viewMode === 'scroll' ? 'scroll' : 'paged'} doc={doc} sizes={sizes} zoom={zoom} onZoom={changeZoom} />
+          </div>
+          <ToolDock />
+        </div>
         {sidebarOpen && <Sidebar pageCount={sizes.length} />}
       </div>
       <SelectionMenu />

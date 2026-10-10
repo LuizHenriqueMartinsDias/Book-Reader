@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Contents, Location, Rendition } from 'epubjs';
 import { useEffect, useRef, useState } from 'react';
 import { db, type Book } from '../../db/schema';
@@ -12,6 +13,7 @@ import FullscreenChrome from '../reader/FullscreenChrome';
 import Sidebar from '../reader/Sidebar';
 import { useFullscreen } from '../reader/useFullscreen';
 import { useSplit } from '../split/splitStore';
+import { Dock, dockBtn, UndoRedo } from '../reader/ToolDock';
 import EpubStickies from './EpubStickies';
 import EpubToolbar from './EpubToolbar';
 import { literataFontFaces } from '../../lib/fonts';
@@ -405,7 +407,7 @@ function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startC
             <div ref={viewerRef} data-reader-pages className="mx-auto size-full max-w-[1400px]" />
           </div>
           {rendition && <EpubStickies rendition={rendition} bookId={book.id} />}
-          {flow === 'paginated' && <ProgressBar epub={epub} location={location} rendition={rendition} />}
+          <EpubDock epub={epub} location={location} rendition={rendition} />
         </div>
         {sidebarOpen && <Sidebar pageCount={0} />}
       </div>
@@ -427,15 +429,20 @@ function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startC
 const spineLength = (epub: EpubBook) => (epub.spine as unknown as { length: number }).length;
 
 /** Scrubber for paged mode: shows how far along you are and jumps anywhere in the book. */
-function ProgressBar({ epub, location, rendition }: { epub: EpubBook; location: EpubLocation | null; rendition: Rendition | null }) {
+/** Turning pages, the position in the book (drag to jump) and undo, in the reader's bottom dock. */
+function EpubDock({ epub, location, rendition }: { epub: EpubBook; location: EpubLocation | null; rendition: Rendition | null }) {
   const [drag, setDrag] = useState<number | null>(null);
   const ready = location?.percentage != null;
   const value = drag ?? location?.percentage ?? 0;
+  const jump = () => {
+    if (drag !== null && rendition) rendition.display(epub.locations.cfiFromPercentage(drag));
+    setDrag(null);
+  };
   return (
-    <div className="flex items-center gap-3 border-t border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-xs text-[var(--muted)]">
-      <span className="hidden max-w-60 truncate sm:block" title={location?.chapterTitle}>
-        {location?.chapterTitle || (location ? `Capítulo ${location.chapter}` : '')}
-      </span>
+    <Dock>
+      <button className={dockBtn} title="Anterior (←)" aria-label="Página anterior" disabled={location?.atStart} onClick={() => useReader.getState().prev()}>
+        <ChevronLeft className="size-5" />
+      </button>
       <input
         type="range"
         min={0}
@@ -443,18 +450,17 @@ function ProgressBar({ epub, location, rendition }: { epub: EpubBook; location: 
         disabled={!ready}
         value={Math.round(value * 1000)}
         onChange={(e) => setDrag(Number(e.target.value) / 1000)}
-        onPointerUp={() => {
-          if (drag !== null && rendition) rendition.display(epub.locations.cfiFromPercentage(drag));
-          setDrag(null);
-        }}
-        onKeyUp={() => {
-          if (drag !== null && rendition) rendition.display(epub.locations.cfiFromPercentage(drag));
-          setDrag(null);
-        }}
-        className="min-w-0 flex-1 accent-amber-500"
+        onPointerUp={jump}
+        onKeyUp={jump}
+        className="w-28 accent-amber-500 sm:w-64"
         aria-label="Posição no livro"
       />
-      <span className="w-20 text-right tabular-nums">{ready ? `${Math.round(value * 100)}%` : 'calculando…'}</span>
-    </div>
+      <span className="w-14 shrink-0 text-center text-xs text-[var(--muted)] tabular-nums">{ready ? `${Math.round(value * 100)}%` : '…'}</span>
+      <button className={dockBtn} title="Próxima (→)" aria-label="Próxima página" disabled={location?.atEnd} onClick={() => useReader.getState().next()}>
+        <ChevronRight className="size-5" />
+      </button>
+      <div className="mx-1 h-6 w-px shrink-0 bg-[var(--border)]" />
+      <UndoRedo />
+    </Dock>
   );
 }

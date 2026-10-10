@@ -35,7 +35,7 @@ const SAMPLE: Point[] = Array.from({ length: 48 }, (_, i) => {
  */
 export default function InkSettings({ tool, brushes = true }: { tool: 'pen' | 'marker'; brushes?: boolean }) {
   const ui = useUi();
-  const [open, setOpen] = useState<{ left: number; top: number } | null>(null);
+  const [open, setOpen] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const range = RANGE[tool];
@@ -65,8 +65,10 @@ export default function InkSettings({ tool, brushes = true }: { tool: 'pen' | 'm
   const toggle = () => {
     if (open) return setOpen(null);
     const r = buttonRef.current!.getBoundingClientRect();
-    // Fixed, so the scrolling toolbar doesn't cut it off; kept on screen.
-    setOpen({ left: Math.max(8, Math.min(r.left, window.innerWidth - 288)), top: r.bottom + 6 });
+    // Fixed, so the scrolling toolbar doesn't cut it off; kept on screen, above the button when
+    // it sits low (the reader's tools are at the bottom).
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - 288));
+    setOpen(r.top > window.innerHeight / 2 ? { left, bottom: window.innerHeight - r.top + 6 } : { left, top: r.bottom + 6 });
   };
 
   return (

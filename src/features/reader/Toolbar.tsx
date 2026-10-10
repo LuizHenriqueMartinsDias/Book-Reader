@@ -1,49 +1,16 @@
-import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Eraser,
-  FileDown,
-  Highlighter,
-  Loader2,
-  Minus,
-  Moon,
-  MousePointer2,
-  PanelRight,
-  PenLine,
-  PenTool,
-  Plus,
-  Redo2,
-  StickyNote,
-  Sun,
-  SunDim,
-  Undo2,
-} from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, FileDown, Loader2, Minus, PanelRight, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db, type Book } from '../../db/schema';
 import { getBookFile } from '../../db/repo';
 import { download } from '../../lib/backup';
-import { useHistory } from '../../store/history';
-import { MARKER_COLORS, PEN_COLORS, useUi, type Theme, type Tool } from '../../store/ui';
-import InkSettings from '../InkSettings';
-import { STICKY_COLORS } from '../../lib/notes/sticky';
-import { useReader } from './readerStore';
-import FullscreenButton from './FullscreenButton';
+import { useUi } from '../../store/ui';
+import HeaderMenu, { fullscreenItem, useThemeItem } from './HeaderMenu';
 import NotebookSideButton from './NotebookSideButton';
+import { useReader } from './readerStore';
 import ViewMenu from './ViewMenu';
 
-const TOOLS: { id: Tool; icon: typeof PenLine; label: string }[] = [
-  { id: 'select', icon: MousePointer2, label: 'Selecionar texto (V)' },
-  { id: 'pen', icon: PenLine, label: 'Caneta (P)' },
-  { id: 'marker', icon: Highlighter, label: 'Marca-texto (H)' },
-  { id: 'eraser', icon: Eraser, label: 'Borracha (E)' },
-  { id: 'sticky', icon: StickyNote, label: 'Post-it (N): toque na página para colar um' },
-];
-const NEXT_THEME: Record<Theme, Theme> = { light: 'sepia', sepia: 'dark', dark: 'light' };
-const THEME_ICON = { light: Sun, sepia: SunDim, dark: Moon };
-
-const btn = 'rounded-md p-2 hover:bg-[var(--app-bg)] disabled:opacity-30 disabled:hover:bg-transparent';
-const divider = <div className="mx-1 h-6 w-px shrink-0 bg-[var(--border)]" />;
+export const headerBtn = 'flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-[var(--app-bg)] disabled:opacity-30 disabled:hover:bg-transparent';
+const divider = <div className="mx-1 h-6 w-px shrink-0 bg-[var(--border)] max-sm:hidden" />;
 
 interface Props {
   book: Book;
@@ -54,21 +21,19 @@ interface Props {
   fullscreen: { supported: boolean; toggle: () => void };
 }
 
+/**
+ * The PDF reader's header: the book, where you are in it, zoom and the reading options. The
+ * drawing tools live in the dock at the bottom (ToolDock).
+ */
 export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom, fullscreen }: Props) {
   const ui = useUi();
-  const { undoStack, redoStack, undo, redo } = useHistory();
   const currentPage = useReader((s) => s.currentPage);
   const paged = ui.viewMode !== 'scroll';
   const [pageInput, setPageInput] = useState(String(currentPage));
   const [exporting, setExporting] = useState(false);
-  const ThemeIcon = THEME_ICON[ui.theme];
+  const themeItem = useThemeItem();
 
   useEffect(() => setPageInput(String(currentPage)), [currentPage]);
-
-  // Under the select tool, the colors shown are those of the ink tool the stylus will use.
-  const isPen = ui.tool === 'pen' || (ui.tool === 'select' && ui.lastInkTool === 'pen');
-  const colors = isPen ? PEN_COLORS : MARKER_COLORS;
-  const color = isPen ? ui.penColor : ui.markerColor;
 
   async function exportPdf() {
     setExporting(true);
@@ -91,144 +56,82 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
   }
 
   return (
-    <header className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-[var(--border)] bg-[var(--panel)] px-2 py-1.5 [scrollbar-width:none]">
-      <a href="#/" className={btn} title="Voltar à estante">
+    <header className="relative flex h-12 shrink-0 items-center gap-0.5 border-b border-[var(--border)] bg-[var(--panel)] px-1.5">
+      <a href="#/" className={headerBtn} title="Voltar à estante" aria-label="Voltar à estante">
         <ArrowLeft className="size-5" />
       </a>
-      <span className="mr-2 hidden max-w-56 truncate text-sm font-medium lg:block" title={book.title}>
+      <span className="mx-1 min-w-0 flex-1 truncate font-serif text-[15px] font-semibold" title={book.title}>
         {book.title}
       </span>
 
-      <div className="flex shrink-0 rounded-lg bg-[var(--app-bg)] p-0.5">
-        {TOOLS.map(({ id, icon: Icon, label }) => (
-          <button
-            key={id}
-            title={label}
-            onClick={() => ui.set({ tool: id })}
-            className={`rounded-md p-1.5 ${ui.tool === id ? 'bg-[var(--panel)] text-[var(--accent-text)] shadow-sm' : 'opacity-70 hover:opacity-100'}`}
-          >
-            <Icon className="size-5" />
-          </button>
-        ))}
-      </div>
-
-      {ui.penDetected && (
-        <button
-          title={
-            ui.stylusAlwaysInks
-              ? 'Caneta sempre escreve; o dedo navega e seleciona (toque para desligar)'
-              : 'A caneta segue a ferramenta escolhida (toque para a caneta sempre escrever)'
-          }
-          onClick={() => ui.set({ stylusAlwaysInks: !ui.stylusAlwaysInks })}
-          className={`ml-1 flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${
-            ui.stylusAlwaysInks ? 'border-amber-500 bg-amber-500/10 text-[var(--accent-text)]' : 'border-[var(--border)] text-[var(--muted)]'
-          }`}
-        >
-          <PenTool className="size-4" /> Caneta escreve
-        </button>
-      )}
-
-      {ui.tool === 'sticky' && (
-        <div className="flex shrink-0 items-center gap-1 pl-1">
-          {STICKY_COLORS.map((c) => (
-            <button
-              key={c}
-              title="Cor do post-it"
-              onClick={() => ui.set({ stickyColor: c })}
-              className={`size-6 rounded-sm border-2 ${ui.stickyColor === c ? 'border-amber-500' : 'border-transparent'}`}
-            >
-              <span className="block size-full rounded-[2px] shadow-sm ring-1 ring-black/10" style={{ background: c }} />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {(ui.tool === 'pen' || ui.tool === 'marker' || (ui.tool === 'select' && ui.penDetected && ui.stylusAlwaysInks)) && (
-        <div className="flex shrink-0 items-center gap-1 pl-1">
-          {colors.map((c) => (
-            <button
-              key={c}
-              title={c}
-              onClick={() => ui.set(isPen ? { penColor: c } : { markerColor: c })}
-              className={`size-6 rounded-full border-2 ${color === c ? 'border-amber-500' : 'border-transparent'}`}
-            >
-              <span className="block size-full rounded-full ring-1 ring-black/10" style={{ background: c }} />
-            </button>
-          ))}
-          {divider}
-          <InkSettings tool={isPen ? 'pen' : 'marker'} />
-        </div>
-      )}
-
-      {divider}
-      <button className={btn} title="Desfazer (Ctrl+Z)" disabled={!undoStack.length} onClick={undo}>
-        <Undo2 className="size-5" />
-      </button>
-      <button className={btn} title="Refazer (Ctrl+Shift+Z)" disabled={!redoStack.length} onClick={redo}>
-        <Redo2 className="size-5" />
-      </button>
-
-      <div className="ml-auto flex shrink-0 items-center gap-1">
-        <button className={`${btn} max-sm:hidden`} title="Diminuir zoom (Ctrl −)" onClick={() => onZoom((z) => z / 1.2)}>
+      <div className="flex shrink-0 items-center max-md:hidden">
+        <button className={headerBtn} title="Diminuir zoom (Ctrl −)" aria-label="Diminuir zoom" onClick={() => onZoom((z) => z / 1.2)}>
           <Minus className="size-4" />
         </button>
         <button
-          className={`w-14 rounded-md py-1 text-center text-sm tabular-nums hover:bg-[var(--app-bg)] ${fitWidth ? 'text-[var(--accent-text)]' : ''}`}
-          title={fitWidth ? 'Ajustado à largura' : 'Ajustar à largura (Ctrl 0)'}
+          className={`h-9 w-14 rounded-full text-center text-sm tabular-nums hover:bg-[var(--app-bg)] ${fitWidth ? 'text-[var(--accent-text)]' : ''}`}
+          title={fitWidth ? 'Ajustado à tela' : 'Ajustar à tela (Ctrl 0)'}
           onClick={() => onZoom(null)}
         >
           {zoomPercent}%
         </button>
-        <button className={`${btn} max-sm:hidden`} title="Aumentar zoom (Ctrl +)" onClick={() => onZoom((z) => z * 1.2)}>
+        <button className={headerBtn} title="Aumentar zoom (Ctrl +)" aria-label="Aumentar zoom" onClick={() => onZoom((z) => z * 1.2)}>
           <Plus className="size-4" />
         </button>
-        {divider}
-        {paged && (
-          <button className={btn} title="Página anterior (←)" disabled={currentPage <= 1} onClick={() => useReader.getState().prev()}>
-            <ChevronLeft className="size-5" />
-          </button>
-        )}
-        <form
-          className="flex items-center gap-1 text-sm"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const n = parseInt(pageInput, 10);
-            if (n) useReader.getState().goToPage(n);
-            (document.activeElement as HTMLElement | null)?.blur();
-          }}
-        >
-          <input
-            value={pageInput}
-            onChange={(e) => setPageInput(e.target.value.replace(/\D/g, ''))}
-            onBlur={() => setPageInput(String(currentPage))}
-            inputMode="numeric"
-            aria-label="Página"
-            className="w-12 rounded-md border border-[var(--border)] bg-transparent px-1.5 py-1 text-center tabular-nums"
-          />
-          <span className="text-[var(--muted)] tabular-nums">/ {pageCount}</span>
-        </form>
-        {paged && (
-          <button className={btn} title="Próxima página (→)" onClick={() => useReader.getState().next()}>
-            <ChevronRight className="size-5" />
-          </button>
-        )}
-        {divider}
-        <NotebookSideButton className={btn} />
-        <ViewMenu className={btn} />
-        <FullscreenButton className={btn} supported={fullscreen.supported} onClick={fullscreen.toggle} />
-        <button className={btn} title="Tema" onClick={() => ui.set({ theme: NEXT_THEME[ui.theme] })}>
-          <ThemeIcon className="size-5" />
+      </div>
+      {divider}
+      {paged && (
+        <button className={`${headerBtn} max-sm:hidden`} title="Página anterior (←)" aria-label="Página anterior" disabled={currentPage <= 1} onClick={() => useReader.getState().prev()}>
+          <ChevronLeft className="size-5" />
         </button>
-        <button className={btn} title="Exportar PDF com anotações" disabled={exporting} onClick={exportPdf}>
-          {exporting ? <Loader2 className="size-5 animate-spin" /> : <FileDown className="size-5" />}
+      )}
+      <form
+        className="flex shrink-0 items-center gap-1 text-sm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const n = parseInt(pageInput, 10);
+          if (n) useReader.getState().goToPage(n);
+          (document.activeElement as HTMLElement | null)?.blur();
+        }}
+      >
+        <input
+          value={pageInput}
+          onChange={(e) => setPageInput(e.target.value.replace(/\D/g, ''))}
+          onBlur={() => setPageInput(String(currentPage))}
+          inputMode="numeric"
+          aria-label="Página"
+          className="h-8 w-11 rounded-full border border-[var(--border)] bg-transparent text-center tabular-nums"
+        />
+        <span className="text-[var(--muted)] tabular-nums">/ {pageCount}</span>
+      </form>
+      {paged && (
+        <button className={`${headerBtn} max-sm:hidden`} title="Próxima página (→)" aria-label="Próxima página" onClick={() => useReader.getState().next()}>
+          <ChevronRight className="size-5" />
         </button>
-        <button
-          className={`${btn} ${ui.sidebarOpen ? 'text-[var(--accent-text)]' : ''}`}
-          title="Sumário, notas e busca"
-          onClick={() => ui.set({ sidebarOpen: !ui.sidebarOpen })}
-        >
-          <PanelRight className="size-5" />
-        </button>
+      )}
+      {divider}
+      <NotebookSideButton className={headerBtn} />
+      <ViewMenu className={headerBtn} />
+      <HeaderMenu
+        className={headerBtn}
+        items={[
+          ...fullscreenItem(fullscreen),
+          themeItem,
+          { icon: exporting ? Loader2 : FileDown, label: 'Exportar PDF com anotações', onClick: exportPdf, disabled: exporting },
+        ]}
+      />
+      <button
+        className={`${headerBtn} ${ui.sidebarOpen ? 'bg-amber-500/15 text-[var(--accent-text)]' : ''}`}
+        title="Sumário, notas e busca"
+        aria-label="Sumário, notas e busca"
+        aria-pressed={ui.sidebarOpen}
+        onClick={() => ui.set({ sidebarOpen: !ui.sidebarOpen })}
+      >
+        <PanelRight className="size-5" />
+      </button>
+      {/* How far into the book, along the header's edge. */}
+      <div className="absolute inset-x-0 -bottom-px h-0.5">
+        <div className="h-full bg-amber-500" style={{ width: `${pageCount > 1 ? ((currentPage - 1) / (pageCount - 1)) * 100 : 0}%` }} />
       </div>
     </header>
   );
