@@ -20,9 +20,12 @@ export default function Sidebar({ pageCount }: { pageCount: number }) {
 
   return (
     <>
-      {/* On narrow screens the sidebar overlays the page; tap outside to close. */}
-      <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={close} />
-      <aside className="fixed inset-y-0 right-0 z-40 flex w-[min(22rem,90vw)] flex-col border-l border-[var(--border)] bg-[var(--panel)] md:static md:z-auto md:w-80">
+      {/* On phones it's a sheet rising from the bottom over the page; tap outside or the handle to close. */}
+      <div className="fixed inset-0 z-30 bg-black/35 md:hidden" onClick={close} />
+      <aside className="fixed inset-x-0 bottom-0 z-40 flex h-[78dvh] flex-col rounded-t-2xl bg-[var(--panel)] shadow-[0_-8px_30px_rgba(0,0,0,0.2)] md:static md:z-auto md:h-auto md:w-80 md:rounded-none md:border-l md:border-[var(--border)] md:shadow-none">
+        <button aria-label="Fechar painel" className="flex justify-center pt-2.5 pb-1 md:hidden" onClick={close}>
+          <span className="h-1.5 w-10 rounded-full bg-[var(--border)]" />
+        </button>
         <div className="flex items-center gap-1 border-b border-[var(--border)] p-1.5">
           {TABS.map(({ id, icon: Icon, label }) => (
             <button
@@ -35,7 +38,7 @@ export default function Sidebar({ pageCount }: { pageCount: number }) {
               <Icon className="size-4" /> {label}
             </button>
           ))}
-          <button className="rounded-md p-1.5 text-[var(--muted)] hover:bg-[var(--app-bg)] md:hidden" onClick={close}>
+          <button aria-label="Fechar" className="rounded-md p-1.5 text-[var(--muted)] hover:bg-[var(--app-bg)] md:hidden" onClick={close}>
             <X className="size-4" />
           </button>
         </div>
