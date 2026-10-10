@@ -123,13 +123,29 @@ export interface Folder {
 /** `paged`: A4-like pages in sequence. `canvas`: one boundless board. */
 export type NotebookKind = 'paged' | 'canvas';
 
+/** Look of a notebook's cover, over `coverColor`. */
+export type CoverPattern = 'plain' | 'stripes' | 'grid' | 'dots' | 'linen' | 'chevron' | 'leather' | 'kraft';
+
+export interface NotebookCover {
+  pattern: CoverPattern;
+  /** A picture of the user's covering it, in `noteAssets` (so it's backed up and deleted with the notebook). */
+  imageId?: string;
+  /** The title on a label; absent = shown. */
+  label?: boolean;
+  /** What the notebook's card shows: this cover, or its first page. */
+  show: 'cover' | 'page';
+}
+
 export interface Notebook {
   id: string;
   folderId?: string | null;
   title: string;
   kind: NotebookKind;
   paper: Paper;
+  /** Cover color (the spine, and the cover under its pattern). */
   coverColor: string;
+  /** Absent on notebooks made before covers: their card shows the first page. */
+  cover?: NotebookCover;
   /** Small image of the first page, refreshed when leaving the editor. */
   thumb?: string;
   /**

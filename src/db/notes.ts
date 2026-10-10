@@ -4,7 +4,7 @@ import { newId } from './repo';
 
 export const A4 = { width: 595, height: 842 };
 
-export const COVER_COLORS = ['#1e3a8a', '#7c2d12', '#065f46', '#581c87', '#9f1239', '#334155', '#a16207'];
+export const COVER_COLORS = ['#1e3a8a', '#7c2d12', '#065f46', '#581c87', '#9f1239', '#334155', '#a16207', '#b5895a', '#0f766e', '#be185d', '#1c1917'];
 
 export interface NewNotebook {
   title: string;

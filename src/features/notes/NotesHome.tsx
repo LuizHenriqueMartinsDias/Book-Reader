@@ -10,6 +10,7 @@ import FolderBar, { folderCounts, inFolder, MoveToFolder, useFolderFilter } from
 import HomeLayout from '../HomeLayout';
 import { notebookFromPdf } from './importPdf';
 import NewNotebookDialog from './NewNotebookDialog';
+import { CoverDialog, NotebookCoverArt, showsCover } from './NotebookCover';
 
 export default function NotesHome() {
   const [filter, setFilter] = useFolderFilter('notebooks');
@@ -155,18 +156,25 @@ function ResumeSplit() {
 function NotebookCard({ notebook, folders }: { notebook: Notebook; folders: Folder[] }) {
   // Which side of the card the menu opens to: rightwards when the card is too near the left edge.
   const [menu, setMenu] = useState<false | 'left' | 'right'>(false);
+  const [editingCover, setEditingCover] = useState(false);
   const folder = folders.find((f) => f.id === notebook.folderId);
   return (
     <div className="group relative">
       <button onClick={() => navigate(`#/caderno/${notebook.id}`)} className="block w-full text-left">
         <div className="relative aspect-[3/4] overflow-hidden rounded-l-sm rounded-r-lg shadow-md ring-1 ring-black/5 transition group-hover:-translate-y-1 group-hover:shadow-lg">
-          {notebook.thumb ? (
-            <img src={notebook.thumb} alt="" className="size-full object-cover object-top" />
+          {showsCover(notebook) ? (
+            <NotebookCoverArt notebook={notebook} className="size-full" />
           ) : (
-            <div className="size-full" style={paperCss(notebook.paper, 0.35)} />
+            <>
+              {notebook.thumb ? (
+                <img src={notebook.thumb} alt="" className="size-full object-cover object-top" />
+              ) : (
+                <div className="size-full" style={paperCss(notebook.paper, 0.35)} />
+              )}
+              {/* The spine, with a fold where it meets the cover. */}
+              <div className="absolute inset-y-0 left-0 w-3.5 shadow-[inset_-3px_0_4px_rgba(0,0,0,0.18)]" style={{ background: notebook.coverColor }} />
+            </>
           )}
-          {/* The spine, with a fold where it meets the cover. */}
-          <div className="absolute inset-y-0 left-0 w-3.5 shadow-[inset_-3px_0_4px_rgba(0,0,0,0.18)]" style={{ background: notebook.coverColor }} />
           {notebook.kind === 'canvas' && (
             <span className="absolute right-1 bottom-1 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">
               <LayoutGrid className="size-3" /> Quadro
@@ -205,6 +213,15 @@ function NotebookCard({ notebook, folders }: { notebook: Notebook; folders: Fold
             >
               Renomear
             </button>
+            <button
+              className="block w-full px-3 py-2 text-left hover:bg-[var(--app-bg)]"
+              onClick={() => {
+                setMenu(false);
+                setEditingCover(true);
+              }}
+            >
+              Capa…
+            </button>
             <MoveToFolder
               folders={folders}
               current={notebook.folderId}
@@ -225,6 +242,7 @@ function NotebookCard({ notebook, folders }: { notebook: Notebook; folders: Fold
           </div>
         </>
       )}
+      {editingCover && <CoverDialog notebook={notebook} onClose={() => setEditingCover(false)} />}
     </div>
   );
 }

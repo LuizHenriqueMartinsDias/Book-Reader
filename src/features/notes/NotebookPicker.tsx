@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { LayoutGrid, Plus, X } from 'lucide-react';
 import { COVER_COLORS, createNotebook } from '../../db/notes';
 import { db } from '../../db/schema';
+import { NotebookCoverArt, showsCover } from './NotebookCover';
 
 interface Props {
   title: string;
@@ -45,8 +46,14 @@ export default function NotebookPicker({ title, onPick, onClose }: Props) {
               <li key={nb.id}>
                 <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-[var(--app-bg)]" onClick={() => onPick(nb.id)}>
                   <span className="relative h-12 w-9 shrink-0 overflow-hidden rounded bg-white shadow-sm ring-1 ring-black/10">
-                    {nb.thumb && <img src={nb.thumb} alt="" className="size-full object-cover object-top" />}
-                    <span className="absolute inset-y-0 left-0 w-1" style={{ background: nb.coverColor }} />
+                    {showsCover(nb) ? (
+                      <NotebookCoverArt notebook={nb} label={false} className="size-full" />
+                    ) : (
+                      <>
+                        {nb.thumb && <img src={nb.thumb} alt="" className="size-full object-cover object-top" />}
+                        <span className="absolute inset-y-0 left-0 w-1" style={{ background: nb.coverColor }} />
+                      </>
+                    )}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{nb.title}</span>

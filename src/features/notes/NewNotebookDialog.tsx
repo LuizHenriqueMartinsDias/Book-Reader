@@ -1,9 +1,10 @@
 import { LayoutGrid, Square, X } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
-import { COVER_COLORS, createNotebook } from '../../db/notes';
+import { createNotebook } from '../../db/notes';
 import { db, type Folder, type NotebookKind, type PaperStyle } from '../../db/schema';
 import { PAPER_COLORS, paperCss } from '../../lib/notes/render';
+import { CoverEditor, coverDraft, saveCover } from './NotebookCover';
 
 const PAPERS: { id: PaperStyle; label: string }[] = [
   { id: 'lined', label: 'Pautado' },
@@ -24,7 +25,7 @@ export default function NewNotebookDialog({ folders, folderId, onCreated, onClos
   const [kind, setKind] = useState<NotebookKind>('paged');
   const [style, setStyle] = useState<PaperStyle>('lined');
   const [paperColor, setPaperColor] = useState(PAPER_COLORS[0]);
-  const [cover, setCover] = useState(COVER_COLORS[0]);
+  const [cover, setCover] = useState(() => coverDraft());
   const [folder, setFolder] = useState<string | null>(folderId);
   const templates = useLiveQuery(() => db.pageTemplates.orderBy('createdAt').toArray(), []) ?? [];
   const [templateId, setTemplateId] = useState<string | null>(null);
@@ -34,10 +35,11 @@ export default function NewNotebookDialog({ folders, folderId, onCreated, onClos
       title: title.trim() || (kind === 'canvas' ? 'Quadro sem título' : 'Caderno sem título'),
       kind,
       paper: { style, color: paperColor },
-      coverColor: cover,
+      coverColor: cover.color,
       folderId: folder,
       template: templates.find((t) => t.id === templateId),
     });
+    await saveCover(nb.id, cover);
     onCreated(nb.id);
   }
 
@@ -46,7 +48,7 @@ export default function NewNotebookDialog({ folders, folderId, onCreated, onClos
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form
-        className="w-full max-w-md rounded-2xl bg-[var(--panel)] p-5 shadow-2xl"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-[var(--panel)] p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
@@ -119,10 +121,8 @@ export default function NewNotebookDialog({ folders, folderId, onCreated, onClos
         )}
 
         <div className="mb-1.5 text-xs font-medium text-[var(--muted)]">Capa</div>
-        <div className="mb-4 flex gap-2">
-          {COVER_COLORS.map((c) => (
-            <button key={c} type="button" title={c} onClick={() => setCover(c)} className={`size-7 rounded-full border-2 ${cover === c ? 'border-amber-500' : 'border-transparent'}`} style={{ background: c }} />
-          ))}
+        <div className="mb-4">
+          <CoverEditor draft={cover} onChange={setCover} title={title.trim()} />
         </div>
 
         {folders.length > 0 && (
