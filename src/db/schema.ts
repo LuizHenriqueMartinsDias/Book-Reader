@@ -339,6 +339,63 @@ export interface NoteAsset {
   height: number;
 }
 
+// ---- Routine (habits tracked day by day) ----
+
+/** `check`: done or not. `count`: units toward a goal (glasses of water). `time`: minutes toward a goal. */
+export type HabitKind = 'check' | 'count' | 'time';
+/** Time the app measures by itself: reading books, or writing in notebooks. */
+export type ActivityKind = 'reading' | 'study';
+
+export interface Habit {
+  id: string;
+  name: string;
+  /** Key of one of the routine's icons (features/routine/icons.ts). */
+  icon: string;
+  color: string;
+  kind: HabitKind;
+  /** Per day: 1 for `check`, units for `count`, minutes for `time`. */
+  goal: number;
+  /** `count`: what's counted ("copos"). */
+  unit?: string;
+  /** `count`: how much each "+" adds; absent = 1. */
+  step?: number;
+  /** Days of the week it's due (0 = Sunday); absent = every day. Other days neither count nor break a streak. */
+  days?: number[];
+  /** National holidays are days off for it. */
+  holidaysOff?: boolean;
+  /** `time` habits only: the app counts this activity's minutes as done. */
+  auto?: ActivityKind;
+  order: number;
+  createdAt: number;
+  /** Hidden from the routine (its history stays). */
+  archived?: boolean;
+}
+
+/** A habit on one day (local date `YYYY-MM-DD`); its id is `${habitId}|${date}`. */
+export interface HabitLog {
+  id: string;
+  habitId: string;
+  date: string;
+  /** Done (`check`: 1), units or minutes; for an `auto` habit, added to the measured minutes (a correction). */
+  value: number;
+  /** A day off for this habit (holiday, gym closed): it neither counts nor breaks the streak. */
+  off?: boolean;
+  updatedAt: number;
+}
+
+/** A day off for every habit (travel, sick); its id is the date. */
+export interface DayOff {
+  id: string;
+}
+
+/** Seconds of reading or study the app measured on a day; its id is `${kind}|${date}`. */
+export interface Activity {
+  id: string;
+  kind: ActivityKind;
+  date: string;
+  seconds: number;
+}
+
 /** Small app values that must live in IndexedDB, e.g. a backup folder's handle (not storable in localStorage). */
 export interface Setting {
   key: string;
@@ -361,6 +418,10 @@ export class BookDB extends Dexie {
   noteAssets!: EntityTable<NoteAsset, 'id'>;
   pageTemplates!: EntityTable<PageTemplate, 'id'>;
   settings!: EntityTable<Setting, 'key'>;
+  habits!: EntityTable<Habit, 'id'>;
+  habitLogs!: EntityTable<HabitLog, 'id'>;
+  dayOffs!: EntityTable<DayOff, 'id'>;
+  activity!: EntityTable<Activity, 'id'>;
 
   constructor(name = 'book-reader') {
     super(name);
@@ -392,12 +453,19 @@ export class BookDB extends Dexie {
     this.version(5).stores({
       settings: 'key',
     });
+    // v6: the routine (habits). Only adds tables.
+    this.version(6).stores({
+      habits: 'id, order',
+      habitLogs: 'id, habitId, date',
+      dayOffs: 'id',
+      activity: 'id, date',
+    });
     this.use(changeTracker);
   }
 }
 
 /** What a backup holds: writes to these mean there's something new to back up (books' reading position doesn't count). */
-const BACKED_UP = new Set(['strokes', 'highlights', 'notes', 'folders', 'bookFolders', 'notebooks', 'notePages', 'noteItems', 'noteAssets', 'pageTemplates']);
+const BACKED_UP = new Set(['strokes', 'highlights', 'notes', 'folders', 'bookFolders', 'notebooks', 'notePages', 'noteItems', 'noteAssets', 'pageTemplates', 'habits', 'habitLogs', 'dayOffs', 'activity']);
 const CHANGED_AT_KEY = 'book-reader-changed-at';
 
 /**
