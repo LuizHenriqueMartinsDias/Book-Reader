@@ -19,6 +19,7 @@ import { useNoteEditor, type NoteTool } from './editorStore';
 import InfiniteCanvas from './InfiniteCanvas';
 import { cloneItems, commitItems, commitTemplate } from './items';
 import NoteToolbar from './NoteToolbar';
+import ToolRail, { ZoomControl } from './ToolRail';
 import PagedNotebook from './PagedNotebook';
 import StretchPageDialog from './StretchPageDialog';
 import RulerOverlay from './RulerOverlay';
@@ -274,8 +275,6 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
         toolbar={
           <NoteToolbar
             notebook={notebook}
-            zoomPercent={Math.round((scale / CSS_UNITS) * 100)}
-            onZoom={changeZoom}
             onInsertImage={insertImage}
             onPaste={paste}
             onExport={exportPdf}
@@ -290,20 +289,21 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
                   }
                 : undefined
             }
-            rulerOn={!!ruler}
-            onToggleRuler={toggleRuler}
             fullscreen={fullscreen}
             onClose={onClose}
           />
         }
       />
-      <div ref={hostRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* On phones the tools are a strip at the bottom: the page stops above it. */}
+      <div ref={hostRef} className="relative flex min-h-0 flex-1 flex-col overflow-hidden max-md:pb-[4.5rem]">
         {notebook.kind === 'canvas' ? (
           <InfiniteCanvas notebook={notebook} page={pages[0]} registerZoom={registerZoom} onScale={setScale} />
         ) : (
           <PagedNotebook notebook={notebook} pages={pages} pdf={pdf} zoom={zoom} onZoom={changeZoom} onScale={setScale} onStretch={stretchPage} />
         )}
         {ruler && <RulerOverlay ruler={ruler} scale={scale} />}
+        <ToolRail rulerOn={!!ruler} onToggleRuler={toggleRuler} />
+        <ZoomControl zoomPercent={Math.round((scale / CSS_UNITS) * 100)} onZoom={changeZoom} />
         {rotationHint !== null && (
           <div className="pointer-events-none absolute top-3 left-1/2 z-30 -translate-x-1/2 rounded-full bg-stone-900/80 px-3 py-1 text-sm font-semibold text-white tabular-nums">
             {Math.round(rotationHint)}°

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../../App';
 import NotebookEditor from '../notes/editor/NotebookEditor';
 import ReaderPage, { type StartAt } from '../reader/ReaderPage';
+import { useUi } from '../../store/ui';
 import { useSplit, type Pane } from './splitStore';
 
 const MIN = 0.25;
@@ -16,8 +17,9 @@ export default function SplitView({ bookId, notebookId, startAt }: { bookId: str
 
   useEffect(() => {
     useSplit.setState({ active: 'reader', notebookId });
+    useUi.getState().set({ lastSplit: { bookId, notebookId } });
     return () => useSplit.setState({ active: null, notebookId: null });
-  }, [notebookId]);
+  }, [bookId, notebookId]);
 
   useEffect(() => {
     const mq = matchMedia('(orientation: portrait)');

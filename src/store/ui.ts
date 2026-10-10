@@ -35,6 +35,8 @@ interface UiState {
   epubFont: EpubFont;
   /** Order of the shelf's books. */
   librarySort: LibrarySort;
+  /** The last book and notebook opened side by side, to pick up from the notebooks screen. */
+  lastSplit: { bookId: string; notebookId: string; page?: number } | null;
   sidebarOpen: boolean;
   /** Once a stylus is seen, finger touches scroll instead of drawing (palm rejection). */
   penDetected: boolean;
@@ -63,6 +65,7 @@ export const useUi = create<UiState>()(
       epubFontSize: 100,
       epubFont: 'original',
       librarySort: 'recent',
+      lastSplit: null,
       sidebarOpen: false,
       penDetected: false,
       stylusAlwaysInks: true,
