@@ -58,7 +58,8 @@ type Gesture =
   | { kind: 'erase'; id: number; at: Vec; stylus: boolean }
   | { kind: 'lasso'; id: number; points: Vec[] }
   | { kind: 'shape'; id: number; from: Vec; to: Vec }
-  | { kind: 'text'; id: number; at: Vec }
+  /** Text tool: a tap types (in the box under it, or a new one); dragging a box (`hit`) moves it. */
+  | { kind: 'text'; id: number; at: Vec; hit: TextItem | null; moving: boolean }
   /** Post-it tool: a tap on one types in it, elsewhere sticks a new one. */
   | { kind: 'sticky'; id: number; at: Vec }
   /**
@@ -166,13 +167,16 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   const moved = useMemo(() => (preview ? new Map(transformItems(selected, preview).map((i) => [i.id, i])) : null), [preview, selected]);
   // A post-it being dragged by its strip (with its writing) or resized by its corner, in page points.
   const [stickyEdit, setStickyEdit] = useState<{ id: string; mode: StickyDrag; dx: number; dy: number } | null>(null);
+  // A text box being dragged (with the text tool, or by its handle while typing), in page points.
+  const [textMove, setTextMove] = useState<{ id: string; dx: number; dy: number } | null>(null);
   const shown = useMemo(() => {
-    const list = moved ? items.map((i) => moved.get(i.id) ?? i) : items;
+    let list = moved ? items.map((i) => moved.get(i.id) ?? i) : items;
+    if (textMove) list = list.map((i) => (i.id === textMove.id && i.type === 'text' ? { ...i, x: i.x + textMove.dx, y: i.y + textMove.dy } : i));
     const edited = stickyEdit && list.find((i): i is StickyItem => i.id === stickyEdit.id && isSticky(i));
     if (!stickyEdit || !edited) return list;
     const changed = new Map(stickyChange(edited, stickyEdit, list).map((i) => [i.id, i]));
     return list.map((i) => changed.get(i.id) ?? i);
-  }, [items, moved, stickyEdit]);
+  }, [items, moved, stickyEdit, textMove]);
   // Boxes as they're shown (also mid-drag), for the arrows to follow.
   const nodeMap = useMemo(() => nodesById(shown), [shown]);
 
@@ -385,7 +389,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     } else if (tool === 'shape') {
       gesture.current = { kind: 'shape', id, from: p, to: p };
     } else if (tool === 'text') {
-      gesture.current = { kind: 'text', id, at: p };
+      gesture.current = { kind: 'text', id, at: p, hit: textAt(p) ?? null, moving: false };
     } else if (tool === 'sticky') {
       // A tap while typing just ends the typing.
       if (wasTyping) return;
@@ -430,6 +434,15 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     if (gesture.current.id !== e.pointerId) return;
     switchByPenButton(e);
     const g = gesture.current;
+    if (g.kind === 'text') {
+      // A drag that starts on a text box moves it; a tap (barely moving) still types in it.
+      if (!g.hit) return;
+      const [x, y] = toWorld(e);
+      if (!g.moving && Math.hypot(x - g.at[0], y - g.at[1]) * view.zoom < 6) return;
+      g.moving = true;
+      setTextMove({ id: g.hit.id, dx: x - g.at[0], dy: y - g.at[1] });
+      return;
+    }
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
     for (const ev of events.length ? events : [e.nativeEvent]) {
       const p = toWorld(ev);
@@ -554,6 +567,12 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
 
     if (g.kind === 'erase') return saveErase();
     if (g.kind === 'diagram' && g.picked) return;
+    if (g.kind === 'text' && g.moving && g.hit) {
+      const [x, y] = toWorld(e);
+      if (!cancelled) await commitItems([{ ...g.hit, x: g.hit.x + x - g.at[0], y: g.hit.y + y - g.at[1] }], [g.hit]);
+      setTextMove(null);
+      return;
+    }
     if (cancelled) return;
 
     if (g.kind === 'ink') {
@@ -588,13 +607,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       useNoteEditor.getState().set({ selection: ids.length ? { pageId: page.id, ids } : null });
     } else if (g.kind === 'text') {
       const [x, y] = g.at;
-      const hit = [...items]
-        .sort((a, b) => b.z - a.z)
-        .find((i): i is TextItem => {
-          if (i.type !== 'text') return false;
-          const b = bboxOf(i);
-          return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
-        });
+      const hit = g.hit;
       if (hit) {
         editOriginal.current = hit;
         useNoteEditor.getState().set({ editingTextId: hit.id });
@@ -622,6 +635,16 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       editor.set({ editingTextId: item.id });
     }
   };
+
+  /** The text box on top under a point. */
+  const textAt = ([x, y]: Vec) =>
+    [...items]
+      .sort((a, b) => b.z - a.z)
+      .find((i): i is TextItem => {
+        if (i.type !== 'text') return false;
+        const b = bboxOf(i);
+        return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h;
+      });
 
   /** The open post-it on top under a point. */
   const stickyAt = ([x, y]: Vec) =>
@@ -918,7 +941,25 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
           <ConnectorLabelView key={c.id} item={c} at={midpoint(connectorPoints(c, nodeMap))} editing={editingTextId === c.id} paper={notebook.paper.color} />
         ))}
         {texts.map((i) => (
-          <TextItemView key={i.id} item={i} editing={editingTextId === i.id} original={editingTextId === i.id ? editOriginal.current : null} />
+          <TextItemView
+            key={i.id}
+            item={i}
+            editing={editingTextId === i.id}
+            original={editingTextId === i.id ? editOriginal.current : null}
+            onMove={(sx, sy, done) => {
+              const [dx, dy] = rotateVec([sx, sy], -rotation).map((v) => v / view.zoom);
+              if (done === 'no') return setTextMove({ id: i.id, dx, dy });
+              const saved = items.find((x): x is TextItem => x.id === i.id && x.type === 'text');
+              // Quietly: the move goes into the history with the typing, when it ends.
+              const save =
+                done === 'drop' && saved
+                  ? db.noteItems.update(i.id, (x) => {
+                      if (x.type === 'text') Object.assign(x, { x: saved.x + dx, y: saved.y + dy });
+                    })
+                  : Promise.resolve();
+              save.then(() => setTextMove(null));
+            }}
+          />
         ))}
         {/* Post-its lie over the page, their controls and text over their paper. */}
         {shown
