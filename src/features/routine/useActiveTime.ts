@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { addActivity } from '../../db/habits';
 import type { ActivityKind } from '../../db/schema';
 import { ActiveTime, TICK_MS } from '../../lib/routine/activity';
+import { focusRunning } from '../../store/pomodoro';
 import { useSplit, type Pane } from '../split/splitStore';
 
 /** How long without input still counts: a dense page can take a while to read. */
@@ -27,7 +28,7 @@ export function useActiveTime(kind: ActivityKind, scope: RefObject<HTMLElement |
     const save = (ready: { day: string; seconds: number }[]) => ready.forEach(({ day, seconds }) => addActivity(kind, day, seconds).catch(() => {}));
     // Up to now the page was visible: count that, then save what's left.
     const leave = () => {
-      save(c.tick(Date.now(), inUse() || document.visibilityState === 'hidden'));
+      save(c.tick(Date.now(), !covered() && (inUse() || document.visibilityState === 'hidden')));
       save(c.flush());
     };
     const onVisibility = () => {
@@ -40,9 +41,11 @@ export function useActiveTime(kind: ActivityKind, scope: RefObject<HTMLElement |
     for (const ev of INPUTS) el.addEventListener(ev, onInput, { capture: true, passive: true });
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', leave);
+    // During a pomodoro focus all the time is already study: the notebook would count it twice.
+    const covered = () => kind === 'study' && focusRunning();
     const inUse = () => {
       const { active } = useSplit.getState();
-      return document.visibilityState === 'visible' && (!active || active === PANE[kind]);
+      return !covered() && document.visibilityState === 'visible' && (!active || active === PANE[kind]);
     };
     const timer = setInterval(() => save(c.tick(Date.now(), inUse())), TICK_MS);
     return () => {
