@@ -1,9 +1,10 @@
-import { ArrowLeft, BookOpen, ClipboardPaste, Expand, FileDown, FileText, Hand, ImagePlus, Loader2, PenLine, Redo2, RotateCcw, Undo2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, ClipboardPaste, Expand, FileDown, FileText, Hand, ImagePlus, Loader2, PenLine, Redo2, RotateCcw, Timer, Undo2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Notebook, PaperStyle } from '../../../db/schema';
 import { updateNotebook } from '../../../db/notes';
 import { PAPER_COLORS } from '../../../lib/notes/render';
 import { useNoteHistory } from '../../../store/history';
+import { openPomodoro } from '../../../store/pomodoro';
 import FullscreenButton from '../../reader/FullscreenButton';
 import { useNoteEditor } from './editorStore';
 import TemplatePicker from './TemplatePicker';
@@ -189,6 +190,9 @@ export default function NoteToolbar({ notebook, onInsertImage, onPaste, onExport
           }}
         >
           {exporting ? <Loader2 className="size-5 animate-spin" /> : <FileDown className="size-5" />}
+        </button>
+        <button className={btn} title="Pomodoro" onClick={openPomodoro}>
+          <Timer className="size-5" />
         </button>
         <FullscreenButton className={btn} supported={fullscreen.supported} onClick={fullscreen.toggle} />
       </div>

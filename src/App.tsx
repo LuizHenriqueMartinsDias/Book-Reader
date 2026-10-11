@@ -9,6 +9,7 @@ import NotesHome from './features/notes/NotesHome';
 import SendQuoteDialog from './features/notes/SendQuoteDialog';
 import ReaderPage, { type StartAt } from './features/reader/ReaderPage';
 import SplitView from './features/split/SplitView';
+import Pomodoro from './features/pomodoro/Pomodoro';
 import Toast from './features/Toast';
 import { useUi } from './store/ui';
 
@@ -77,6 +78,7 @@ export default function App() {
     <>
       <Screen route={route} />
       <SendQuoteDialog />
+      <Pomodoro />
       <Toast />
     </>
   );

@@ -1,10 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Flame, Pencil, Plus } from 'lucide-react';
+import { Flame, Pencil, Plus, Timer } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { createHabit, routineData, statusOn, type RoutineData } from '../../db/habits';
 import type { Habit } from '../../db/schema';
 import { dayKey, dayTitle, formatAmount, formatMinutes, fromKey, gridWeeks, overallLevel, streaks, type DayStatus } from '../../lib/routine/calendar';
 import { EMPTY, OVERALL_COLOR, ramp } from '../../lib/routine/ramp';
+import { openPomodoro } from '../../store/pomodoro';
 import { useUi, type Theme } from '../../store/ui';
 import HomeLayout from '../HomeLayout';
 import ContributionGrid, { GridLegend, type Cell } from './ContributionGrid';
@@ -57,6 +58,14 @@ export default function RoutinePage() {
           <h1 className="font-serif text-2xl font-bold">Rotina</h1>
           <div className="text-[13px] text-[var(--muted)]">{dayTitle(today)}</div>
         </div>
+        <button
+          className="flex h-11 items-center gap-2 rounded-full border border-[var(--border)] px-4 text-sm font-semibold hover:bg-[var(--app-bg)] max-sm:w-11 max-sm:justify-center max-sm:px-0"
+          title="Pomodoro"
+          aria-label="Pomodoro"
+          onClick={openPomodoro}
+        >
+          <Timer className="size-4" /> <span className="max-sm:hidden">Pomodoro</span>
+        </button>
         <button className="flex h-11 items-center gap-2 rounded-full bg-amber-500 px-4 text-sm font-semibold text-stone-900 hover:bg-amber-400" onClick={() => setEditing('new')}>
           <Plus className="size-4" /> Novo hábito
         </button>

@@ -4,7 +4,7 @@ import { db, type Book } from '../../db/schema';
 import { getBookFile } from '../../db/repo';
 import { download } from '../../lib/backup';
 import { useUi } from '../../store/ui';
-import HeaderMenu, { fullscreenItem, useThemeItem } from './HeaderMenu';
+import HeaderMenu, { fullscreenItem, pomodoroItem, useThemeItem } from './HeaderMenu';
 import NotebookSideButton from './NotebookSideButton';
 import { useReader } from './readerStore';
 import ViewMenu from './ViewMenu';
@@ -117,6 +117,7 @@ export default function Toolbar({ book, pageCount, zoomPercent, fitWidth, onZoom
         items={[
           ...fullscreenItem(fullscreen),
           themeItem,
+          pomodoroItem,
           { icon: exporting ? Loader2 : FileDown, label: 'Exportar PDF com anotações', onClick: exportPdf, disabled: exporting },
         ]}
       />

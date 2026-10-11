@@ -1,5 +1,6 @@
-import { Maximize, Moon, MoreHorizontal, Sun, SunDim } from 'lucide-react';
+import { Maximize, Moon, MoreHorizontal, Sun, SunDim, Timer } from 'lucide-react';
 import { useState } from 'react';
+import { openPomodoro } from '../../store/pomodoro';
 import { useUi, type Theme } from '../../store/ui';
 
 const NEXT_THEME: Record<Theme, Theme> = { light: 'sepia', sepia: 'dark', dark: 'light' };
@@ -21,6 +22,8 @@ export function useThemeItem(): MenuItem {
 
 export const fullscreenItem = (fullscreen: { supported: boolean; toggle: () => void }): MenuItem[] =>
   fullscreen.supported ? [{ icon: Maximize, label: 'Tela cheia', onClick: fullscreen.toggle }] : [];
+
+export const pomodoroItem: MenuItem = { icon: Timer, label: 'Pomodoro', onClick: openPomodoro };
 
 /**
  * Header items that show as buttons from tablets up and gather in a "⋯" menu on phones,

@@ -2,7 +2,7 @@ import { ArrowLeft, PanelRight, Type } from 'lucide-react';
 import { useState } from 'react';
 import type { Book } from '../../db/schema';
 import { useUi, type EpubFont } from '../../store/ui';
-import HeaderMenu, { fullscreenItem, useThemeItem } from '../reader/HeaderMenu';
+import HeaderMenu, { fullscreenItem, pomodoroItem, useThemeItem } from '../reader/HeaderMenu';
 import NotebookSideButton from '../reader/NotebookSideButton';
 import { headerBtn as btn } from '../reader/Toolbar';
 import ViewMenu from '../reader/ViewMenu';
@@ -86,7 +86,7 @@ export default function EpubToolbar({ book, location, fullscreen }: Props) {
       </div>
       <NotebookSideButton className={btn} />
       <ViewMenu className={btn} />
-      <HeaderMenu className={btn} items={[...fullscreenItem(fullscreen), themeItem]} />
+      <HeaderMenu className={btn} items={[...fullscreenItem(fullscreen), themeItem, pomodoroItem]} />
       <button
         className={`${btn} ${ui.sidebarOpen ? 'bg-amber-500/15 text-[var(--accent-text)]' : ''}`}
         title="Sumário, notas e busca"

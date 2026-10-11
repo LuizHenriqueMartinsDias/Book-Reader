@@ -33,7 +33,7 @@ export const TEMPLATES: (NewHabit & { detail: string })[] = [
   { name: 'Água', icon: 'water', color: '#2563eb', kind: 'count', goal: 2000, unit: 'ml', amounts: [200, 300, 500], detail: '2 L por dia · copo, caneca, garrafa' },
   { name: 'Academia', icon: 'gym', color: '#ea580c', kind: 'check', goal: 1, days: WEEKDAYS, holidaysOff: true, detail: 'seg a sex · feriado é folga' },
   { name: 'Leitura', icon: 'book', color: '#16a34a', kind: 'time', goal: 30, auto: 'reading', detail: '30 min · conta sozinho nos livros' },
-  { name: 'Estudo', icon: 'pen', color: '#9333ea', kind: 'time', goal: 120, auto: 'study', days: WEEKDAYS, holidaysOff: true, detail: '2 h, seg a sex · conta sozinho nos cadernos' },
+  { name: 'Estudo', icon: 'pen', color: '#9333ea', kind: 'time', goal: 120, auto: 'study', days: WEEKDAYS, holidaysOff: true, detail: '2 h, seg a sex · conta sozinho nos cadernos e no pomodoro' },
   { name: 'Meditação', icon: 'leaf', color: '#0d9488', kind: 'time', goal: 10, detail: '10 min por dia' },
   { name: 'Dormir cedo', icon: 'moon', color: '#4f46e5', kind: 'check', goal: 1, detail: 'antes das 23h · feito ou não' },
 ];
