@@ -1,5 +1,6 @@
 import { ClipboardCopy, CopyPlus, Trash2 } from 'lucide-react';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { Guide } from '../../../lib/notes/diagram';
 import type { NoteItem } from '../../../db/schema';
 import { bboxOf, rotateVec, unionBox, type Transform } from '../../../lib/notes/geometry';
@@ -34,6 +35,38 @@ const HANDLE = 22;
 export default function SelectionOverlay({ items, view, rotation, preview, onPreview, onCommit, onRecolor, onDuplicate, onCopy, onDelete, onTap, extra, clearance = 0, snap }: Props) {
   const drag = useRef<{ mode: 'move' | 'resize'; start: [number, number]; id: number } | null>(null);
   const [guides, setGuides] = useState<Guide[]>([]);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  /**
+   * The action bar is over the screen, not in the page (which clips what goes past its edges, and
+   * may be turned): placed by where the selection is on screen, above it if there's room, else
+   * below, and kept on screen.
+   */
+  const [menuAt, setMenuAt] = useState<{ left: number; top: number } | null>(null);
+  const placeMenu = useRef(() => {});
+  placeMenu.current = () => {
+    const sel = boxRef.current?.getBoundingClientRect();
+    const bar = menuRef.current;
+    if (!sel || !bar) return;
+    // Scrolled away: no bar stuck at the screen's edge.
+    if (sel.bottom < 0 || sel.top > innerHeight) return setMenuAt(null);
+    const [w, h] = [bar.offsetWidth, bar.offsetHeight];
+    const above = sel.top - h - 8 - clearance;
+    const top = above >= 8 ? above : Math.max(8, Math.min(sel.bottom + 12 + clearance, innerHeight - h - 8));
+    const left = Math.max(8, Math.min(sel.left, innerWidth - w - 8));
+    setMenuAt((at) => (at && at.left === left && at.top === top ? at : { left, top }));
+  };
+  useLayoutEffect(() => placeMenu.current());
+  // The page scrolling under it, or the window changing size.
+  useEffect(() => {
+    const place = () => placeMenu.current();
+    addEventListener('scroll', place, true);
+    addEventListener('resize', place);
+    return () => {
+      removeEventListener('scroll', place, true);
+      removeEventListener('resize', place);
+    };
+  }, []);
   const box = unionBox(items.map(bboxOf));
   if (!box) return null;
 
@@ -87,7 +120,6 @@ export default function SelectionOverlay({ items, view, rotation, preview, onPre
     }
   };
 
-  const actionsAbove = top > 56 + clearance;
   return (
     <>
       {guides.map((g, i) => (
@@ -98,6 +130,7 @@ export default function SelectionOverlay({ items, view, rotation, preview, onPre
         />
       ))}
       <div
+        ref={boxRef}
         className="absolute z-30 cursor-move touch-none rounded-sm border-2 border-dashed border-sky-500 bg-sky-500/5"
         style={{ left: left - 4, top: top - 4, width: width + 8, height: height + 8 }}
         onPointerDown={start('move')}
@@ -114,33 +147,36 @@ export default function SelectionOverlay({ items, view, rotation, preview, onPre
           onPointerCancel={end}
         />
       </div>
-      {!preview && (
-        <div
-          className="absolute z-30 flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 text-[var(--app-fg)] shadow-lg"
-          style={{ left: Math.max(4, left), top: actionsAbove ? top - 50 - clearance : top + height + 12 + clearance }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {extra && (
-            <>
-              {extra}
-              <div className="mx-1 h-5 w-px bg-[var(--border)]" />
-            </>
-          )}
-          {PEN_COLORS.map((c) => (
-            <button key={c} title="Mudar cor" onClick={() => onRecolor(c)} className="size-6 rounded-full ring-1 ring-black/10" style={{ background: c }} />
-          ))}
-          <div className="mx-1 h-5 w-px bg-[var(--border)]" />
-          <button title="Duplicar (Ctrl+D)" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={onDuplicate}>
-            <CopyPlus className="size-4" />
-          </button>
-          <button title="Copiar (Ctrl+C)" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={onCopy}>
-            <ClipboardCopy className="size-4" />
-          </button>
-          <button title="Apagar (Delete)" className="rounded-md p-1.5 text-red-600 hover:bg-[var(--app-bg)]" onClick={onDelete}>
-            <Trash2 className="size-4" />
-          </button>
-        </div>
-      )}
+      {!preview &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-40 flex w-max items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-1 text-[var(--app-fg)] shadow-lg"
+            style={{ left: menuAt?.left ?? 0, top: menuAt?.top ?? 0, visibility: menuAt ? 'visible' : 'hidden' }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {extra && (
+              <>
+                {extra}
+                <div className="mx-1 h-5 w-px bg-[var(--border)]" />
+              </>
+            )}
+            {PEN_COLORS.map((c) => (
+              <button key={c} title="Mudar cor" onClick={() => onRecolor(c)} className="size-6 rounded-full ring-1 ring-black/10" style={{ background: c }} />
+            ))}
+            <div className="mx-1 h-5 w-px bg-[var(--border)]" />
+            <button title="Duplicar (Ctrl+D)" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={onDuplicate}>
+              <CopyPlus className="size-4" />
+            </button>
+            <button title="Copiar (Ctrl+C)" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={onCopy}>
+              <ClipboardCopy className="size-4" />
+            </button>
+            <button title="Apagar (Delete)" className="rounded-md p-1.5 text-red-600 hover:bg-[var(--app-bg)]" onClick={onDelete}>
+              <Trash2 className="size-4" />
+            </button>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
