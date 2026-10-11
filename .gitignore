@@ -6,3 +6,8 @@ dev-dist
 .wrangler
 .env.local
 .dev.vars
+
+# Local notes and tools, not part of the app
+planos/
+graphify-out/
+.gitattributes
