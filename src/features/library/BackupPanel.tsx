@@ -292,12 +292,15 @@ export function BackupMenuSection({ onDone }: { onDone: () => void }) {
             </span>
           </button>
         ))}
-      {folder && !folder.allowed && (
+      {/* With Drive connected, backups go there and the folder isn't used. */}
+      {folder && !folder.allowed && !(driveAccount && driveAvailable()) && (
         <div className="flex items-center gap-2.5 px-2.5 py-2">
           <ShieldAlert className="size-4 shrink-0 text-[var(--accent-text)]" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate">Pasta “{folder.name}” sem permissão</span>
-            <span className="block text-xs text-[var(--muted)]">No aviso do navegador, escolha permitir em todas as visitas</span>
+            <span className="block break-words">Pasta “{folder.name}” sem permissão</span>
+            <span className="block text-xs text-[var(--muted)]">
+              {matchMedia('(display-mode: standalone)').matches ? 'Toque em Permitir' : 'Instale o app para o navegador não pedir de novo a cada visita'}
+            </span>
           </span>
           <button
             className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-semibold text-stone-900 hover:bg-amber-400"
