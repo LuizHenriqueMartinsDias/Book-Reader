@@ -26,6 +26,15 @@ describe('partial eraser', () => {
     expect(cutPoints(line(45, 55), 50, 0, 10)).toEqual([]);
   });
 
+  it('keeps the points of the parts far from the eraser as they were', () => {
+    const points: Point[] = [[0, 0, 0.5], [100, 0, 0.5], [200, 0, 0.5], [300, 0, 0.5]];
+    const [left, right] = cutPoints(points, 250, 0, 10)!;
+    expect(left.slice(0, 3)).toEqual(points.slice(0, 3));
+    // Only the segment under the eraser was filled in.
+    expect(left.length + right.length).toBeLessThan(40);
+    expect(right.at(-1)).toEqual([300, 0, 0.5]);
+  });
+
   it('turns a touched item into pieces with the same look and stacking', () => {
     const stroke: StrokeItem = { ...base, id: 's', type: 'stroke', tool: 'marker', color: '#ff0', width: 10, points: line(0, 100) };
     const pieces = eraseItem(stroke, 50, 13, 10, id)!;

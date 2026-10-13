@@ -123,7 +123,7 @@ export function strokeHit(points: Point[], x: number, y: number, radius: number)
   return false;
 }
 
-function distToSegment(px: number, py: number, a: Point, b: Point) {
+export function distToSegment(px: number, py: number, a: Point, b: Point) {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const len2 = dx * dx + dy * dy;

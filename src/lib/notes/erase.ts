@@ -1,5 +1,6 @@
 import type { NoteItem, Point, ShapeItem, StrokeItem } from '../../db/schema';
-import { shapePoints } from './geometry';
+import { distToSegment } from '../ink';
+import { bboxOf, shapePoints, type Box } from './geometry';
 import { arrowHead } from './render';
 
 /**
@@ -29,7 +30,19 @@ export function densify(points: Point[], step: number): Point[] {
  * it, or null when the disc doesn't reach the stroke. `radius` should include half the ink width.
  */
 export function cutPoints(points: Point[], x: number, y: number, radius: number): Point[][] | null {
-  const dense = densify(points, Math.max(0.5, radius / 3));
+  const step = Math.max(0.5, radius / 3);
+  // Only the segments near the eraser are filled in finely enough to cut; the rest keep their
+  // points, so a long stroke costs little and its pieces don't grow with every pass.
+  const dense: Point[] = points.slice(0, 1);
+  let near = points.length === 1 && Math.hypot(points[0][0] - x, points[0][1] - y) <= radius;
+  for (let i = 1; i < points.length; i++) {
+    if (distToSegment(x, y, points[i - 1], points[i]) > radius + step) dense.push(points[i]);
+    else {
+      near = true;
+      dense.push(...densify([points[i - 1], points[i]], step).slice(1));
+    }
+  }
+  if (!near) return null;
   const inside = dense.map(([px, py]) => Math.hypot(px - x, py - y) <= radius);
   if (!inside.includes(true)) return null;
   const runs: Point[][] = [];
@@ -56,14 +69,25 @@ export function shapeAsStrokes(s: ShapeItem): Point[][] {
   return lines;
 }
 
+/** Items never change (an edit makes a new one), so their boxes are kept, once per item. */
+const boxes = new WeakMap<NoteItem, Box>();
+function boxOf(item: NoteItem) {
+  let box = boxes.get(item);
+  if (!box) boxes.set(item, (box = bboxOf(item)));
+  return box;
+}
+
 /**
  * The pieces an ink item turns into when the eraser disc at (x, y) touches it, or null when it
  * doesn't. Text and images aren't affected. `newId` names each piece.
  */
 export function eraseItem(item: NoteItem, x: number, y: number, radius: number, newId: () => string): StrokeItem[] | null {
   if (item.type !== 'stroke' && item.type !== 'shape') return null;
-  const lines = item.type === 'stroke' ? [item.points] : shapeAsStrokes(item);
   const reach = radius + item.width / 2;
+  // Most of the page is far from the eraser: its box (which includes the ink's width) rules it out.
+  const b = boxOf(item);
+  if (x < b.x - radius || y < b.y - radius || x > b.x + b.w + radius || y > b.y + b.h + radius) return null;
+  const lines = item.type === 'stroke' ? [item.points] : shapeAsStrokes(item);
   const cut = lines.map((points) => cutPoints(points, x, y, reach));
   if (cut.every((c) => c === null)) return null;
   const base = { notebookId: item.notebookId, pageId: item.pageId, z: item.z, createdAt: item.createdAt, color: item.color, width: item.width, ...(item.parentId ? { parentId: item.parentId } : {}) };
