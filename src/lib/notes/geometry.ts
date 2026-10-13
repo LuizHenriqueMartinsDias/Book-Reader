@@ -178,6 +178,11 @@ export const nodeRadius = (n: Pick<NodeItem, 'w' | 'h'>) => Math.min(16, n.w / 4
 /** Ink the eraser touches: strokes, shapes and box outlines (text and images need the lasso to delete). */
 export function eraserHits(items: NoteItem[], x: number, y: number, radius: number) {
   return items.filter((i) => {
+    if (i.type !== 'stroke' && i.type !== 'shape' && i.type !== 'node') return false;
+    // Most of the page is far from the eraser: its box (which includes the ink's width) rules it
+    // out without going through its points.
+    const b = cachedBox(i);
+    if (x < b.x - radius || y < b.y - radius || x > b.x + b.w + radius || y > b.y + b.h + radius) return false;
     if (i.type === 'stroke') return strokeHit(i.points, x, y, radius + i.width / 2);
     if (i.type === 'shape') return strokeHit(shapePoints(i), x, y, radius + i.width / 2);
     // A box is erased by its outline, so erasing what's written inside it leaves the box.

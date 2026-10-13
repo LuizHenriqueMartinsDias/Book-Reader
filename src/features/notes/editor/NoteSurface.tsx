@@ -55,7 +55,7 @@ type Gesture =
   /** `predicted`: where the pen is about to be, drawn ahead of `points` but never saved. */
   | { kind: 'ink'; id: number; tool: 'pen' | 'marker'; points: Point[]; predicted?: Point[]; shape: RecognizedShape | null; edge: Edge | null }
   /** `stylus`: erasing because the pen's button is held, so letting go of it goes back to the pen. */
-  | { kind: 'erase'; id: number; at: Vec; stylus: boolean }
+  | { kind: 'erase'; id: number; at: Vec; stylus: boolean; /** Where it last erased. */ swept: Vec }
   | { kind: 'lasso'; id: number; points: Vec[] }
   | { kind: 'shape'; id: number; from: Vec; to: Vec }
   /** Text tool: a tap types (in the box under it, or a new one); dragging a box (`hit`) moves it. */
@@ -290,7 +290,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
           drawConnector(ctx, c, connectorPoints(c, nodeMap));
           return;
         }
-        const g = gesture.current ?? (hoverEraser.current && { kind: 'erase' as const, id: -1, at: hoverEraser.current, stylus: true });
+        const g = gesture.current ?? (hoverEraser.current && { kind: 'erase' as const, id: -1, at: hoverEraser.current, stylus: true, swept: hoverEraser.current });
         if (!g) return;
         ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
         const ink = inkStyle(g.kind === 'ink' ? g.tool : 'pen');
@@ -413,7 +413,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     hoverEraser.current = null;
 
     if (tool === 'eraser' || stylusErase) {
-      gesture.current = { kind: 'erase', id, at: p, stylus: stylusErase && tool !== 'eraser' };
+      gesture.current = { kind: 'erase', id, at: p, stylus: stylusErase && tool !== 'eraser', swept: p };
       eraseAt(p);
     } else if (tool === 'pen' || tool === 'marker') {
       const edge = rulerEdgeAt(e);
@@ -485,7 +485,15 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       const p = toWorld(ev);
       if (g.kind === 'erase') {
         g.at = p;
-        eraseAt(p);
+        // The pen reports points far closer together than the eraser is wide, and erasing at each
+        // one fell behind on a full page (a pen sends more while it's busy, so it snowballed into
+        // freezes of seconds). Erase every half eraser along the way instead: no gaps, however
+        // fast it moves, and the work follows the distance, not the pen's rate.
+        const step = useNoteEditor.getState().eraserSize / view.zoom / 2;
+        const [sx, sy] = g.swept;
+        const n = Math.floor(Math.hypot(p[0] - sx, p[1] - sy) / step);
+        for (let k = 1; k <= n; k++) eraseAt([sx + ((p[0] - sx) * k) / n, sy + ((p[1] - sy) * k) / n]);
+        if (n) g.swept = p;
       } else if (g.kind === 'ink' && g.edge !== null) {
         const q = strokePoint(ev, g.edge);
         g.points.push([q[0], q[1], ev.pointerType === 'pen' ? ev.pressure || 0.5 : 0.5]);
@@ -545,7 +553,8 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     if (g.kind === 'ink' && erases) {
       clearTimeout(holdTimer.current);
       if (g.shape || g.points.length > 1) saveInk(g);
-      gesture.current = { kind: 'erase', id: g.id, at: toWorld(e), stylus: true };
+      const at = toWorld(e);
+      gesture.current = { kind: 'erase', id: g.id, at, stylus: true, swept: at };
     } else if (g.kind === 'erase' && g.stylus && !erases && (tool === 'pen' || tool === 'marker')) {
       saveErase();
       const [x, y] = toWorld(e);

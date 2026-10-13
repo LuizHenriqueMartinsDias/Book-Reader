@@ -41,6 +41,16 @@ describe('bbox and eraser', () => {
     expect(eraserHits(items, 50, 3, 2).map((i) => i.id)).toEqual(['s']);
     expect(eraserHits(items, 250, 220, 5)).toEqual([]);
   });
+
+  it('reaches ink at the edge of its box, counting the eraser and the ink width', () => {
+    // A diagonal stroke: inside its box but away from the line misses; next to the line hits.
+    const diagonal = stroke('d', [[0, 0], [100, 100]]);
+    expect(eraserHits([diagonal], 90, 10, 5)).toEqual([]);
+    expect(eraserHits([diagonal], 50, 56, 5).map((i) => i.id)).toEqual(['d']);
+    // Just past the end, by less than the eraser plus half the ink.
+    expect(eraserHits([diagonal], 104, 104, 5).map((i) => i.id)).toEqual(['d']);
+    expect(eraserHits([diagonal], 110, 110, 5)).toEqual([]);
+  });
 });
 
 describe('rotated views', () => {
