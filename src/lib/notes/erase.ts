@@ -1,6 +1,6 @@
 import type { NoteItem, Point, ShapeItem, StrokeItem } from '../../db/schema';
 import { distToSegment } from '../ink';
-import { cachedBox, shapePoints, unionBox, type Box } from './geometry';
+import { cachedBox, shapePoints } from './geometry';
 import { arrowHead } from './render';
 
 /**
@@ -86,33 +86,4 @@ export function eraseItem(item: NoteItem, x: number, y: number, radius: number, 
   const tool = item.type === 'stroke' ? item.tool : 'pen';
   const brush = item.type === 'stroke' && item.brush ? { brush: item.brush } : {};
   return cut.flatMap((runs, i) => runs ?? [lines[i]]).map((points) => ({ ...base, ...brush, id: newId(), type: 'stroke', tool, points }));
-}
-
-/** What the eraser has done so far: the saved items it hides and the pieces shown in their place. */
-export interface EraseState {
-  erasing: Set<string>;
-  pieces: StrokeItem[];
-}
-
-/** Plain ink: drawn on its own, with nothing else (a box, a post-it) deciding how it looks. */
-export const plainInk = (i: NoteItem): i is StrokeItem | ShapeItem => (i.type === 'stroke' || i.type === 'shape') && !i.parentId;
-
-/**
- * Where the page looks different from `before` to `after`: around the items just hidden and the
- * pieces that changed, padded for the ink's width. Null when nothing changed; undefined when
- * something other than plain ink did (the whole page has to be drawn again).
- */
-export function erasedArea(before: EraseState, after: EraseState, items: Map<string, NoteItem>): Box | null | undefined {
-  const changed: NoteItem[] = [];
-  for (const id of after.erasing) if (!before.erasing.has(id)) changed.push(items.get(id)!);
-  for (const id of before.erasing) if (!after.erasing.has(id)) changed.push(items.get(id)!);
-  const was = new Set(before.pieces);
-  const is = new Set(after.pieces);
-  changed.push(...before.pieces.filter((p) => !is.has(p)), ...after.pieces.filter((p) => !was.has(p)));
-  if (!changed.length) return null;
-  if (!changed.every((i) => i && plainInk(i))) return undefined;
-  const area = unionBox(changed.map(cachedBox))!;
-  // Brushes can spread a little past half their width.
-  const pad = Math.max(...changed.map((i) => (i as StrokeItem | ShapeItem).width)) + 2;
-  return { x: area.x - pad, y: area.y - pad, w: area.w + 2 * pad, h: area.h + 2 * pad };
 }

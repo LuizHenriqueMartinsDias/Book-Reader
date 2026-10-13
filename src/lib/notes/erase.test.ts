@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { NodeItem, NoteItem, Point, ShapeItem, StrokeItem, TextItem } from '../../db/schema';
-import { cutPoints, densify, erasedArea, eraseItem } from './erase';
+import type { Point, ShapeItem, StrokeItem, TextItem } from '../../db/schema';
+import { cutPoints, densify, eraseItem } from './erase';
 
 const base = { notebookId: 'n', pageId: 'p', z: 3, createdAt: 0 };
 const line = (x1: number, x2: number): Point[] => [[x1, 0, 0.5], [x2, 0, 0.5]];
@@ -54,35 +54,5 @@ describe('partial eraser', () => {
   it('ignores text and images', () => {
     const text: TextItem = { ...base, id: 't', type: 'text', x: 0, y: 0, w: 100, text: 'oi', fontSize: 16, color: '#000' };
     expect(eraseItem(text, 10, 10, 50, id)).toBeNull();
-  });
-});
-
-describe('erasedArea', () => {
-  const stroke = (id: string, x1: number, x2: number, y = 0): StrokeItem => ({ ...base, id, type: 'stroke', tool: 'pen', color: '#000', width: 2, points: [[x1, y, 0.5], [x2, y, 0.5]] });
-  const a = stroke('a', 0, 100);
-  const far = stroke('far', 500, 600, 400);
-  const items = new Map<string, NoteItem>([a, far].map((i) => [i.id, i]));
-  const none = { erasing: new Set<string>(), pieces: [] };
-
-  it('covers the item just hidden and the pieces put in its place, not the rest of the page', () => {
-    const pieces = eraseItem(a, 50, 0, 5, id)!;
-    const area = erasedArea(none, { erasing: new Set(['a']), pieces }, items)!;
-    expect(area.x).toBeLessThanOrEqual(-1);
-    expect(area.x + area.w).toBeGreaterThanOrEqual(101);
-    expect(area.y + area.h).toBeLessThan(400);
-  });
-
-  it('covers only the pieces that changed on the next move', () => {
-    const first = eraseItem(a, 50, 0, 5, id)!;
-    const [left, right] = first;
-    const cutLeft = eraseItem(left, 20, 0, 5, id)!;
-    const area = erasedArea({ erasing: new Set(['a']), pieces: first }, { erasing: new Set(['a']), pieces: [...cutLeft, right] }, items)!;
-    expect(area.x + area.w).toBeLessThan(60);
-  });
-
-  it('is null when nothing changed, and undefined when more than plain ink did', () => {
-    expect(erasedArea(none, none, items)).toBeNull();
-    const box: NodeItem = { ...base, id: 'box', type: 'node', shape: 'rect', x: 0, y: 0, w: 50, h: 30, color: '#000', width: 2, text: '' } as NodeItem;
-    expect(erasedArea(none, { erasing: new Set(['box']), pieces: [] }, new Map([['box', box]]))).toBeUndefined();
   });
 });

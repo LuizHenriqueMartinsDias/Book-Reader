@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { NoteItem, StrokeItem, TextItem } from '../../db/schema';
-import { bboxOf, eraserHits, itemsInLasso, pointInPolygon, transformItems, type Vec } from './geometry';
+import type { NodeItem, NoteItem, StrokeItem, TextItem } from '../../db/schema';
+import { bboxOf, changedArea, eraserHits, itemsInLasso, pointInPolygon, transformItems, type Vec } from './geometry';
 
 const base = { notebookId: 'n', pageId: 'p', z: 1, createdAt: 0 };
 const stroke = (id: string, pts: [number, number][]): StrokeItem => ({ ...base, id, type: 'stroke', tool: 'pen', color: '#000', width: 2, points: pts.map(([x, y]) => [x, y, 0.5]) });
@@ -70,5 +70,31 @@ describe('rotated views', () => {
     expect(snapQuarter(-3)).toBe(0);
     expect(snapQuarter(30)).toBe(30);
     expect(snapQuarter(270)).toBe(-90);
+  });
+});
+
+describe('changedArea', () => {
+  const a = stroke('a', [[0, 0], [100, 0]]);
+  const far = stroke('far', [[500, 400], [600, 400]]);
+
+  it('covers what was added or removed, not the rest of the page', () => {
+    const added = stroke('b', [[10, 50], [40, 50]]);
+    const area = changedArea([a, far], [a, far, added])!;
+    expect(area.x).toBeLessThanOrEqual(9);
+    expect(area.x + area.w).toBeGreaterThanOrEqual(41);
+    expect(area.y + area.h).toBeLessThan(400);
+    // A stroke replaced by its pieces: the area of both.
+    const piece = stroke('p', [[0, 0], [40, 0]]);
+    expect(changedArea([a, far], [piece, far])!.x + changedArea([a, far], [piece, far])!.w).toBeGreaterThanOrEqual(101);
+  });
+
+  it('is null when the same objects are shown, whatever their order', () => {
+    expect(changedArea([a, far], [far, a])).toBeNull();
+  });
+
+  it('asks for the whole page when more than plain ink changed', () => {
+    const box = { ...base, id: 'box', type: 'node', shape: 'rect', x: 0, y: 0, w: 50, h: 30, color: '#000', width: 2, text: '' } as NodeItem;
+    expect(changedArea([a], [a, box])).toBeUndefined();
+    expect(changedArea([a], [a, text])).toBeUndefined();
   });
 });

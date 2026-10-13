@@ -6,9 +6,9 @@ import { newId } from '../../../db/repo';
 import { drawStroke } from '../../../lib/ink';
 import { attachedTo, connectorHit, connectorPoints, isConnector, midpoint, nodesById, settle, SIDES, sideDir, sidePoint, type Side } from '../../../lib/notes/connectors';
 import { attach, isNode, layoutTree, NODE_SIZE, nodeAt, readSketch, snapMove, withChildren, withDependents } from '../../../lib/notes/diagram';
-import { erasedArea, eraseItem, plainInk } from '../../../lib/notes/erase';
+import { eraseItem } from '../../../lib/notes/erase';
 import { isSticky, STICKY_HEADER, STICKY_SIZE } from '../../../lib/notes/sticky';
-import { bboxOf, boxesOverlap, cachedBox, eraserHits, itemsInLasso, rotateVec, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
+import { bboxOf, boxesOverlap, cachedBox, changedArea, eraserHits, plainInk, itemsInLasso, rotateVec, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
 import { defaultInk, drawConnector, drawItems, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
@@ -19,7 +19,7 @@ import { useNoteEditor } from './editorStore';
 import ImageItemView from './ImageItemView';
 import ConnectorLabelView from './ConnectorLabelView';
 import StickyItemView, { type StickyDrag } from './StickyItemView';
-import { cloneItems, commitItems } from './items';
+import { cloneItems, commitItems, keepUnchanged } from './items';
 import NodeItemView from './NodeItemView';
 import SelectionOverlay from './SelectionOverlay';
 import TextItemView from './TextItemView';
@@ -137,7 +137,18 @@ function newConnector(from: NodeItem, to: ConnectorEnd): Omit<ConnectorItem, 'id
  * → lasso selection. Coordinates are page points; `view` maps them to the screen.
  */
 export default function NoteSurface({ notebook, page, width, height, view, background, infinite, rotation = 0 }: Props) {
-  const items = useLiveQuery(() => db.noteItems.where('pageId').equals(page.id).toArray(), [page.id]) ?? [];
+  // In a transaction of its own: Dexie then reads straight from the database instead of going
+  // through its query cache, which copies every item of the page again on each read (on a page
+  // of a thousand strokes, most of the hitch after each one saved).
+  const read = useLiveQuery(() => db.transaction('r', db.noteItems, () => db.noteItems.where('pageId').equals(page.id).toArray()), [page.id]);
+  /** The items on screen by id, and those just saved from here (the next read brings copies of them). */
+  const known = useRef(new Map<string, NoteItem>());
+  const items = useMemo(() => {
+    const kept = keepUnchanged(known.current, read ?? []);
+    known.current = new Map(kept.map((i) => [i.id, i]));
+    return kept;
+  }, [read]);
+  const remember = (saved: NoteItem[]) => saved.forEach((i) => known.current.set(i.id, i));
   const tool = useNoteEditor((s) => s.tool);
   const selection = useNoteEditor((s) => (s.selection?.pageId === page.id ? s.selection : null));
   const editingTextId = useNoteEditor((s) => s.editingTextId);
@@ -180,9 +191,8 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   // Boxes as they're shown (also mid-drag), for the arrows to follow.
   const nodeMap = useMemo(() => nodesById(shown), [shown]);
 
-  const shownById = useMemo(() => new Map(shown.map((i) => [i.id, i])), [shown]);
-  /** What the ink canvas shows, so the eraser's moves redraw only the area they changed. */
-  const drawn = useRef<{ shown: NoteItem[]; erasing: Set<string>; pieces: StrokeItem[]; view: string } | null>(null);
+  /** What the ink canvas shows, so a change redraws only the area it touched. */
+  const drawn = useRef<{ visible: NoteItem[]; view: string } | null>(null);
 
   /** Paints the committed ink, with what the eraser has done so far. */
   const paintInk = () => {
@@ -190,15 +200,16 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     if (!canvas) return;
     const erasing = erasingRef.current;
     const pieces = piecesRef.current;
+    const visible = erasing.size || pieces.length ? [...shown.filter((i) => !erasing.has(i.id)), ...pieces] : shown;
     const last = drawn.current;
     const viewKey = `${width}|${height}|${view.x}|${view.y}|${view.zoom}`;
-    drawn.current = { shown, erasing, pieces, view: viewKey };
-    const all = pieces.length ? [...shown, ...pieces] : shown;
-    if (last && last.shown === shown && last.view === viewKey) {
-      // Only the eraser moved: redrawing the whole page on every move makes it lag on a full page.
-      const area = erasedArea(last, { erasing, pieces }, shownById);
+    drawn.current = { visible, view: viewKey };
+    if (last && last.view === viewKey) {
+      // An eraser move, a stroke saved, an undo: redrawing the whole page for each makes a full
+      // page lag, so only the area of what changed is.
+      const area = changedArea(last.visible, visible);
       if (area === null) return;
-      const around = area && all.filter((i) => boxesOverlap(cachedBox(i), area));
+      const around = area && visible.filter((i) => boxesOverlap(cachedBox(i), area));
       if (area && around!.every(plainInk)) {
         // The world transform of the last full draw is still set.
         const ctx = canvas.getContext('2d')!;
@@ -207,7 +218,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
         ctx.rect(area.x, area.y, area.w, area.h);
         ctx.clip();
         ctx.clearRect(area.x, area.y, area.w, area.h);
-        drawItems(ctx, around!, erasing);
+        drawItems(ctx, around!);
         ctx.restore();
         return;
       }
@@ -217,7 +228,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
-    drawItems(ctx, all, erasing);
+    drawItems(ctx, visible);
   };
   /** Once per frame however many moves the eraser makes in it. */
   const inkFrame = useRef(0);
@@ -240,7 +251,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   }, [items]);
 
   // Committed ink.
-  useEffect(paintInk, [shown, shownById, width, height, view.x, view.y, view.zoom]);
+  useEffect(paintInk, [shown, width, height, view.x, view.y, view.zoom]);
 
   useEffect(() => {
     if (liveRef.current) sizeCanvas(liveRef.current, width, height);
@@ -526,6 +537,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     const removed = items.filter((i) => erasingRef.current.has(i.id));
     if (!removed.length) return clearErase();
     settling.current = true;
+    remember(piecesRef.current);
     await commitItems(piecesRef.current, removed);
   };
 
@@ -539,7 +551,9 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     const ctx = inkRef.current?.getContext('2d');
     if (ctx) drawItems(ctx, [item]);
     // Written inside a diagram box: it belongs to the box.
-    await commitItems([attach(item, items)]);
+    const saved = attach(item, items);
+    remember([saved]);
+    await commitItems([saved]);
   };
 
   /**
