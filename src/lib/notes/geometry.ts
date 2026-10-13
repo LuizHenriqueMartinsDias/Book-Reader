@@ -52,6 +52,16 @@ export function bboxOf(item: NoteItem): Box {
   }
 }
 
+/** Items never change (an edit makes a new one), so their boxes are worked out once per item. */
+const boxes = new WeakMap<NoteItem, Box>();
+export function cachedBox(item: NoteItem): Box {
+  let box = boxes.get(item);
+  if (!box) boxes.set(item, (box = bboxOf(item)));
+  return box;
+}
+
+export const boxesOverlap = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
 export function unionBox(boxes: Box[]): Box | null {
   if (!boxes.length) return null;
   const x = Math.min(...boxes.map((b) => b.x));

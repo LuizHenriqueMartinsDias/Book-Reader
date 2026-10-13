@@ -1,6 +1,6 @@
 import type { NoteItem, Point, ShapeItem, StrokeItem } from '../../db/schema';
 import { distToSegment } from '../ink';
-import { bboxOf, shapePoints, type Box } from './geometry';
+import { cachedBox, shapePoints, unionBox, type Box } from './geometry';
 import { arrowHead } from './render';
 
 /**
@@ -69,14 +69,6 @@ export function shapeAsStrokes(s: ShapeItem): Point[][] {
   return lines;
 }
 
-/** Items never change (an edit makes a new one), so their boxes are kept, once per item. */
-const boxes = new WeakMap<NoteItem, Box>();
-function boxOf(item: NoteItem) {
-  let box = boxes.get(item);
-  if (!box) boxes.set(item, (box = bboxOf(item)));
-  return box;
-}
-
 /**
  * The pieces an ink item turns into when the eraser disc at (x, y) touches it, or null when it
  * doesn't. Text and images aren't affected. `newId` names each piece.
@@ -85,7 +77,7 @@ export function eraseItem(item: NoteItem, x: number, y: number, radius: number, 
   if (item.type !== 'stroke' && item.type !== 'shape') return null;
   const reach = radius + item.width / 2;
   // Most of the page is far from the eraser: its box (which includes the ink's width) rules it out.
-  const b = boxOf(item);
+  const b = cachedBox(item);
   if (x < b.x - radius || y < b.y - radius || x > b.x + b.w + radius || y > b.y + b.h + radius) return null;
   const lines = item.type === 'stroke' ? [item.points] : shapeAsStrokes(item);
   const cut = lines.map((points) => cutPoints(points, x, y, reach));
@@ -94,4 +86,33 @@ export function eraseItem(item: NoteItem, x: number, y: number, radius: number, 
   const tool = item.type === 'stroke' ? item.tool : 'pen';
   const brush = item.type === 'stroke' && item.brush ? { brush: item.brush } : {};
   return cut.flatMap((runs, i) => runs ?? [lines[i]]).map((points) => ({ ...base, ...brush, id: newId(), type: 'stroke', tool, points }));
+}
+
+/** What the eraser has done so far: the saved items it hides and the pieces shown in their place. */
+export interface EraseState {
+  erasing: Set<string>;
+  pieces: StrokeItem[];
+}
+
+/** Plain ink: drawn on its own, with nothing else (a box, a post-it) deciding how it looks. */
+export const plainInk = (i: NoteItem): i is StrokeItem | ShapeItem => (i.type === 'stroke' || i.type === 'shape') && !i.parentId;
+
+/**
+ * Where the page looks different from `before` to `after`: around the items just hidden and the
+ * pieces that changed, padded for the ink's width. Null when nothing changed; undefined when
+ * something other than plain ink did (the whole page has to be drawn again).
+ */
+export function erasedArea(before: EraseState, after: EraseState, items: Map<string, NoteItem>): Box | null | undefined {
+  const changed: NoteItem[] = [];
+  for (const id of after.erasing) if (!before.erasing.has(id)) changed.push(items.get(id)!);
+  for (const id of before.erasing) if (!after.erasing.has(id)) changed.push(items.get(id)!);
+  const was = new Set(before.pieces);
+  const is = new Set(after.pieces);
+  changed.push(...before.pieces.filter((p) => !is.has(p)), ...after.pieces.filter((p) => !was.has(p)));
+  if (!changed.length) return null;
+  if (!changed.every((i) => i && plainInk(i))) return undefined;
+  const area = unionBox(changed.map(cachedBox))!;
+  // Brushes can spread a little past half their width.
+  const pad = Math.max(...changed.map((i) => (i as StrokeItem | ShapeItem).width)) + 2;
+  return { x: area.x - pad, y: area.y - pad, w: area.w + 2 * pad, h: area.h + 2 * pad };
 }

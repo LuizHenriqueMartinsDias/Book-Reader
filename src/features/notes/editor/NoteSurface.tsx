@@ -6,9 +6,9 @@ import { newId } from '../../../db/repo';
 import { drawStroke } from '../../../lib/ink';
 import { attachedTo, connectorHit, connectorPoints, isConnector, midpoint, nodesById, settle, SIDES, sideDir, sidePoint, type Side } from '../../../lib/notes/connectors';
 import { attach, isNode, layoutTree, NODE_SIZE, nodeAt, readSketch, snapMove, withChildren, withDependents } from '../../../lib/notes/diagram';
-import { eraseItem } from '../../../lib/notes/erase';
+import { erasedArea, eraseItem, plainInk } from '../../../lib/notes/erase';
 import { isSticky, STICKY_HEADER, STICKY_SIZE } from '../../../lib/notes/sticky';
-import { bboxOf, eraserHits, itemsInLasso, rotateVec, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
+import { bboxOf, boxesOverlap, cachedBox, eraserHits, itemsInLasso, rotateVec, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
 import { defaultInk, drawConnector, drawItems, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
@@ -180,16 +180,41 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   // Boxes as they're shown (also mid-drag), for the arrows to follow.
   const nodeMap = useMemo(() => nodesById(shown), [shown]);
 
+  /** What the ink canvas shows, so the eraser's moves redraw only the area they changed. */
+  const drawn = useRef<{ shown: NoteItem[]; erasing: Set<string>; pieces: StrokeItem[]; view: string } | null>(null);
+
   // Committed ink.
   useEffect(() => {
     const canvas = inkRef.current;
     if (!canvas) return;
+    const last = drawn.current;
+    const viewKey = `${width}|${height}|${view.x}|${view.y}|${view.zoom}`;
+    drawn.current = { shown, erasing, pieces, view: viewKey };
+    const all = pieces.length ? [...shown, ...pieces] : shown;
+    if (last && last.shown === shown && last.view === viewKey) {
+      // Only the eraser moved: redrawing the whole page on every move makes it lag on a full page.
+      const area = erasedArea(last, { erasing, pieces }, new Map(shown.map((i) => [i.id, i])));
+      if (area === null) return;
+      const around = area && all.filter((i) => boxesOverlap(cachedBox(i), area));
+      if (area && around!.every(plainInk)) {
+        // The world transform of the last full draw is still set.
+        const ctx = canvas.getContext('2d')!;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(area.x, area.y, area.w, area.h);
+        ctx.clip();
+        ctx.clearRect(area.x, area.y, area.w, area.h);
+        drawItems(ctx, around!, erasing);
+        ctx.restore();
+        return;
+      }
+    }
     const ratio = sizeCanvas(canvas, width, height);
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
-    drawItems(ctx, pieces.length ? [...shown, ...pieces] : shown, erasing);
+    drawItems(ctx, all, erasing);
   }, [shown, erasing, pieces, width, height, view.x, view.y, view.zoom]);
 
   const clearErase = () => {
