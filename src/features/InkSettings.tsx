@@ -1,5 +1,6 @@
 import { Brush as BrushIcon, Highlighter, Pen, PenLine, Pencil } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Brush, Point } from '../db/schema';
 import { drawStroke } from '../lib/ink';
 import { useUi } from '../store/ui';
@@ -87,7 +88,10 @@ export default function InkSettings({ tool, brushes = true, opacity: showOpacity
         </span>
         {formatWidth(width)}
       </button>
-      {open && (
+      {/* On body: inside the notebook's options panel (transformed, scrolling), `fixed` would be
+          placed against that panel and clipped by it. */}
+      {open &&
+        createPortal(
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(null)} />
           <div className="fixed z-50 w-[280px] rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3 text-sm shadow-xl" style={open}>
@@ -151,7 +155,8 @@ export default function InkSettings({ tool, brushes = true, opacity: showOpacity
               </label>
             )}
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </>
   );
