@@ -6,6 +6,7 @@ import { PAPER_SPACING, paperCss } from '../../../lib/notes/render';
 import { appliedTurn, classify, initialTwoFinger, rotates, zooms, type TwoFingerState } from '../../../lib/notes/twoFinger';
 import { CSS_UNITS } from '../../../lib/pdf';
 import type { ZoomChange } from '../../reader/views/types';
+import { useUi } from '../../../store/ui';
 import { useNoteEditor } from './editorStore';
 import NoteSurface from './NoteSurface';
 
@@ -164,7 +165,7 @@ export default function InfiniteCanvas({ notebook, page, registerZoom, onScale }
       const t = touchInfo(e.touches);
       const ratio = t.dist / pinch.dist;
       const delta = ((t.angle - pinch.angle + 540) % 360) - 180;
-      pinch.tf = classify(pinch.tf, ratio, delta);
+      pinch.tf = classify(pinch.tf, ratio, delta, !useUi.getState().rotationLocked);
       // Panning by the midpoint always works; zoom and rotation join in as the gesture shows them.
       const zoom = zooms(pinch.tf) ? Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinch.zoom * ratio)) : pinch.zoom;
       const rotation = rotates(pinch.tf) ? snapQuarter(pinch.rotation + appliedTurn(pinch.tf, delta)) : pinch.rotation;

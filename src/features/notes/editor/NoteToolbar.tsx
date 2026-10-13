@@ -1,9 +1,10 @@
-import { ArrowLeft, BookOpen, ClipboardPaste, Expand, FileDown, FileText, Hand, ImagePlus, Loader2, PenLine, Redo2, RotateCcw, Timer, Undo2, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, ClipboardPaste, Expand, FileDown, FileText, Hand, ImagePlus, Loader2, Lock, LockOpen, PenLine, Redo2, RotateCcw, Timer, Undo2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { Notebook, PaperStyle } from '../../../db/schema';
 import { updateNotebook } from '../../../db/notes';
 import { PAPER_COLORS } from '../../../lib/notes/render';
 import { useNoteHistory } from '../../../store/history';
+import { useUi } from '../../../store/ui';
 import { openPomodoro } from '../../../store/pomodoro';
 import FullscreenButton from '../../reader/FullscreenButton';
 import { useNoteEditor } from './editorStore';
@@ -39,6 +40,7 @@ interface Props {
  */
 export default function NoteToolbar({ notebook, onInsertImage, onPaste, onExport, onOpenBook, onStretchPage, template, fullscreen, onClose }: Props) {
   const editor = useNoteEditor();
+  const rotationLocked = useUi((s) => s.rotationLocked);
   const { undoStack, redoStack, undo, redo } = useNoteHistory();
   const [paperOpen, setPaperOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -121,6 +123,17 @@ export default function NoteToolbar({ notebook, onInsertImage, onPaste, onExport
         >
           {editor.fingerDraws ? <PenLine className="size-4" /> : <Hand className="size-4" />}
           {editor.fingerDraws ? 'Dedo: escreve' : 'Dedo: navega'}
+        </button>
+        <button
+          className={`flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-xs font-medium ${
+            rotationLocked ? 'border-amber-500 bg-amber-500/10 text-[var(--accent-text)]' : 'border-[var(--border)] text-[var(--muted)]'
+          }`}
+          title={rotationLocked ? 'Dois dedos só rolam e dão zoom. Toque para poder girar a folha de novo.' : 'Dois dedos também giram a folha. Toque para travar o giro.'}
+          aria-pressed={rotationLocked}
+          onClick={() => useUi.getState().set({ rotationLocked: !rotationLocked })}
+        >
+          {rotationLocked ? <Lock className="size-4" /> : <LockOpen className="size-4" />}
+          {rotationLocked ? 'Giro travado' : 'Giro livre'}
         </button>
         {divider}
         <div className="relative">

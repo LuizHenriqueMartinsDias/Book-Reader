@@ -9,6 +9,7 @@ import { appliedTurn, classify, initialTwoFinger, rotates, zooms, type TwoFinger
 import { CSS_UNITS, type PDFDocumentProxy } from '../../../lib/pdf';
 import PdfPageCanvas from '../../reader/PdfPageCanvas';
 import type { ZoomChange, ZoomMode } from '../../reader/views/types';
+import { useUi } from '../../../store/ui';
 import { useNoteEditor } from './editorStore';
 import NoteSurface from './NoteSurface';
 import TemplateBackground from './TemplateBackground';
@@ -326,7 +327,7 @@ function useTwoFingerGestures(
       // Real hands drift while they twist or pinch, so moving together never locks the gesture
       // into scrolling: it scrolls along while zoom and rotation can still start.
       const wasZooming = zooms(g.tf);
-      g.tf = classify(g.tf, ratio, turn, !!g.pageId);
+      g.tf = classify(g.tf, ratio, turn, !!g.pageId && !useUi.getState().rotationLocked);
       const prevMid = g.lastMid;
       g.lastMid = t.mid;
       if (zooms(g.tf) && !wasZooming) {

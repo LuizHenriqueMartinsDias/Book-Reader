@@ -63,6 +63,8 @@ interface UiState {
   lastBackupAt: number | null;
   /** Ink being written reaches ahead to where the pen is going (the browser's prediction), to keep up with it. */
   lowLatencyInk: boolean;
+  /** Notebooks: two fingers only scroll and zoom, never turn the sheet. */
+  rotationLocked: boolean;
   /** The Google account whose Drive gets the backups, or null when not connected. */
   driveAccount: string | null;
   set: (patch: Partial<Omit<UiState, "set" | "addCustomColor" | "removeCustomColor">>) => void;
@@ -102,6 +104,7 @@ export const useUi = create<UiState>()(
       stickyColor: '#fef08a',
       lastBackupAt: null,
       lowLatencyInk: true,
+      rotationLocked: false,
       driveAccount: null,
       set: (patch) =>
         set((s) => {
