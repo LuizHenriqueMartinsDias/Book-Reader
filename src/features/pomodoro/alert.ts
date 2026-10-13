@@ -1,13 +1,14 @@
 let audio: AudioContext | null = null;
 
 /**
- * Gets sound ready. Browsers only let a page start audio from a tap, so this runs on taps; later
- * the chime can play on its own.
+ * Gets sound ready. Browsers only let a page start audio after a tap, so this runs on taps; later
+ * the chime can play on its own. The audio stays asleep until then: running, it keeps a thread
+ * busy the whole time the app is open, which a tablet feels.
  */
 export function unlockSound() {
   try {
     audio ??= new AudioContext();
-    if (audio.state === 'suspended') audio.resume().catch(() => {});
+    if (audio.state === 'running') audio.suspend().catch(() => {});
   } catch {
     // No Web Audio: the end of a phase just vibrates.
   }
@@ -33,6 +34,15 @@ function chime(ctx: AudioContext) {
 
 /** The end of a phase: a chime and a buzz, as set. */
 export function phaseAlert({ sound, vibrate }: { sound: boolean; vibrate: boolean }) {
-  if (sound && audio) chime(audio);
+  const ctx = audio;
+  if (sound && ctx)
+    ctx
+      .resume()
+      .then(() => {
+        chime(ctx);
+        // Asleep again once the notes have faded.
+        setTimeout(() => ctx.suspend().catch(() => {}), 1600);
+      })
+      .catch(() => {});
   if (vibrate) navigator.vibrate?.([200, 100, 200, 100, 400]);
 }
