@@ -4,7 +4,7 @@ Leitor pessoal de livros em PDF e EPUB com anotações — roda no navegador, in
 
 - **Biblioteca**: importe PDFs e EPUBs (botão ou arrastar e soltar); capa, progresso e última posição lida.
 - **EPUB**: texto que se ajusta à tela, com tamanho e fonte ajustáveis, temas, sumário, busca, destaques e notas. Modo página (com toque/deslize nas bordas) ou rolagem. Escrita à mão livre e exportação em PDF são só para PDFs.
-- **Leitura**: rolagem contínua, zoom (botões, Ctrl+roda, pinça), sumário, busca no texto, temas claro/sépia/escuro.
+- **Leitura**: rolagem contínua, zoom (botões, Ctrl+roda, pinça), sumário, busca no texto, temas claro/sépia/escuro; "Significado" de uma palavra ou símbolo selecionado (Wikcionário, ou pesquisa na internet).
 - **Escrita à mão**: caneta e marca-texto com pressão de stylus, borracha (inclusive a ponta-borracha da caneta), desfazer/refazer. Com stylus detectado, o dedo rola a página (rejeição de palma).
 - **Destaques e notas**: selecione texto → escolha a cor ou crie uma nota; notas por página no painel lateral.
 - **Livros grátis** (estilo loja): vitrine com prateleiras (mais baixados, clássicos do idioma, romances, poesia…), gêneros e autores; página de cada livro com capa, resumo, assuntos, "mais do autor" e "mais do gênero"; busca nas duas fontes ao mesmo tempo. Livros do Project Gutenberg (EPUB) e do Internet Archive (PDF/EPUB, domínio público ou licença aberta), baixados direto para a estante; os que já estão nela aparecem marcados.

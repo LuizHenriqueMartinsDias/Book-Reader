@@ -1,9 +1,12 @@
-import { Copy, MessageSquarePlus, NotebookPen, StickyNote, Trash2 } from 'lucide-react';
+import { BookA, Copy, MessageSquarePlus, NotebookPen, StickyNote, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { db, type Highlight } from '../../db/schema';
 import { newId, putNote } from '../../db/repo';
 import { useHistory } from '../../store/history';
 import { HIGHLIGHT_COLORS, useUi } from '../../store/ui';
 import { sendQuoteToNotebook } from '../notes/SendQuoteDialog';
+import { lookupable, lookupWord } from '../../lib/lookup/dictionary';
+import LookupCard from './LookupCard';
 import { useReader } from './readerStore';
 import { pinNote } from './StickyLayer';
 
@@ -40,6 +43,8 @@ const newNote = (h: Highlight) => ({
  */
 export default function AnnotationMenu({ x, y, target, onClose }: Props) {
   const current = target.kind === 'highlight' ? target.highlight.color : null;
+  const [lookingUp, setLookingUp] = useState(false);
+  const selected = target.kind === 'selection' ? target.text : target.highlight.text;
 
   async function highlight(color: string, withNote = false) {
     if (target.kind === 'selection') {
@@ -105,6 +110,8 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
     sendQuoteToNotebook({ text, source: { bookId, title: book?.title ?? 'Livro', page: h?.page ?? currentPage, cfi: h?.cfi } });
   }
 
+  if (lookingUp) return <LookupCard x={x} y={y} text={selected} onClose={onClose} />;
+
   const left = Math.min(Math.max(8, x - 150), window.innerWidth - 308);
   const top = Math.min(y + 8, window.innerHeight - 56);
 
@@ -135,6 +142,12 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
       <button title="Enviar para caderno" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={sendToNotebook}>
         <NotebookPen className="size-5" />
       </button>
+      {/* A word, expression or symbol: a whole passage isn't in the dictionary. */}
+      {lookupable(lookupWord(selected)) && (
+        <button title="Significado" aria-label="Significado" className="rounded-md p-1.5 hover:bg-[var(--app-bg)]" onClick={() => setLookingUp(true)}>
+          <BookA className="size-5" />
+        </button>
+      )}
       {target.kind === 'selection' ? (
         <button
           title="Copiar"
