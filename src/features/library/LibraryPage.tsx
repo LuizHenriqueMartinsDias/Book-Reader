@@ -156,6 +156,10 @@ export default function LibraryPage() {
                   >
                     <Upload className="size-4" /> Restaurar backup
                   </button>
+                  <div className="mt-1 border-t border-[var(--border)] px-2.5 pt-2 pb-1 text-[11px] text-[var(--muted)]">
+                    Versão de {new Date(__BUILD__.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    {__BUILD__.sha && ` · ${__BUILD__.sha}`}
+                  </div>
                 </div>
               </>
             )}

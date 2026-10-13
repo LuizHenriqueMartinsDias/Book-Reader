@@ -57,6 +57,9 @@ export default defineConfig(({ mode }) => ({
   // wrangler dev keeps its local state in worker/.wrangler; don't reload the app on every write.
   server: { host: true, watch: { ignored: ['**/.wrangler/**'] } },
   build: { chunkSizeWarningLimit: 1500 },
+  // Which build is running, shown in the library's menu (the commit comes from GitHub Actions).
+  // (The app's types are browser-only on purpose, so Node's `process` is reached untyped.)
+  define: { __BUILD__: JSON.stringify({ sha: ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.GITHUB_SHA ?? '').slice(0, 7), at: Date.now() }) },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test-setup.ts'],
