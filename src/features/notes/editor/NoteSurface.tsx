@@ -8,7 +8,7 @@ import { attachedTo, connectorHit, connectorPoints, isConnector, midpoint, nodes
 import { attach, isNode, layoutTree, NODE_SIZE, nodeAt, readSketch, snapMove, withChildren, withDependents } from '../../../lib/notes/diagram';
 import { eraseItem } from '../../../lib/notes/erase';
 import { isSticky, STICKY_HEADER, STICKY_SIZE } from '../../../lib/notes/sticky';
-import { bboxOf, boxesOverlap, cachedBox, changedArea, eraserHits, plainInk, itemsInLasso, rotateVec, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
+import { bboxOf, boxesOverlap, cachedBox, changedArea, eraserHits, noteInk, plainInk, itemsInLasso, rotateVec, screenToLocal, transformItems, unionBox, type Transform, type Vec } from '../../../lib/notes/geometry';
 import { defaultInk, drawConnector, drawItems, drawShape } from '../../../lib/notes/render';
 import { edgeNear, projectOnEdge, type Edge } from '../../../lib/notes/ruler';
 import { recognizeShape, type RecognizedShape } from '../../../lib/notes/shapes';
@@ -19,7 +19,8 @@ import { useNoteEditor } from './editorStore';
 import ImageItemView from './ImageItemView';
 import ConnectorLabelView from './ConnectorLabelView';
 import StickyItemView, { type StickyDrag } from './StickyItemView';
-import { cloneItems, commitItems, keepUnchanged } from './items';
+import { cloneItems, commitItems } from './items';
+import { keepUnchanged } from '../../../lib/keepUnchanged';
 import NodeItemView from './NodeItemView';
 import SelectionOverlay from './SelectionOverlay';
 import TextItemView from './TextItemView';
@@ -207,7 +208,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     if (last && last.view === viewKey) {
       // An eraser move, a stroke saved, an undo: redrawing the whole page for each makes a full
       // page lag, so only the area of what changed is.
-      const area = changedArea(last.visible, visible);
+      const area = changedArea(last.visible, visible, noteInk);
       if (area === null) return;
       const around = area && visible.filter((i) => boxesOverlap(cachedBox(i), area));
       if (area && around!.every(plainInk)) {

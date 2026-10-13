@@ -127,6 +127,41 @@ export function outlinePath(points: [number, number][]) {
   return path;
 }
 
+// Outlines are costly to compute and pages redraw often; strokes never change (an edit makes a
+// new one), so their paths are kept by identity.
+const paths = new WeakMap<object, Path2D>();
+
+/** A finished stroke's outline as a canvas path, worked out once per stroke. */
+export function inkPath(stroke: InkLike) {
+  let path = paths.get(stroke);
+  if (!path) paths.set(stroke, (path = outlinePath(strokeOutline(stroke))));
+  return path;
+}
+
+/** Draws a finished stroke (its outline kept for the next time). */
+export function drawInk(ctx: CanvasRenderingContext2D, stroke: InkLike & Pick<Stroke, 'color'>) {
+  fillInk(ctx, inkPath(stroke), stroke);
+}
+
+const boxes = new WeakMap<object, { x: number; y: number; w: number; h: number }>();
+
+/** The box a stroke's ink covers (its width included), worked out once per stroke. */
+export function inkBox(stroke: Pick<Stroke, 'points' | 'width'>) {
+  let box = boxes.get(stroke);
+  if (!box) {
+    let [x1, y1, x2, y2] = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const [x, y] of stroke.points) {
+      if (x < x1) x1 = x;
+      if (x > x2) x2 = x;
+      if (y < y1) y1 = y;
+      if (y > y2) y2 = y;
+    }
+    const pad = stroke.width / 2;
+    boxes.set(stroke, (box = { x: x1 - pad, y: y1 - pad, w: x2 - x1 + 2 * pad, h: y2 - y1 + 2 * pad }));
+  }
+  return box;
+}
+
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: InkLike & Pick<Stroke, 'color'>, last = true) {
   fillInk(ctx, outlinePath(strokeOutline(stroke, last)), stroke);
 }

@@ -68,21 +68,26 @@ export const plainInk = (i: NoteItem): i is Extract<NoteItem, { type: 'stroke' |
 /** Past this many changed items, redrawing the whole page is as cheap as finding where. */
 const MAX_CHANGED = 300;
 
+/** A notebook item as ink a page can redraw a part of: its box and width, or null when it isn't plain ink. */
+export const noteInk = (i: NoteItem) => (plainInk(i) ? { box: cachedBox(i), width: i.width } : null);
+
 /**
- * Where the page looks different from `before` to `after` (items compared as objects, which never
- * change): around the items added or removed, padded for the ink's width. Null when nothing
- * changed; undefined when the whole page has to be drawn again (something other than plain ink
- * changed, or a lot did).
+ * Where a page looks different from `before` to `after` (items compared as objects, which never
+ * change): around the items added or removed, padded for the ink's width. `ink` tells each item's
+ * box and width, or null for one that isn't plain ink. Null when nothing changed; undefined when
+ * the whole page has to be drawn again (something other than plain ink changed, or a lot did).
  */
-export function changedArea(before: NoteItem[], after: NoteItem[]): Box | null | undefined {
+export function changedArea<T extends object>(before: T[], after: T[], ink: (item: T) => { box: Box; width: number } | null): Box | null | undefined {
   const was = new Set(before);
   const is = new Set(after);
   const changed = [...before.filter((i) => !is.has(i)), ...after.filter((i) => !was.has(i))];
   if (!changed.length) return null;
-  if (changed.length > MAX_CHANGED || !changed.every(plainInk)) return undefined;
-  const area = unionBox(changed.map(cachedBox))!;
+  if (changed.length > MAX_CHANGED) return undefined;
+  const inks = changed.map(ink);
+  if (inks.some((i) => !i)) return undefined;
+  const area = unionBox(inks.map((i) => i!.box))!;
   // Brushes can spread a little past half their width.
-  const pad = Math.max(...changed.map((i) => (i as { width: number }).width)) + 2;
+  const pad = Math.max(...inks.map((i) => i!.width)) + 2;
   return { x: area.x - pad, y: area.y - pad, w: area.w + 2 * pad, h: area.h + 2 * pad };
 }
 

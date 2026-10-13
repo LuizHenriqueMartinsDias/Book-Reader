@@ -1,5 +1,5 @@
 import type { ConnectorItem, NodeItem, NoteItem, Paper, ShapeItem, StickyItem, StrokeItem } from '../../db/schema';
-import { fillInk, hexToRgb, outlinePath, strokeOutline } from '../ink';
+import { drawInk, hexToRgb } from '../ink';
 import { barbs, connectorPoints, heads, midpoint, nodesById } from './connectors';
 import { nodeRadius, type Vec } from './geometry';
 import { isSticky, STICKY_HEADER, STICKY_INK } from './sticky';
@@ -97,22 +97,7 @@ export function arrowHead(s: Pick<ShapeItem, 'x1' | 'y1' | 'x2' | 'y2' | 'width'
   ];
 }
 
-// Outlines are costly to compute and the infinite canvas redraws on every pan frame; items
-// are immutable (edits create new objects), so cache their paths by identity.
-const pathCache = new WeakMap<StrokeItem, Path2D>();
-
-function strokePath(s: StrokeItem) {
-  let path = pathCache.get(s);
-  if (!path) {
-    path = outlinePath(strokeOutline(s));
-    pathCache.set(s, path);
-  }
-  return path;
-}
-
-export function drawStrokeItem(ctx: CanvasRenderingContext2D, s: StrokeItem) {
-  fillInk(ctx, strokePath(s), s);
-}
+export const drawStrokeItem = (ctx: CanvasRenderingContext2D, s: StrokeItem) => drawInk(ctx, s);
 
 /** A diagram box's outline and tint (its text is DOM in the editor; see `drawNodeText`). */
 export function drawNode(ctx: CanvasRenderingContext2D, n: NodeItem) {

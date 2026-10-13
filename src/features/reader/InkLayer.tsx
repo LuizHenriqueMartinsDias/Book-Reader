@@ -1,8 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { db, type InkTool, type Point, type Stroke } from '../../db/schema';
 import { newId } from '../../db/repo';
-import { drawStroke, strokeHit } from '../../lib/ink';
+import { drawInk, drawStroke, inkBox, strokeHit } from '../../lib/ink';
+import { keepUnchanged } from '../../lib/keepUnchanged';
+import { boxesOverlap, changedArea } from '../../lib/notes/geometry';
 import type { PageSize } from '../../lib/pdf';
 import { useHistory } from '../../store/history';
 import { inkStyle, useUi } from '../../store/ui';
@@ -26,11 +28,25 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
   const tool = useUi((s) => s.tool);
   const penDetected = useUi((s) => s.penDetected);
   const stylusAlwaysInks = useUi((s) => s.stylusAlwaysInks);
-  const strokes = useLiveQuery(() => db.strokes.where({ bookId, page: pageNumber }).sortBy('createdAt'), [bookId, pageNumber]);
-  // Strokes being erased: the ref is read when the gesture ends (state may not have caught up
-  // with a quick swipe), the state hides them right away.
-  const [erasing, setErasing] = useState<Set<string>>(new Set());
+  // In a transaction of its own, so Dexie reads straight from the database instead of copying the
+  // page's strokes again into its query cache on every read.
+  const read = useLiveQuery(
+    () => db.transaction('r', db.strokes, () => db.strokes.where({ bookId, page: pageNumber }).sortBy('createdAt')),
+    [bookId, pageNumber],
+  );
+  /** The strokes on screen by id, and the one just saved from here (the next read brings a copy). */
+  const known = useRef(new Map<string, Stroke>());
+  const strokes = useMemo(() => {
+    if (!read) return undefined;
+    const kept = keepUnchanged(known.current, read);
+    known.current = new Map(kept.map((s) => [s.id, s]));
+    return kept;
+  }, [read]);
+  // Strokes being erased, hidden as the eraser goes. A ref, not state: like the pen, erasing
+  // paints straight away, without making React render the page on every move.
   const erasingRef = useRef<Set<string>>(new Set());
+  /** An erase was saved: the strokes stay hidden until the read without them arrives. */
+  const settling = useRef(false);
 
   const committedRef = useRef<HTMLCanvasElement>(null);
   const liveRef = useRef<HTMLCanvasElement>(null);
@@ -40,7 +56,7 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
    * `stylus`: erasing because the pen's button is held, so letting go of it draws again.
    * `predicted`: where the pen is about to be, drawn ahead of `points` but never saved.
    */
-  const current = useRef<{ pointerId: number; points: Point[]; predicted: Point[]; mode: 'draw' | 'erase'; ink: InkTool; captured: boolean; stylus: boolean } | null>(null);
+  const current = useRef<{ pointerId: number; points: Point[]; predicted: Point[]; mode: 'draw' | 'erase'; ink: InkTool; captured: boolean; stylus: boolean; swept: Point | null } | null>(null);
   const penActive = useRef(false);
   const [penHover, setPenHover] = useState(false);
   const frame = useRef(0);
@@ -52,14 +68,50 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
   const width = size.width * scale;
   const height = size.height * scale;
 
-  useEffect(() => {
+  /** What the committed canvas shows, so a change redraws only the area it touched. */
+  const drawn = useRef<{ visible: Stroke[]; view: string } | null>(null);
+  const paint = () => {
     const canvas = committedRef.current;
-    if (!canvas) return;
+    if (!canvas || !strokes) return;
+    const erasing = erasingRef.current;
+    const visible = erasing.size ? strokes.filter((s) => !erasing.has(s.id)) : strokes;
+    const last = drawn.current;
+    const view = `${width}|${height}|${scale}`;
+    drawn.current = { visible, view };
+    if (last && last.view === view) {
+      // An eraser move, a stroke saved, an undo: only the area of what changed is redrawn.
+      const area = changedArea(last.visible, visible, (s) => ({ box: inkBox(s), width: s.width }));
+      if (area === null) return;
+      if (area) {
+        // The page's transform of the last full draw is still set.
+        const ctx = canvas.getContext('2d')!;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(area.x, area.y, area.w, area.h);
+        ctx.clip();
+        ctx.clearRect(area.x, area.y, area.w, area.h);
+        for (const s of visible) if (boxesOverlap(inkBox(s), area)) drawInk(ctx, s);
+        ctx.restore();
+        return;
+      }
+    }
     const ratio = sizeCanvas(canvas, width, height);
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(ratio * scale, 0, 0, ratio * scale, 0, 0);
-    for (const s of strokes ?? []) if (!erasing.has(s.id)) drawStroke(ctx, s);
-  }, [strokes, erasing, width, height, scale]);
+    for (const s of visible) drawInk(ctx, s);
+  };
+  const paintFrame = useRef(0);
+  const schedulePaint = () => {
+    cancelAnimationFrame(paintFrame.current);
+    paintFrame.current = requestAnimationFrame(paint);
+  };
+  // Before painting: once a saved erase is read back, its strokes are gone for good.
+  useEffect(() => {
+    if (!settling.current) return;
+    settling.current = false;
+    erasingRef.current = new Set();
+  }, [strokes]);
+  useEffect(paint, [strokes, width, height, scale]);
 
   useEffect(() => {
     const canvas = liveRef.current;
@@ -91,10 +143,33 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
 
   const eraseAt = (x: number, y: number) => {
     const radius = ERASER_RADIUS_PX / scale;
-    const hits = (strokes ?? []).filter((s) => !erasingRef.current.has(s.id) && strokeHit(s.points, x, y, radius + s.width / 2));
+    const hits = (strokes ?? []).filter((s) => {
+      if (erasingRef.current.has(s.id)) return false;
+      // Most strokes are far from the eraser: their box rules them out without going through their points.
+      const b = inkBox(s);
+      if (x < b.x - radius || y < b.y - radius || x > b.x + b.w + radius || y > b.y + b.h + radius) return false;
+      return strokeHit(s.points, x, y, radius + s.width / 2);
+    });
     if (!hits.length) return;
     erasingRef.current = new Set([...erasingRef.current, ...hits.map((s) => s.id)]);
-    setErasing(erasingRef.current);
+    schedulePaint();
+  };
+
+  /**
+   * Erases along the way from where it last did, every half eraser: the pen reports points far
+   * closer together than that, and erasing at each one falls behind on a page full of ink.
+   */
+  const eraseTo = (stroke: NonNullable<typeof current.current>, p: Point) => {
+    if (!stroke.swept) {
+      eraseAt(p[0], p[1]);
+      stroke.swept = p;
+      return;
+    }
+    const step = ERASER_RADIUS_PX / scale / 2;
+    const [sx, sy] = stroke.swept;
+    const n = Math.floor(Math.hypot(p[0] - sx, p[1] - sy) / step);
+    for (let k = 1; k <= n; k++) eraseAt(sx + ((p[0] - sx) * k) / n, sy + ((p[1] - sy) * k) / n);
+    if (n) stroke.swept = p;
   };
 
   const renderLive = () => {
@@ -118,8 +193,8 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
     const stylusErase = penErases(e);
     const mode = tool === 'eraser' || stylusErase ? 'erase' : 'draw';
     const ink: InkTool = drawing ? (tool as InkTool) : useUi.getState().lastInkTool;
-    current.current = { pointerId: e.pointerId, points: [p], predicted: [], mode, ink, captured, stylus: stylusErase && tool !== 'eraser' };
-    if (mode === 'erase') eraseAt(p[0], p[1]);
+    current.current = { pointerId: e.pointerId, points: [p], predicted: [], mode, ink, captured, stylus: stylusErase && tool !== 'eraser', swept: null };
+    if (mode === 'erase') eraseTo(current.current, p);
     renderLive();
   };
 
@@ -174,19 +249,20 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
 
   const saveErase = () => {
     const removed = (strokes ?? []).filter((s) => erasingRef.current.has(s.id));
-    const clear = () => {
+    if (!removed.length) {
       erasingRef.current = new Set();
-      setErasing(erasingRef.current);
-    };
-    if (removed.length) useHistory.getState().commit({ added: {}, removed: { strokes: removed } }).then(clear);
-    else clear();
+      return schedulePaint();
+    }
+    settling.current = true;
+    useHistory.getState().commit({ added: {}, removed: { strokes: removed } });
   };
 
   const saveStroke = (ink: InkTool, points: Point[]) => {
     const s: Stroke = { id: newId(), bookId, page: pageNumber, ...inkStyle(ink), points, createdAt: Date.now() };
     // Paint it onto the committed canvas right away to avoid a flicker before the DB query updates.
     const committed = committedRef.current?.getContext('2d');
-    if (committed) drawStroke(committed, s);
+    if (committed) drawInk(committed, s);
+    known.current.set(s.id, s);
     useHistory.getState().commit({ added: { strokes: [s] }, removed: {} });
   };
 
@@ -200,7 +276,7 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
       const erases = penErases(e);
       if (stroke.mode === 'draw' && erases) {
         if (stroke.points.length > 1) saveStroke(stroke.ink, stroke.points);
-        Object.assign(stroke, { mode: 'erase', stylus: true, points: [] });
+        Object.assign(stroke, { mode: 'erase', stylus: true, points: [], swept: null });
       } else if (stroke.mode === 'erase' && stroke.stylus && !erases) {
         saveErase();
         Object.assign(stroke, { mode: 'draw', points: [] });
@@ -209,7 +285,7 @@ export default function InkLayer({ pageNumber, size, scale }: Props) {
     const events = e.nativeEvent.getCoalescedEvents?.() ?? [e.nativeEvent];
     for (const ev of events.length ? events : [e.nativeEvent]) {
       const p = toPoint(ev, rect);
-      if (stroke.mode === 'erase') eraseAt(p[0], p[1]);
+      if (stroke.mode === 'erase') eraseTo(stroke, p);
       else stroke.points.push(p);
     }
     stroke.predicted = stroke.mode === 'draw' ? predictedPoints(e.nativeEvent, (ev) => toPoint(ev, rect)) : [];
