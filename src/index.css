@@ -19,6 +19,7 @@
   --border: #e7e5e4;
   --muted: #6b635c;
   --accent-text: #b45309;
+  --grid-off: #c9c4bf;
   --page-filter: none;
   --highlight-blend: multiply;
   --paper: #ffffff;
@@ -31,6 +32,7 @@
   --border: #dccfb8;
   --muted: #6b5a46;
   --accent-text: #92400e;
+  --grid-off: #c4b393;
   --page-filter: sepia(0.35) brightness(0.97);
   --paper: #f4ecdc;
 }
@@ -41,6 +43,7 @@
   --border: #292524;
   --muted: #a8a29e;
   --accent-text: #fbbf24;
+  --grid-off: #57534e;
   --page-filter: invert(0.9) hue-rotate(180deg);
   --highlight-blend: screen;
   --paper: #262626;

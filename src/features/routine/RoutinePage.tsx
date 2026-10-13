@@ -186,7 +186,7 @@ function Year({ habits, data, weeks, today, theme, onPick }: { habits: Habit[]; 
         <h2 className="text-[17px] font-semibold">Seu ano</h2>
         <GridLegend shades={[EMPTY[theme], ...shades]} />
       </div>
-      <ContributionGrid weeks={weeks} cell={cell} today={today} onPick={onPick} labels title="Todos os hábitos, dia a dia, no último ano" />
+      <ContributionGrid weeks={weeks} cell={cell} today={today} ring={shades[2]} onPick={onPick} labels title="Todos os hábitos, dia a dia, no último ano" />
       <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <div className={tile}>
           <div className="text-xl font-bold">{allDone.current}</div>
@@ -255,7 +255,7 @@ function HabitCard({
           <Pencil className="size-4" />
         </button>
       </div>
-      <ContributionGrid weeks={recent} cell={cell} today={today} onPick={onPick} title={`${habit.name} nos últimos 6 meses`} />
+      <ContributionGrid weeks={recent} cell={cell} today={today} ring={shades[2]} onPick={onPick} title={`${habit.name} nos últimos 6 meses`} />
       <div className="mt-2.5 flex flex-wrap justify-between gap-x-3 text-xs text-[var(--muted)]">
         <span>
           {goalText(habit)} · {daysText(habit.days)}
