@@ -151,11 +151,11 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   /** Where a hovering pen with its button held is, to show the eraser before it touches. */
   const hoverEraser = useRef<Vec | null>(null);
   const frame = useRef(0);
+  // What the eraser hides as it goes, and (partial eraser) what's left of the items it cut, shown
+  // in their place until saved. Refs, not state: like the pen, erasing paints the canvas straight
+  // away, without making React render the page on every move.
   const erasingRef = useRef<Set<string>>(new Set());
-  const [erasing, setErasing] = useState<Set<string>>(new Set());
-  // Partial eraser: what's left of the items it cut so far (shown in their place until saved).
   const piecesRef = useRef<StrokeItem[]>([]);
-  const [pieces, setPieces] = useState<StrokeItem[]>([]);
   /** An erase was just saved: keep showing its result until the database query catches up. */
   const settling = useRef(false);
   const [preview, setPreview] = useState<Transform | null>(null);
@@ -180,20 +180,23 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
   // Boxes as they're shown (also mid-drag), for the arrows to follow.
   const nodeMap = useMemo(() => nodesById(shown), [shown]);
 
+  const shownById = useMemo(() => new Map(shown.map((i) => [i.id, i])), [shown]);
   /** What the ink canvas shows, so the eraser's moves redraw only the area they changed. */
   const drawn = useRef<{ shown: NoteItem[]; erasing: Set<string>; pieces: StrokeItem[]; view: string } | null>(null);
 
-  // Committed ink.
-  useEffect(() => {
+  /** Paints the committed ink, with what the eraser has done so far. */
+  const paintInk = () => {
     const canvas = inkRef.current;
     if (!canvas) return;
+    const erasing = erasingRef.current;
+    const pieces = piecesRef.current;
     const last = drawn.current;
     const viewKey = `${width}|${height}|${view.x}|${view.y}|${view.zoom}`;
     drawn.current = { shown, erasing, pieces, view: viewKey };
     const all = pieces.length ? [...shown, ...pieces] : shown;
     if (last && last.shown === shown && last.view === viewKey) {
       // Only the eraser moved: redrawing the whole page on every move makes it lag on a full page.
-      const area = erasedArea(last, { erasing, pieces }, new Map(shown.map((i) => [i.id, i])));
+      const area = erasedArea(last, { erasing, pieces }, shownById);
       if (area === null) return;
       const around = area && all.filter((i) => boxesOverlap(cachedBox(i), area));
       if (area && around!.every(plainInk)) {
@@ -215,19 +218,29 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(ratio * view.zoom, 0, 0, ratio * view.zoom, -view.x * view.zoom * ratio, -view.y * view.zoom * ratio);
     drawItems(ctx, all, erasing);
-  }, [shown, erasing, pieces, width, height, view.x, view.y, view.zoom]);
+  };
+  /** Once per frame however many moves the eraser makes in it. */
+  const inkFrame = useRef(0);
+  const schedulePaint = () => {
+    cancelAnimationFrame(inkFrame.current);
+    inkFrame.current = requestAnimationFrame(paintInk);
+  };
 
   const clearErase = () => {
     erasingRef.current = new Set();
     piecesRef.current = [];
-    setErasing(erasingRef.current);
-    setPieces([]);
+    schedulePaint();
   };
+  // Before painting: once a saved erase is in the items, its pieces mustn't be drawn twice.
   useEffect(() => {
     if (!settling.current) return;
     settling.current = false;
-    clearErase();
+    erasingRef.current = new Set();
+    piecesRef.current = [];
   }, [items]);
+
+  // Committed ink.
+  useEffect(paintInk, [shown, shownById, width, height, view.x, view.y, view.zoom]);
 
   useEffect(() => {
     if (liveRef.current) sizeCanvas(liveRef.current, width, height);
@@ -320,7 +333,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
       if (!hits.length) return;
       // Erasing a box erases what's written in it and the arrows on it.
       erasingRef.current = new Set([...erasingRef.current, ...withDependents(hits.map((i) => i.id), items)]);
-      setErasing(erasingRef.current);
+      schedulePaint();
       return;
     }
     // Partial: cut the saved items it touches (hiding them) and the pieces already cut.
@@ -342,8 +355,7 @@ export default function NoteSurface({ notebook, page, width, height, view, backg
     if (!changed) return;
     erasingRef.current = hidden;
     piecesRef.current = next;
-    setErasing(hidden);
-    setPieces(next);
+    schedulePaint();
   };
 
   const nextZ = () => items.reduce((m, i) => Math.max(m, i.z), 0) + 1;

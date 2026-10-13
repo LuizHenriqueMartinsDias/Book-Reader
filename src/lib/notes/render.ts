@@ -1,5 +1,5 @@
 import type { ConnectorItem, NodeItem, NoteItem, Paper, ShapeItem, StickyItem, StrokeItem } from '../../db/schema';
-import { fillInk, hexToRgb, outlineToSvgPath, strokeOutline } from '../ink';
+import { fillInk, hexToRgb, outlinePath, strokeOutline } from '../ink';
 import { barbs, connectorPoints, heads, midpoint, nodesById } from './connectors';
 import { nodeRadius, type Vec } from './geometry';
 import { isSticky, STICKY_HEADER, STICKY_INK } from './sticky';
@@ -104,7 +104,7 @@ const pathCache = new WeakMap<StrokeItem, Path2D>();
 function strokePath(s: StrokeItem) {
   let path = pathCache.get(s);
   if (!path) {
-    path = new Path2D(outlineToSvgPath(strokeOutline(s)));
+    path = outlinePath(strokeOutline(s));
     pathCache.set(s, path);
   }
   return path;

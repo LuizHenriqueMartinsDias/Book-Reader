@@ -110,8 +110,25 @@ export function outlineToSvgPath(points: [number, number][], map = (x: number, y
   return d + ' Z';
 }
 
+/**
+ * The same curves as `outlineToSvgPath`, built straight into a canvas path: no SVG text to write
+ * and parse back, which on screen is most of what drawing a stroke costs.
+ */
+export function outlinePath(points: [number, number][]) {
+  const path = new Path2D();
+  if (points.length < 2) return path;
+  path.moveTo(points[0][0], points[0][1]);
+  for (let i = 0; i < points.length; i++) {
+    const [ax, ay] = points[i];
+    const [bx, by] = points[(i + 1) % points.length];
+    path.quadraticCurveTo(ax, ay, (ax + bx) / 2, (ay + by) / 2);
+  }
+  path.closePath();
+  return path;
+}
+
 export function drawStroke(ctx: CanvasRenderingContext2D, stroke: InkLike & Pick<Stroke, 'color'>, last = true) {
-  fillInk(ctx, new Path2D(outlineToSvgPath(strokeOutline(stroke, last))), stroke);
+  fillInk(ctx, outlinePath(strokeOutline(stroke, last)), stroke);
 }
 
 /** True when the point is within `radius` of any segment of the stroke's centerline. */
