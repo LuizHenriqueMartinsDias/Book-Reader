@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { addActivity } from '../../db/habits';
 import type { ActivityKind } from '../../db/schema';
 import { ActiveTime, TICK_MS } from '../../lib/routine/activity';
-import { focusRunning } from '../../store/pomodoro';
+import { studyRunning } from '../../store/pomodoro';
 import { useSplit, type Pane } from '../split/splitStore';
 
 /** How long without input still counts: a dense page can take a while to read. */
@@ -41,8 +41,8 @@ export function useActiveTime(kind: ActivityKind, scope: RefObject<HTMLElement |
     for (const ev of INPUTS) el.addEventListener(ev, onInput, { capture: true, passive: true });
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', leave);
-    // During a pomodoro focus all the time is already study: the notebook would count it twice.
-    const covered = () => kind === 'study' && focusRunning();
+    // While the pomodoro counts as study (a focus, or a break if set so), the notebook would count it twice.
+    const covered = () => kind === 'study' && studyRunning();
     const inUse = () => {
       const { active } = useSplit.getState();
       return !covered() && document.visibilityState === 'visible' && (!active || active === PANE[kind]);

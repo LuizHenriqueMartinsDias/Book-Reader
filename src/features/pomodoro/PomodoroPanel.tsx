@@ -143,12 +143,13 @@ function Settings({ prefs }: { prefs: PomodoroPrefs }) {
   const set = (patch: Partial<PomodoroPrefs>) => usePomodoro.getState().set({ prefs: { ...prefs, ...patch } });
   return (
     <div className="pb-1">
-      <p className="mb-1 text-xs text-[var(--muted)]">O tempo de foco conta como estudo na Rotina. Mudanças valem a partir da próxima etapa.</p>
+      <p className="mb-1 text-xs text-[var(--muted)]">{prefs.breaks ? 'Foco e pausas contam' : 'O tempo de foco conta'} como estudo na Rotina. Mudanças valem a partir da próxima etapa.</p>
       <Stepper label="Foco" unit="min" value={prefs.focus} min={5} max={120} step={5} onChange={(focus) => set({ focus })} />
       <Stepper label="Pausa" unit="min" value={prefs.short} min={1} max={30} step={1} onChange={(short) => set({ short })} />
       <Stepper label="Pausa longa" unit="min" value={prefs.long} min={5} max={60} step={5} onChange={(long) => set({ long })} />
       <Stepper label="Pausa longa a cada" unit="focos" value={prefs.longEvery} min={2} max={8} step={1} onChange={(longEvery) => set({ longEvery })} />
       <Check label="Começar a próxima etapa sozinha" checked={prefs.autoNext} onChange={(autoNext) => set({ autoNext })} />
+      <Check label="Pausas contam como estudo" hint="Para a meta medir o tempo dedicado, não só o de foco." checked={prefs.breaks} onChange={(breaks) => set({ breaks })} />
       <Check label="Som no fim de cada etapa" checked={prefs.sound} onChange={(sound) => set({ sound })} />
       <Check label="Vibrar no fim de cada etapa" checked={prefs.vibrate} onChange={(vibrate) => set({ vibrate })} />
       <Check label="Manter a tela acesa enquanto roda" hint="Para ouvir o fim da etapa com o tablet parado." checked={prefs.keepAwake} onChange={(keepAwake) => set({ keepAwake })} />

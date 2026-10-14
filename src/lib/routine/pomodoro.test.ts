@@ -14,7 +14,7 @@ describe('pomodoro', () => {
     let s = start(IDLE, 'focus', settings, at(10)).state;
     s = pause(s, at(10, 10)).state;
     expect(remaining(s, settings, at(11))).toBe(15 * min);
-    s = resume(s, at(11)).state;
+    s = resume(s, settings, at(11)).state;
     expect(s.endsAt).toBe(at(11, 15));
     expect(remaining(s, settings, at(11, 5))).toBe(10 * min);
   });
@@ -62,11 +62,25 @@ describe('pomodoro', () => {
     expect(credit(s, at(14, 4)).credit).toEqual([]);
   });
 
+  it('gives the breaks to study too when set so', () => {
+    const breaks = { ...settings, breaks: true };
+    let s = start(IDLE, 'short', breaks, at(10)).state;
+    expect(credit(s, at(10, 4)).credit).toEqual([{ day: '2026-10-10', seconds: 240 }]);
+    // With autoNext: 25 focus + 5 break + 10 of the next focus, all of it study.
+    const auto = { ...breaks, autoNext: true };
+    s = start(IDLE, 'focus', auto, at(11)).state;
+    expect(seconds(advance(s, auto, at(11, 40)).credit)).toBe(40 * 60);
+    // A break paused and resumed still counts.
+    s = pause(start(IDLE, 'long', breaks, at(12)).state, at(12, 5)).state;
+    s = resume(s, breaks, at(13)).state;
+    expect(seconds(credit(s, at(13, 10)).credit)).toBe(600);
+  });
+
   it('does not count a paused focus', () => {
     let s = start(IDLE, 'focus', settings, at(10)).state;
     const paused = pause(s, at(10, 5));
     expect(seconds(paused.credit)).toBe(300);
-    s = resume(paused.state, at(11)).state;
+    s = resume(paused.state, settings, at(11)).state;
     expect(seconds(credit(s, at(11, 5)).credit)).toBe(300);
   });
 

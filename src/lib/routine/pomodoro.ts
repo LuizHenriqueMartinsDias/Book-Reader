@@ -3,16 +3,20 @@ import { dayKey } from './calendar';
 /** A stretch of focus, a short break, or the long break after a few focuses. */
 export type Phase = 'focus' | 'short' | 'long';
 
-/** Minutes of each phase, how many focuses until a long break, and whether the next phase starts by itself. */
+/**
+ * Minutes of each phase, how many focuses until a long break, whether the next phase starts by
+ * itself, and whether the breaks count as study too.
+ */
 export interface PomodoroSettings {
   focus: number;
   short: number;
   long: number;
   longEvery: number;
   autoNext: boolean;
+  breaks: boolean;
 }
 
-export const DEFAULT_SETTINGS: PomodoroSettings = { focus: 25, short: 5, long: 15, longEvery: 4, autoNext: false };
+export const DEFAULT_SETTINGS: PomodoroSettings = { focus: 25, short: 5, long: 15, longEvery: 4, autoNext: false, breaks: false };
 
 /**
  * Where the timer is. It runs by its end time, not by counting seconds, so it stays right while
@@ -25,7 +29,7 @@ export interface Pomodoro {
   endsAt: number | null;
   /** Paused: milliseconds left. */
   left: number | null;
-  /** A focus running: up to when its time was given to study. */
+  /** A phase that counts as study running: up to when its time was given to study. */
   credited: number | null;
   /** Focuses finished since the last long break. */
   done: number;
@@ -33,10 +37,10 @@ export interface Pomodoro {
 
 export const IDLE: Pomodoro = { phase: 'focus', status: 'idle', endsAt: null, left: null, credited: null, done: 0 };
 
-/** Seconds of focus to add to each day's study. */
+/** Seconds to add to each day's study. */
 export type Credit = { day: string; seconds: number }[];
 
-/** What an action leads to: the new state, focus time to save, and the phases that ran out. */
+/** What an action leads to: the new state, study time to save, and the phases that ran out. */
 export interface Step {
   state: Pomodoro;
   credit: Credit;
@@ -70,9 +74,9 @@ function splitByDay(from: number, to: number): { credit: Credit; until: number }
   return { credit, until: t };
 }
 
-/** Gives the focus time since the last credit (up to the end of the focus) to study. */
+/** Gives the time since the last credit (up to the end of the phase) to study, if the phase counts. */
 export function credit(state: Pomodoro, now: number): Step {
-  if (state.status !== 'running' || state.phase !== 'focus' || state.credited === null || state.endsAt === null) return { state, credit: [], ended: [] };
+  if (state.status !== 'running' || state.credited === null || state.endsAt === null) return { state, credit: [], ended: [] };
   const { credit, until } = splitByDay(state.credited, Math.min(now, state.endsAt));
   return { state: { ...state, credited: until }, credit, ended: [] };
 }
@@ -83,26 +87,27 @@ function after(state: Pomodoro, now: number, next: (s: Pomodoro) => Pomodoro): S
   return { ...c, state: next(c.state) };
 }
 
-const running = (phase: Phase, endsAt: number, from: number, done: number): Pomodoro => ({
+/** `phase` running from `from`; it counts as study if it's a focus, or a break with `settings.breaks`. */
+const running = (phase: Phase, endsAt: number, from: number, done: number, settings: PomodoroSettings): Pomodoro => ({
   phase,
   status: 'running',
   endsAt,
   left: null,
-  credited: phase === 'focus' ? from : null,
+  credited: phase === 'focus' || settings.breaks ? from : null,
   done,
 });
 
-/** Starts `phase` now (whatever was running stops, its focus time kept). */
+/** Starts `phase` now (whatever was running stops, its study time kept). */
 export const start = (state: Pomodoro, phase: Phase, settings: PomodoroSettings, now: number): Step =>
-  after(state, now, (s) => running(phase, now + phaseMs(phase, settings), now, s.phase === 'long' && phase !== 'long' ? 0 : s.done));
+  after(state, now, (s) => running(phase, now + phaseMs(phase, settings), now, s.phase === 'long' && phase !== 'long' ? 0 : s.done, settings));
 
 export const pause = (state: Pomodoro, now: number): Step =>
   state.status !== 'running' || state.endsAt === null ? { state, credit: [], ended: [] } : after(state, now, (s) => ({ ...s, status: 'paused', left: Math.max(0, s.endsAt! - now), endsAt: null, credited: null }));
 
-export const resume = (state: Pomodoro, now: number): Step =>
-  state.status !== 'paused' || state.left === null ? { state, credit: [], ended: [] } : { state: running(state.phase, now + state.left, now, state.done), credit: [], ended: [] };
+export const resume = (state: Pomodoro, settings: PomodoroSettings, now: number): Step =>
+  state.status !== 'paused' || state.left === null ? { state, credit: [], ended: [] } : { state: running(state.phase, now + state.left, now, state.done, settings), credit: [], ended: [] };
 
-/** Stops the round: back to the start, with the focus time so far kept. */
+/** Stops the round: back to the start, with the study time so far kept. */
 export const stop = (state: Pomodoro, now: number): Step => after(state, now, () => IDLE);
 
 /**
@@ -113,7 +118,7 @@ export function skip(state: Pomodoro, settings: PomodoroSettings, now: number): 
   return after(state, now, (s) => {
     const done = s.phase === 'long' ? 0 : s.done;
     const phase = nextPhase(s.phase, done, settings);
-    return running(phase, now + phaseMs(phase, settings), now, done);
+    return running(phase, now + phaseMs(phase, settings), now, done, settings);
   });
 }
 
@@ -132,7 +137,7 @@ export function advance(state: Pomodoro, settings: PomodoroSettings, now: number
     const done = s.phase === 'focus' ? s.done + 1 : s.phase === 'long' ? 0 : s.done;
     const phase = nextPhase(s.phase, done, settings);
     ended.push({ phase: s.phase, at });
-    s = settings.autoNext ? running(phase, at + phaseMs(phase, settings), at, done) : { ...IDLE, phase, status: 'ended', done };
+    s = settings.autoNext ? running(phase, at + phaseMs(phase, settings), at, done, settings) : { ...IDLE, phase, status: 'ended', done };
   }
   if (s !== state && s.status === 'running') {
     const c = credit(s, now);
