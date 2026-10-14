@@ -1,5 +1,6 @@
 import { ExternalLink, Loader2, Search, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { SEARCH_PANEL } from '../../lib/menuSpot';
 import { lookUp, lookupWord, type DictEntry, type DictResult } from '../../lib/lookup/dictionary';
 
 const WIDTH = 320;
@@ -35,8 +36,8 @@ export default function LookupCard({ x, y, text, onClose }: Props) {
   }, [word]);
 
   const left = Math.min(Math.max(8, x - WIDTH / 2), window.innerWidth - WIDTH - 8);
-  // Below the selection when there's room, else as low as it fits.
-  const top = Math.max(8, Math.min(y + 8, window.innerHeight - 8 - 300));
+  // Below the selection when there's room, else as low as it fits above the browser's search panel.
+  const top = Math.max(8, Math.min(y + 8, window.innerHeight - SEARCH_PANEL - 300));
 
   return (
     <div
@@ -44,7 +45,7 @@ export default function LookupCard({ x, y, text, onClose }: Props) {
       role="dialog"
       aria-label={`Significado de ${word}`}
       className="fixed z-50 flex flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] text-sm shadow-xl"
-      style={{ left, top, width: WIDTH, maxHeight: window.innerHeight - top - 8 }}
+      style={{ left, top, width: WIDTH, maxHeight: window.innerHeight - top - SEARCH_PANEL }}
       // Keeps the book's selection while tapping here.
       onPointerDown={(e) => e.preventDefault()}
     >

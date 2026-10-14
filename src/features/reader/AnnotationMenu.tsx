@@ -6,6 +6,7 @@ import { useHistory } from '../../store/history';
 import { HIGHLIGHT_COLORS, useUi } from '../../store/ui';
 import { sendQuoteToNotebook } from '../notes/SendQuoteDialog';
 import { lookupable, lookupWord } from '../../lib/lookup/dictionary';
+import { menuTop } from '../../lib/menuSpot';
 import LookupCard from './LookupCard';
 import { useReader } from './readerStore';
 import { pinNote } from './StickyLayer';
@@ -15,8 +16,10 @@ export type MenuTarget =
   | { kind: 'highlight'; highlight: Highlight };
 
 interface Props {
+  /** Middle and bottom of the selection (or the point tapped); `top` is its top, if it has one. */
   x: number;
   y: number;
+  top?: number;
   target: MenuTarget;
   onClose: () => void;
 }
@@ -41,7 +44,7 @@ const newNote = (h: Highlight) => ({
  * Floating menu shared by the PDF and EPUB readers: highlight a selection (or add a note to
  * it), or recolor / annotate / remove an existing highlight. Changes go through the undo history.
  */
-export default function AnnotationMenu({ x, y, target, onClose }: Props) {
+export default function AnnotationMenu({ x, y, top: selTop = y, target, onClose }: Props) {
   const current = target.kind === 'highlight' ? target.highlight.color : null;
   const [lookingUp, setLookingUp] = useState(false);
   const selected = target.kind === 'selection' ? target.text : target.highlight.text;
@@ -113,7 +116,8 @@ export default function AnnotationMenu({ x, y, target, onClose }: Props) {
   if (lookingUp) return <LookupCard x={x} y={y} text={selected} onClose={onClose} />;
 
   const left = Math.min(Math.max(8, x - 150), window.innerWidth - 308);
-  const top = Math.min(y + 8, window.innerHeight - 56);
+  // Out of the way of the browser's own bar and Google panel on a selection, which stay usable.
+  const top = menuTop(selTop, y, 48, window.innerHeight);
 
   return (
     <div

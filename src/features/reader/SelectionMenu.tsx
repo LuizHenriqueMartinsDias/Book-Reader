@@ -7,7 +7,7 @@ import AnnotationMenu, { type MenuTarget } from './AnnotationMenu';
 import { useReader } from './readerStore';
 
 type MenuState =
-  | { kind: 'selection'; x: number; y: number; range: Range }
+  | { kind: 'selection'; x: number; y: number; top: number; range: Range }
   | { kind: 'highlight'; x: number; y: number; highlight: Highlight };
 
 /** Tracks text selections and highlight clicks on PDF pages and shows the annotation menu. */
@@ -30,7 +30,8 @@ export default function SelectionMenu() {
       const rects = [...range.getClientRects()].filter((r) => r.width > 0);
       const last = rects.at(-1);
       if (!last) return;
-      setMenu({ kind: 'selection', x: last.left + last.width / 2, y: last.bottom, range: range.cloneRange() });
+      const top = Math.min(...rects.map((r) => r.top));
+      setMenu({ kind: 'selection', x: last.left + last.width / 2, y: last.bottom, top, range: range.cloneRange() });
     };
 
     const onSelectionChange = () => {
@@ -82,7 +83,7 @@ export default function SelectionMenu() {
       ? { kind: 'selection', text: menu.range.toString(), createHighlights: (color) => rangeToHighlights(menu.range, color) }
       : { kind: 'highlight', highlight: menu.highlight };
 
-  return <AnnotationMenu x={menu.x} y={menu.y} target={target} onClose={close} />;
+  return <AnnotationMenu x={menu.x} y={menu.y} top={menu.kind === 'selection' ? menu.top : undefined} target={target} onClose={close} />;
 }
 
 /** Splits a DOM selection into one highlight per page it touches. */

@@ -65,7 +65,7 @@ export interface EpubLocation {
   atEnd: boolean;
 }
 
-type Menu = { x: number; y: number; target: MenuTarget; clear?: () => void };
+type Menu = { x: number; y: number; top?: number; target: MenuTarget; clear?: () => void };
 
 function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startCfi?: string }) {
   // Seed the per-book store before children render.
@@ -203,6 +203,7 @@ function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startC
       setMenu({
         x: frame.left + rect.left + rect.width / 2,
         y: frame.top + rect.bottom,
+        top: frame.top + rect.top,
         clear: () => contents.window.getSelection()?.removeAllRanges(),
         target: {
           kind: 'selection',
@@ -421,6 +422,7 @@ function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startC
         <AnnotationMenu
           x={menu.x}
           y={menu.y}
+          top={menu.top}
           target={menu.target}
           onClose={() => {
             menu.clear?.();
