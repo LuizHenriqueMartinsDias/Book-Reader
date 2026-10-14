@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { addActivity, addAmount, bump, convertUnit, createHabit, removeAmount, deleteHabit, routineData, setDaysOff, setOff, setValue, statusOn } from './habits';
+import { activityMinutes, addActivity, addAmount, bump, convertUnit, createHabit, removeAmount, deleteHabit, routineData, setDaysOff, setOff, setValue, statusOn } from './habits';
 import { db } from './schema';
 
 describe('habits', () => {
@@ -24,6 +24,18 @@ describe('habits', () => {
     await setValue(reading.id, '2026-10-09', 5);
     const data = await routineData('2026-10-09', '2026-10-09');
     expect(statusOn(data, reading, '2026-10-09')).toMatchObject({ value: 35, met: true });
+  });
+
+  it('counts reading and study minutes with the corrections, or measured when there is no habit', async () => {
+    await addActivity('study', '2026-10-09', 1200);
+    await addActivity('reading', '2026-10-09', 600);
+    const study = await createHabit({ name: 'Estudo', icon: 'study', color: '#7c3aed', kind: 'time', goal: 60, auto: 'study' });
+    await bump(study, '2026-10-09', 15);
+    await bump(study, '2026-10-08', 15);
+    const data = await routineData('2026-10-08', '2026-10-09');
+    expect(activityMinutes(data, [study], 'study', '2026-10-09')).toBe(35);
+    expect(activityMinutes(data, [study], 'study', '2026-10-08')).toBe(15);
+    expect(activityMinutes(data, [study], 'reading', '2026-10-09')).toBe(10);
   });
 
   it('keeps days off, for one habit or for all', async () => {

@@ -129,3 +129,12 @@ export const statusOn = (data: RoutineData, habit: Habit, key: string) =>
     allOff: data.dayOffs.has(key),
     activitySeconds: habit.auto ? data.activity.get(`${habit.auto}|${key}`) : 0,
   });
+
+/**
+ * Minutes of reading or study on a day as the routine shows them: the automatic habit's, with its
+ * corrections (+15 min, a fixed day); without one, just the measured time.
+ */
+export function activityMinutes(data: RoutineData, habits: Habit[], kind: ActivityKind, key: string) {
+  const habit = habits.find((h) => h.auto === kind);
+  return habit ? statusOn(data, habit, key).value : (data.activity.get(`${kind}|${key}`) ?? 0) / 60;
+}

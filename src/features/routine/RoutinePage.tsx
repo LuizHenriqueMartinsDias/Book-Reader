@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Flame, Pencil, Plus, Timer } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { createHabit, routineData, statusOn, type RoutineData } from '../../db/habits';
+import { activityMinutes, createHabit, routineData, statusOn, type RoutineData } from '../../db/habits';
 import type { Habit } from '../../db/schema';
 import { dayKey, dayTitle, formatAmount, formatMinutes, fromKey, gridWeeks, overallLevel, streaks, type DayStatus } from '../../lib/routine/calendar';
 import { EMPTY, OVERALL_COLOR, ramp } from '../../lib/routine/ramp';
@@ -176,7 +176,7 @@ function Year({ habits, data, weeks, today, theme, onPick }: { habits: Habit[]; 
       due++;
       if (s.met) met++;
     }
-    minutes += ((data.activity.get(`reading|${k}`) ?? 0) + (data.activity.get(`study|${k}`) ?? 0)) / 60;
+    minutes += activityMinutes(data, habits, 'reading', k) + activityMinutes(data, habits, 'study', k);
   }
 
   const tile = 'rounded-xl bg-[var(--app-bg)] p-3';

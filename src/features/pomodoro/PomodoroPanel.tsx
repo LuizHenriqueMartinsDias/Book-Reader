@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ChevronDown, Minus, Pause, Play, Plus, SkipForward, Square, X } from 'lucide-react';
 import { useState } from 'react';
-import { db } from '../../db/schema';
+import { activityMinutes, routineData } from '../../db/habits';
 import { dayKey, formatMinutes } from '../../lib/routine/calendar';
 import { clock, phaseMs, remaining, type Phase } from '../../lib/routine/pomodoro';
 import { focusesToday, pausePomodoro, resumePomodoro, skipPomodoro, startPhase, stopPomodoro, usePomodoro, type PomodoroPrefs } from '../../store/pomodoro';
@@ -26,7 +26,11 @@ export default function PomodoroPanel() {
   const today = usePomodoro((s) => s.today);
   const now = useNow(timer.status === 'running');
   const day = dayKey(new Date(now));
-  const study = useLiveQuery(() => db.activity.get(`study|${day}`), [day]);
+  // As the routine counts it: with the study habit's corrections.
+  const studyMinutes = useLiveQuery(async () => {
+    const data = await routineData(day, day);
+    return Math.floor(activityMinutes(data, data.habits.filter((h) => !h.archived), 'study', day));
+  }, [day]) ?? 0;
   const [picked, setPicked] = useState<Phase | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const close = () => usePomodoro.getState().set({ panelOpen: false });
@@ -37,7 +41,6 @@ export default function PomodoroPanel() {
   const left = choosing ? phaseMs(phase, prefs) : remaining(timer, prefs, now);
   const progress = choosing ? 0 : 1 - left / phaseMs(phase, prefs);
   const focuses = focusesToday(today, day);
-  const studyMinutes = Math.floor((study?.seconds ?? 0) / 60);
   // A tap is when sound may be switched on, for the chime at the end.
   const act = (run: () => void) => () => {
     unlockSound();
