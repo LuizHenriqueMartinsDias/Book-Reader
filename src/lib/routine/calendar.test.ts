@@ -47,6 +47,12 @@ describe('a day of a habit', () => {
     expect(dayStatus(weekdays, '2026-10-10', { log: log('2026-10-10', 1) })).toMatchObject({ off: null, met: true });
   });
 
+  it("stays off with a bit done on a day off, without owing the whole goal", () => {
+    const study = habit({ kind: 'time', goal: 480, auto: 'study', days: [1, 2, 3, 4, 5] });
+    expect(dayStatus(study, '2026-10-11', { activitySeconds: 60 })).toMatchObject({ value: 1, off: 'unscheduled', met: false }); // a Sunday
+    expect(dayStatus(study, '2026-10-11', { activitySeconds: 480 * 60 })).toMatchObject({ off: null, met: true });
+  });
+
   it('adds measured minutes to an automatic habit, with corrections', () => {
     const reading = habit({ kind: 'time', goal: 30, auto: 'reading' });
     expect(dayStatus(reading, '2026-10-10', { activitySeconds: 25 * 60 + 50 }).value).toBe(25);

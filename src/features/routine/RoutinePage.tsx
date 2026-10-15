@@ -239,7 +239,7 @@ function HabitCard({
   const cell = (day: string): Cell => {
     const s = statusOn(data, habit, day);
     const label = `${shortDate(day)}: ${s.off && !s.value ? 'folga' : habit.kind === 'check' ? (s.met ? 'feito' : 'não feito') : habit.kind === 'time' ? formatMinutes(s.value) : formatAmount(s.value, habit.unit)}`;
-    if (s.off && day >= created) return { off: true, label };
+    if (s.off && !s.value && day >= created) return { off: true, label };
     return { fill: s.level ? shades[s.level - 1] : EMPTY[theme], label };
   };
 

@@ -92,7 +92,7 @@ export interface DayStatus {
   value: number;
   level: 0 | 1 | 2 | 3 | 4;
   met: boolean;
-  /** A day that doesn't count: it neither adds to nor breaks a streak (unless done anyway, then it counts). */
+  /** A day that doesn't count: it neither adds to nor breaks a streak (unless the goal is met anyway, then it counts). */
   off: OffReason | null;
 }
 
@@ -107,8 +107,9 @@ export function dayStatus(habit: Habit, key: string, o: { log?: HabitLog; allOff
         : habit.holidaysOff && holidayName(key)
           ? 'holiday'
           : null;
-  // Done anyway on a day off: an extra, counted like any other day.
-  return { value, level: level(habit, value), met: met(habit, value), off: reason && value <= 0 ? reason : null };
+  // A day off stays off with a bit done (an extra, it doesn't owe the whole goal); met anyway, it counts.
+  const done = met(habit, value);
+  return { value, level: level(habit, value), met: done, off: reason && !done ? reason : null };
 }
 
 /**

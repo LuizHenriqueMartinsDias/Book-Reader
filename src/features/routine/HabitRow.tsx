@@ -32,9 +32,11 @@ export function statusText(habit: Habit, status: DayStatus, day: string) {
     if (status.off === 'holiday') return `Folga: ${holidayName(day)}`;
     return status.off === 'dayoff' ? 'Folga em tudo neste dia' : 'Folga';
   }
+  // A bit done on a day off: shown, but it owes nothing.
+  const off = status.off ? 'Folga · ' : '';
   if (habit.kind === 'check') return status.met ? 'Feito' : 'Ainda não';
-  if (habit.kind === 'time') return `${formatMinutes(status.value)} de ${formatMinutes(habit.goal)}`;
-  return `${formatAmount(status.value, habit.unit)} de ${goalText(habit)}`;
+  if (habit.kind === 'time') return `${off}${formatMinutes(status.value)} de ${formatMinutes(habit.goal)}`;
+  return `${off}${formatAmount(status.value, habit.unit)} de ${goalText(habit)}`;
 }
 
 const round = 'flex size-11 shrink-0 items-center justify-center rounded-full';
