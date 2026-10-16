@@ -14,6 +14,7 @@ import EpubReader from '../epub/EpubReader';
 import FullscreenChrome from './FullscreenChrome';
 import { useDocument } from './useDocument';
 import { useFullscreen } from './useFullscreen';
+import { usePenButtonClick } from './usePenButtonClick';
 import PagedView from './views/PagedView';
 import ScrollView from './views/ScrollView';
 import { MAX_ZOOM, MIN_ZOOM, type ZoomChange, type ZoomMode } from './views/types';
@@ -108,6 +109,16 @@ function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentP
     const t = setTimeout(() => updateBook(book.id, { zoom: zooms.scroll ?? 0, pagedZoomFactor: zooms.paged ?? 0 }), 500);
     return () => clearTimeout(t);
   }, [book.id, zooms]);
+
+  // A click of the pen's button in the air switches to the eraser and back.
+  const beforeEraser = useRef<Tool | null>(null);
+  usePenButtonClick(() => {
+    if (useSplit.getState().active === 'notes') return;
+    const ui = useUi.getState();
+    if (ui.tool === 'eraser') return ui.set({ tool: beforeEraser.current ?? ui.lastInkTool });
+    beforeEraser.current = ui.tool;
+    ui.set({ tool: 'eraser' });
+  });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

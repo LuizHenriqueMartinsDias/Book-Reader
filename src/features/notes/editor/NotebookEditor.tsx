@@ -24,6 +24,7 @@ import PagedNotebook from './PagedNotebook';
 import StretchPageDialog from './StretchPageDialog';
 import RulerOverlay from './RulerOverlay';
 import { useActiveTime } from '../../routine/useActiveTime';
+import { usePenButtonClick } from '../../reader/usePenButtonClick';
 
 const TOOL_KEYS: Record<string, NoteTool> = { p: 'pen', h: 'marker', e: 'eraser', l: 'lasso', t: 'text', s: 'shape', d: 'diagram', n: 'sticky' };
 
@@ -81,6 +82,16 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
   const hostRef = useRef<HTMLDivElement>(null);
   const ruler = useNoteEditor((s) => s.ruler);
   const rotationHint = useNoteEditor((s) => s.rotationHint);
+
+  // A click of the pen's button in the air switches to the eraser and back.
+  const beforeEraser = useRef<NoteTool>('pen');
+  usePenButtonClick(() => {
+    if (useSplit.getState().active === 'reader') return;
+    const editor = useNoteEditor.getState();
+    if (editor.tool === 'eraser') return editor.set({ tool: beforeEraser.current });
+    beforeEraser.current = editor.tool;
+    editor.set({ tool: 'eraser' });
+  });
 
   // The ruler lives in the view area's coordinates.
   useEffect(() => {
