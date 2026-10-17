@@ -26,9 +26,9 @@ export function useActiveTime(kind: ActivityKind, scope: RefObject<HTMLElement |
     clock.current = c;
     c.input(Date.now()); // opening the book or notebook is using it
     const save = (ready: { day: string; seconds: number }[]) => ready.forEach(({ day, seconds }) => addActivity(kind, day, seconds).catch(() => {}));
-    // Up to now the page was visible: count that, then save what's left.
+    // Up to now the page was visible: count that (if this side was the one in use), then save what's left.
     const leave = () => {
-      save(c.tick(Date.now(), !covered() && (inUse() || document.visibilityState === 'hidden')));
+      save(c.tick(Date.now(), inPane()));
       save(c.flush());
     };
     const onVisibility = () => {
@@ -43,10 +43,11 @@ export function useActiveTime(kind: ActivityKind, scope: RefObject<HTMLElement |
     window.addEventListener('pagehide', leave);
     // While the pomodoro counts as study (a focus, or a break if set so), the notebook would count it twice.
     const covered = () => kind === 'study' && studyRunning();
-    const inUse = () => {
+    const inPane = () => {
       const { active } = useSplit.getState();
-      return !covered() && document.visibilityState === 'visible' && (!active || active === PANE[kind]);
+      return !covered() && (!active || active === PANE[kind]);
     };
+    const inUse = () => inPane() && document.visibilityState === 'visible';
     const timer = setInterval(() => save(c.tick(Date.now(), inUse())), TICK_MS);
     return () => {
       for (const ev of INPUTS) el.removeEventListener(ev, onInput, { capture: true });

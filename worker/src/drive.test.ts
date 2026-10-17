@@ -123,7 +123,7 @@ describe('lasting Google Drive access', () => {
   });
 
   it('only sends back to the app', async () => {
-    for (const ret of ['https://evil.example/', 'https://luizhenriquemartinsdias.github.io.evil.example/', 'javascript:alert(1)', '']) {
+    for (const ret of ['https://evil.example/', 'https://luizhenriquemartinsdias.github.io.evil.example/', 'http://192.168.1.19:5173/', 'javascript:alert(1)', '']) {
       expect((await nav(`/auth/start?return=${encodeURIComponent(ret)}`)).status).toBe(400);
     }
     expect(kv.data.size).toBe(0);

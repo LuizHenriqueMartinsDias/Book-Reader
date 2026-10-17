@@ -1,4 +1,4 @@
-import { allowedOrigin } from './validate';
+import { linkOrigin } from './validate';
 
 /**
  * Lasting Google Drive access for the app's automatic backups. The browser alone only gets an
@@ -78,7 +78,7 @@ export async function unseal(secret: string, sealed: string, context: string) {
   return new TextDecoder().decode(plain);
 }
 
-/** Where to send the user back: a page of the app (by its allowed origins), without query or fragment. */
+/** Where to send the user back: a page of the app (see `linkOrigin`), without query or fragment. */
 export function appReturn(raw: string | null): string | null {
   if (!raw) return null;
   let url: URL;
@@ -87,7 +87,7 @@ export function appReturn(raw: string | null): string | null {
   } catch {
     return null;
   }
-  if (url.username || url.password || !allowedOrigin(url.origin)) return null;
+  if (url.username || url.password || !linkOrigin(url.origin)) return null;
   url.search = '';
   url.hash = '';
   return url.toString();

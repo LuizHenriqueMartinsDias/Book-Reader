@@ -23,6 +23,13 @@ export function allowedOrigin(origin: string | null): string | null {
   return ALLOWED_ORIGINS.includes(origin) || LAN_ORIGIN.test(origin) ? origin : null;
 }
 
+/**
+ * Where Google's consent may send the device key back to: the app and this machine's dev server,
+ * not any machine on the network (anyone on the same Wi-Fi could serve one; the tablet reaches
+ * the dev server as localhost through `adb reverse`).
+ */
+export const linkOrigin = (origin: string) => ALLOWED_ORIGINS.includes(origin);
+
 /** Only books (PDF or EPUB) go through, so the proxy can't be used to fetch arbitrary pages. */
 export function bookType(contentType: string | null, url: URL): 'application/pdf' | 'application/epub+zip' | null {
   const type = (contentType ?? '').split(';')[0].trim().toLowerCase();

@@ -43,6 +43,28 @@ describe('backup', () => {
     expect((await db.activity.get('reading|2026-10-10'))?.seconds).toBe(1800);
   });
 
+  it("doesn't take back the routine done since the backup", async () => {
+    await db.habitLogs.bulkAdd([
+      { id: 'h|2026-10-10', habitId: 'h', date: '2026-10-10', value: 1, updatedAt: 10 },
+      { id: 'h|2026-10-11', habitId: 'h', date: '2026-10-11', value: 1, updatedAt: 10 },
+    ]);
+    await db.activity.bulkAdd([
+      { id: 'study|2026-10-10', kind: 'study', date: '2026-10-10', seconds: 600 },
+      { id: 'study|2026-10-11', kind: 'study', date: '2026-10-11', seconds: 600 },
+    ]);
+    const backup = await createBackup();
+    // Since the backup: more done on the 10th; the 11th lost on this device.
+    await db.habitLogs.put({ id: 'h|2026-10-10', habitId: 'h', date: '2026-10-10', value: 3, updatedAt: 20 });
+    await db.habitLogs.delete('h|2026-10-11');
+    await db.activity.put({ id: 'study|2026-10-10', kind: 'study', date: '2026-10-10', seconds: 3600 });
+    await db.activity.put({ id: 'study|2026-10-11', kind: 'study', date: '2026-10-11', seconds: 60 });
+    await restoreBackup(backup);
+    expect((await db.habitLogs.get('h|2026-10-10'))?.value).toBe(3);
+    expect((await db.habitLogs.get('h|2026-10-11'))?.value).toBe(1);
+    expect((await db.activity.get('study|2026-10-10'))?.seconds).toBe(3600);
+    expect((await db.activity.get('study|2026-10-11'))?.seconds).toBe(600);
+  });
+
   it('round-trips page templates with their pictures', async () => {
     await db.pageTemplates.add({ id: 't', name: 'Cornell', blob: new Blob(['png-bytes'], { type: 'image/png' }), width: 595, height: 842, thumb: 'data:', createdAt: 1 });
     const backup = await createBackup();

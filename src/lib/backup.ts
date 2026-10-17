@@ -88,7 +88,11 @@ export async function createBackup(): Promise<Blob> {
   return new Blob([JSON.stringify(backup)], { type: 'application/json' });
 }
 
-/** Merges a backup into the database; records with the same id are overwritten. */
+/**
+ * Merges a backup into the database; records with the same id are overwritten, except the
+ * routine's: a day's log keeps its latest change and its measured time the most, so an older
+ * backup doesn't take back what was done since.
+ */
 export async function restoreBackup(file: Blob) {
   const backup = JSON.parse(await file.text()) as Backup;
   if (backup.app !== 'book-reader') throw new Error('Arquivo de backup inválido');
@@ -109,9 +113,13 @@ export async function restoreBackup(file: Blob) {
     await db.highlights.bulkPut(backup.highlights ?? []);
     await db.notes.bulkPut(backup.notes ?? []);
     await db.habits.bulkPut(backup.habits ?? []);
-    await db.habitLogs.bulkPut(backup.habitLogs ?? []);
+    const logs = backup.habitLogs ?? [];
+    const logsHere = await db.habitLogs.bulkGet(logs.map((l) => l.id));
+    await db.habitLogs.bulkPut(logs.filter((l, i) => !logsHere[i] || logsHere[i]!.updatedAt <= l.updatedAt));
     await db.dayOffs.bulkPut(backup.dayOffs ?? []);
-    await db.activity.bulkPut(backup.activity ?? []);
+    const activity = backup.activity ?? [];
+    const activityHere = await db.activity.bulkGet(activity.map((a) => a.id));
+    await db.activity.bulkPut(activity.filter((a, i) => !activityHere[i] || activityHere[i]!.seconds < a.seconds));
     for (const b of backup.books ?? []) {
       const existing = await db.books.get(b.id);
       if (!existing) continue;
