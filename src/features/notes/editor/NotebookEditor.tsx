@@ -266,9 +266,8 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
     [pages, currentPage],
   );
 
-  const rootRef = useRef<HTMLDivElement>(null);
-  // Study time for the routine: writing, typing, moving around the notebook.
-  useActiveTime('study', rootRef);
+  // Study time for the routine.
+  useActiveTime('study');
 
   const registerZoom = useCallback((fn: (z: ZoomChange) => void) => {
     canvasZoom.current = fn;
@@ -276,7 +275,6 @@ function Editor({ notebook, pages, pdf, onClose }: { notebook: Notebook; pages: 
 
   return (
     <div
-      ref={rootRef}
       className="flex h-full min-h-0 flex-col"
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {

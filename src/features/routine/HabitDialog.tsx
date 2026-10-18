@@ -14,7 +14,7 @@ const KINDS: { id: HabitKind; title: string; hint: string }[] = [
 ];
 const AUTOS: { id: ActivityKind | null; title: string; hint: string }[] = [
   { id: null, title: 'Não, eu registro', hint: 'Você soma o tempo à mão' },
-  { id: 'reading', title: 'Tempo lendo livros', hint: 'Minutos com um livro aberto e em uso' },
+  { id: 'reading', title: 'Tempo lendo livros', hint: 'Minutos com um livro aberto na tela' },
   { id: 'study', title: 'Tempo nos cadernos', hint: 'Minutos nos cadernos e no pomodoro' },
 ];
 const DAYS = [

@@ -86,11 +86,8 @@ function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startC
   const spread = spreadLayout === 'single' ? 'none' : spreadLayout === 'double' ? 'always' : 'auto';
   const fullscreen = useFullscreen();
   const highlights = useLiveQuery(() => db.highlights.where('bookId').equals(book.id).toArray(), [book.id]);
-  const rootRef = useRef<HTMLDivElement>(null);
-  // Reading time for the routine. The text is in a frame of its own that the page's listeners
-  // don't hear, so a page turned (a new location) counts as reading too.
-  const readingNow = useActiveTime('reading', rootRef);
-  useEffect(readingNow, [location, readingNow]);
+  // Reading time for the routine.
+  useActiveTime('reading');
 
   useEffect(() => {
     useReader.setState({ epub });
@@ -402,7 +399,7 @@ function EpubView({ book, epub, startCfi }: { book: Book; epub: EpubBook; startC
   const colors = EPUB_THEMES[theme];
 
   return (
-    <div ref={rootRef} className="flex h-full flex-col">
+    <div className="flex h-full flex-col">
       <FullscreenChrome
         fullscreen={fullscreen.active}
         onExit={fullscreen.toggle}

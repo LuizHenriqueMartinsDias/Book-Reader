@@ -76,10 +76,8 @@ function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentP
   const currentPage = useReader((s) => s.currentPage);
   const scale = useReader((s) => s.scale);
   const fullscreen = useFullscreen();
-  const rootRef = useRef<HTMLDivElement>(null);
-  // Reading time for the routine; turning a page (by key, too) is reading.
-  const readingNow = useActiveTime('reading', rootRef);
-  useEffect(readingNow, [currentPage, readingNow]);
+  // Reading time for the routine.
+  useActiveTime('reading');
 
   useEffect(() => {
     useReader.setState({ doc });
@@ -175,7 +173,7 @@ function Reader({ book, doc, sizes, startPage }: { book: Book; doc: PDFDocumentP
   const View = viewMode === 'scroll' ? ScrollView : PagedView;
 
   return (
-    <div ref={rootRef} className="flex h-full flex-col">
+    <div className="flex h-full flex-col">
       <FullscreenChrome
         fullscreen={fullscreen.active}
         onExit={fullscreen.toggle}
