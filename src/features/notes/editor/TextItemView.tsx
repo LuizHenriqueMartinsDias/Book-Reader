@@ -2,6 +2,8 @@ import { BookOpen, GripHorizontal } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { navigate } from '../../../App';
 import { db, type TextItem } from '../../../db/schema';
+import { useReader } from '../../reader/readerStore';
+import { useSplit } from '../../split/splitStore';
 import { commitItems } from './items';
 import { useNoteEditor } from './editorStore';
 
@@ -16,10 +18,19 @@ interface Props {
 
 const lineHeight = 1.35;
 
-/** Opens the book a quote came from, at the quoted spot. */
+/** Opens the book a quote came from, at the quoted spot. Side by side, the notebook stays open. */
 export function openSource(source: NonNullable<TextItem['source']>) {
-  const at = source.cfi ? `?cfi=${encodeURIComponent(source.cfi)}` : source.page ? `?p=${source.page}` : '';
-  navigate(`#/read/${source.bookId}${at}`);
+  const notebookId = useSplit.getState().notebookId;
+  const reader = useReader.getState();
+  // Its book is the one beside the notebook: just go to the spot.
+  if (notebookId && reader.bookId === source.bookId) {
+    if (source.cfi) reader.goToCfi(source.cfi);
+    else if (source.page) reader.goToPage(source.page);
+    return;
+  }
+  const at = source.cfi ? [`cfi=${encodeURIComponent(source.cfi)}`] : source.page ? [`p=${source.page}`] : [];
+  if (notebookId) at.push(`caderno=${notebookId}`);
+  navigate(`#/read/${source.bookId}${at.length ? `?${at.join('&')}` : ''}`);
 }
 
 /** A typed text box, positioned in page points (its parent is scaled to the zoom). */
