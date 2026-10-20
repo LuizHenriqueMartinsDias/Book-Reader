@@ -85,33 +85,41 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
 
   useZoomGestures(stageRef, onZoom);
 
-  // Zoomed in, fingers pan the page; reaching an edge and swiping on, or tapping the screen's
-  // edges, turns it. The new page opens at its top.
+  // Zoomed in, fingers pan the page; swiping on past its edge, or tapping the screen's edges,
+  // turns it. The new page opens at its top.
   /** Where the page that's coming should open, once the turn (maybe animated) lands. */
   const openAt = useRef<'top' | 'bottom' | null>(null);
   useEffect(() => {
     const el = stageRef.current;
     if (!el || !zoomed) return;
-    let start: { x: number; y: number; t: number; atLeft: boolean; atRight: boolean } | null = null;
+    type Edge = { x: number; y: number; atLeft: boolean; atRight: boolean };
+    /** Where the finger was when the page got scrolled all the way to a side. */
+    let start: { x: number; y: number; t: number; edge: Edge | null } | null = null;
+    const edgeAt = (x: number, y: number): Edge | null => {
+      const max = el.scrollWidth - el.clientWidth;
+      const atLeft = el.scrollLeft <= 2;
+      const atRight = el.scrollLeft >= max - 2;
+      return atLeft || atRight ? { x, y, atLeft, atRight } : null;
+    };
     const onStart = (e: TouchEvent) => {
       if (e.touches.length !== 1) {
         start = null; // pinching
         return;
       }
-      const max = el.scrollWidth - el.clientWidth;
-      start = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp, atLeft: el.scrollLeft <= 2, atRight: el.scrollLeft >= max - 2 };
+      const { clientX: x, clientY: y } = e.touches[0];
+      start = { x, y, t: e.timeStamp, edge: edgeAt(x, y) };
     };
     const onEnd = (e: TouchEvent) => {
       if (!start || e.touches.length) return;
       const t = e.changedTouches[0];
       const r = el.getBoundingClientRect();
+      const { edge } = start;
       const dir = zoomedTurn({
         dx: t.clientX - start.x,
         dy: t.clientY - start.y,
         ms: e.timeStamp - start.t,
         startFraction: (start.x - r.left) / r.width,
-        atLeft: start.atLeft,
-        atRight: start.atRight,
+        edge: edge && { dx: t.clientX - edge.x, dy: t.clientY - edge.y, atLeft: edge.atLeft, atRight: edge.atRight },
       });
       start = null;
       const { tool, penDetected } = useUi.getState();
@@ -120,13 +128,17 @@ export default function PagedView({ doc, sizes, zoom, onZoom }: ViewProps) {
       openAt.current = 'top';
       bookRef.current?.turn(dir);
     };
-    // A sideways swipe with the page already at that edge is ours (it turns the page): keep the
-    // browser from treating it as overscroll, which on Chrome means "go back".
+    // Panning that gets the page to a side marks where the finger was then: what it moves on
+    // from there is the swipe that turns. A sideways swipe with the page already at that edge is
+    // ours: keep the browser from treating it as overscroll, which on Chrome means "go back".
     const onMove = (e: TouchEvent) => {
       if (!start || e.touches.length !== 1) return;
-      const dx = e.touches[0].clientX - start.x;
-      const dy = e.touches[0].clientY - start.y;
-      if (Math.abs(dx) > Math.abs(dy) && ((dx > 0 && start.atLeft) || (dx < 0 && start.atRight))) e.preventDefault();
+      const { clientX: x, clientY: y } = e.touches[0];
+      const now = edgeAt(x, y);
+      if (now && (now.atLeft !== start.edge?.atLeft || now.atRight !== start.edge?.atRight)) start.edge = now;
+      const { edge } = start;
+      const dx = x - start.x;
+      if (e.cancelable && edge && Math.abs(dx) > Math.abs(y - start.y) && ((dx > 0 && edge.atLeft) || (dx < 0 && edge.atRight))) e.preventDefault();
     };
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('touchmove', onMove, { passive: false });
